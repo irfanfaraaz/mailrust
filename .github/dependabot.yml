@@ -1,0 +1,19 @@
+# Monthly, one grouped PR per ecosystem, to keep the noise low.
+# Security updates still come as soon as GitHub finds a problem.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule: { interval: monthly }
+    groups:
+      cargo: { patterns: ["*"] }
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: monthly }
+    groups:
+      actions: { patterns: ["*"] }
+  - package-ecosystem: docker
+    directory: /deploy
+    schedule: { interval: monthly }
+    groups:
+      docker: { patterns: ["*"] }
