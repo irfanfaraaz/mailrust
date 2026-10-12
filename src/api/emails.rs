@@ -19,7 +19,7 @@ use super::{AppState, auth::Auth};
 use crate::{
     domains::{self, DomainStatus},
     emails::{
-        self, EmailStatus, EmailSummary, EmailView, MAX_BATCH, SendEmailRequest, SendResponse,
+        self, EmailStatus, Priority, EmailSummary, EmailView, MAX_BATCH, SendEmailRequest, SendResponse,
         ValidEmail,
     },
     error::ApiError,
@@ -121,7 +121,7 @@ pub(crate) async fn send(
     let mut tx = state.pool.begin().await?;
     if let Some(key) = &key {
         let prior = sqlx::query!(
-            "SELECT id, request_hash, created_at FROM emails WHERE account_id = $1 AND idempotency_key = $2",
+            r#"SELECT id, request_hash, created_at, priority AS "priority: Priority" FROM emails WHERE account_id = $1 AND idempotency_key = $2"#,
             auth.account_id(),
             key
         )
@@ -130,7 +130,7 @@ pub(crate) async fn send(
         if let Some(p) = prior {
             if p.created_at > now - Duration::hours(IDEMPOTENCY_HOURS) {
                 return if p.request_hash.as_deref() == Some(hash.as_slice()) {
-                    Ok(Json(SendResponse { id: p.id }))
+                    Ok(Json(SendResponse { id: p.id, priority: p.priority }))
                 } else {
                     Err(ApiError::Conflict(
                         "idempotency_conflict",
@@ -148,8 +148,8 @@ pub(crate) async fn send(
         }
     }
     let idem = key.as_deref().map(|k| (k, hash.as_slice()));
-    let id = match emails::insert(&mut tx, auth.account_id(), domain_id, &email, idem).await {
-        Ok(id) => id,
+    let (id, priority) = match emails::insert(&mut tx, auth.account_id(), domain_id, &email, idem).await {
+        Ok(done) => done,
         Err(e) if is_idempotency_race(&e) => {
             return Err(ApiError::Conflict(
                 "idempotency_conflict",
@@ -159,7 +159,7 @@ pub(crate) async fn send(
         Err(e) => return Err(e.into()),
     };
     tx.commit().await?;
-    Ok(Json(SendResponse { id }))
+    Ok(Json(SendResponse { id, priority }))
 }
 
 pub(crate) async fn batch(
@@ -203,9 +203,9 @@ pub(crate) async fn batch(
     let mut tx = state.pool.begin().await?;
     let mut data = Vec::with_capacity(valid.len());
     for (e, domain_id) in &valid {
-        data.push(SendResponse {
-            id: emails::insert(&mut tx, auth.account_id(), *domain_id, e, None).await?,
-        });
+        let (id, priority) =
+            emails::insert(&mut tx, auth.account_id(), *domain_id, e, None).await?;
+        data.push(SendResponse { id, priority });
     }
     tx.commit().await?;
     Ok(Json(BatchResponse { data }))
@@ -245,16 +245,16 @@ pub(crate) async fn cancel(
     Path(id): Path<Uuid>,
 ) -> Result<Json<SendResponse>, ApiError> {
     auth.require_full()?;
-    let done = sqlx::query_scalar!(
-        "UPDATE emails SET status = 'canceled', updated_at = now()
-         WHERE id = $1 AND account_id = $2 AND status = 'queued' RETURNING id",
+    let done = sqlx::query!(
+        r#"UPDATE emails SET status = 'canceled', updated_at = now()
+         WHERE id = $1 AND account_id = $2 AND status = 'queued' RETURNING id, priority AS "priority: Priority""#,
         id,
         auth.account_id()
     )
     .fetch_optional(&state.pool)
     .await?;
     match done {
-        Some(id) => Ok(Json(SendResponse { id })),
+        Some(r) => Ok(Json(SendResponse { id: r.id, priority: r.priority })),
         None => match emails::view(&state.pool, auth.account_id(), id).await? {
             None => Err(ApiError::NotFound),
             Some(_) => Err(ApiError::Conflict(

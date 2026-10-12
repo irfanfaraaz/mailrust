@@ -408,7 +408,7 @@ async fn an_app_clock_ahead_of_the_database_does_not_delay_a_send(pool: sqlx::Pg
     let ahead = chrono::Utc::now() + chrono::Duration::seconds(5);
     let valid = mailrust::emails::validate(req, ahead).unwrap();
     let mut conn = t.state.pool.acquire().await.unwrap();
-    let id = mailrust::emails::insert(&mut conn, d.account_id, d.id, &valid, None)
+    let (id, _) = mailrust::emails::insert(&mut conn, d.account_id, d.id, &valid, None)
         .await
         .unwrap();
     drop(conn);

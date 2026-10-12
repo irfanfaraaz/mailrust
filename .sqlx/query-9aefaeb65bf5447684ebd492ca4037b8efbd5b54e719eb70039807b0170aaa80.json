@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, from_address, to_addresses, cc_addresses, bcc_addresses, reply_to, subject, html, text_body,\n                  status AS \"status: EmailStatus\", send_at, created_at, sent_at, last_error,\n                  tags AS \"tags: Json<BTreeMap<String, String>>\"\n           FROM emails WHERE id = $1 AND account_id = $2",
+  "query": "SELECT id, from_address, to_addresses, cc_addresses, bcc_addresses, reply_to, subject, html, text_body,\n                  status AS \"status: EmailStatus\", priority AS \"priority: Priority\", send_at, created_at, sent_at, last_error,\n                  tags AS \"tags: Json<BTreeMap<String, String>>\"\n           FROM emails WHERE id = $1 AND account_id = $2",
   "describe": {
     "columns": [
       {
@@ -74,26 +74,42 @@
       },
       {
         "ordinal": 10,
+        "name": "priority: Priority",
+        "type_info": {
+          "Custom": {
+            "name": "email_priority",
+            "kind": {
+              "Enum": [
+                "urgent",
+                "normal",
+                "bulk"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 11,
         "name": "send_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 11,
+        "ordinal": 12,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 12,
+        "ordinal": 13,
         "name": "sent_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 13,
+        "ordinal": 14,
         "name": "last_error",
         "type_info": "Text"
       },
       {
-        "ordinal": 14,
+        "ordinal": 15,
         "name": "tags: Json<BTreeMap<String, String>>",
         "type_info": "Jsonb"
       }
@@ -117,10 +133,11 @@
       false,
       false,
       false,
+      false,
       true,
       true,
       false
     ]
   },
-  "hash": "4b217386d0db91ce87ebf9dc92bc8af58c82db0e1feb960342cfb8fc9ac0e944"
+  "hash": "9aefaeb65bf5447684ebd492ca4037b8efbd5b54e719eb70039807b0170aaa80"
 }

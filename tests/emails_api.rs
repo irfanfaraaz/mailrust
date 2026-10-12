@@ -280,3 +280,44 @@ async fn list_paginates_newest_first(pool: sqlx::PgPool) {
     assert_eq!(p2["data"].as_array().unwrap().len(), 1);
     assert!(p2["next_cursor"].is_null());
 }
+
+#[sqlx::test]
+async fn priority_defaults_to_normal_and_shows_everywhere(pool: sqlx::PgPool) {
+    let t = common::app(pool).await;
+    common::verified_domain(&t, "shop.com").await;
+    let (s, b) = common::call(&t.router, common::req("POST", "/emails", Some(&t.key), Some(email("a@x.com")))).await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    assert_eq!(b["priority"], "normal");
+    let id = b["id"].as_str().unwrap();
+    let (_, v) = common::call(&t.router, common::req("GET", &format!("/emails/{id}"), Some(&t.key), None)).await;
+    assert_eq!(v["priority"], "normal");
+    let (_, l) = common::call(&t.router, common::req("GET", "/emails", Some(&t.key), None)).await;
+    assert_eq!(l["data"][0]["priority"], "normal");
+    let (_, c) = common::call(&t.router, common::req("POST", &format!("/emails/{id}/cancel"), Some(&t.key), None)).await;
+    assert_eq!(c["priority"], "normal");
+}
+
+#[sqlx::test]
+async fn priority_is_saved_per_batch_item(pool: sqlx::PgPool) {
+    let t = common::app(pool).await;
+    common::verified_domain(&t, "shop.com").await;
+    let mut urgent = email("a@x.com");
+    urgent["priority"] = json!("urgent");
+    let mut bulk = email("b@x.com");
+    bulk["priority"] = json!("bulk");
+    let (s, b) = common::call(&t.router, common::req("POST", "/emails/batch", Some(&t.key), Some(json!([urgent, bulk, email("c@x.com")])))).await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    let got: Vec<&str> = b["data"].as_array().unwrap().iter().map(|e| e["priority"].as_str().unwrap()).collect();
+    assert_eq!(got, ["urgent", "bulk", "normal"]);
+}
+
+#[sqlx::test]
+async fn unknown_priority_is_a_validation_error(pool: sqlx::PgPool) {
+    let t = common::app(pool).await;
+    common::verified_domain(&t, "shop.com").await;
+    let mut e = email("a@x.com");
+    e["priority"] = json!("asap");
+    let (s, b) = common::call(&t.router, common::req("POST", "/emails", Some(&t.key), Some(e))).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    assert_eq!(b["error"]["code"], "validation_error");
+}
