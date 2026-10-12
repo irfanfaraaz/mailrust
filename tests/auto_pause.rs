@@ -109,3 +109,31 @@ async fn simulated_bounces_trip_the_pause_through_the_worker(pool: sqlx::PgPool)
         AccountStatus::Paused
     );
 }
+
+#[sqlx::test]
+async fn ses_bounce_events_trip_the_pause(pool: sqlx::PgPool) {
+    let t = common::app(pool).await;
+    common::verified_domain(&t, "shop.com").await;
+    let id = common::send_email(
+        &t,
+        json!({ "from": "hi@shop.com", "to": "a@x.com", "subject": "Hi", "text": "x" }),
+    )
+    .await;
+    seed(&t.state.pool, t.account.id, id, 100, 2).await;
+    let ev: events::SesEvent = serde_json::from_value(json!({
+        "eventType": "Bounce",
+        "mail": { "messageId": "ses-1", "tags": { "mailrust_email_id": [id.to_string()] } },
+        "bounce": { "bounceType": "Permanent", "bouncedRecipients": [{ "emailAddress": "u9@x.com" }] }
+    }))
+    .unwrap();
+    events::ingest(&t.state.pool, &ev, None).await.unwrap();
+    let acc = accounts::get(&t.state.pool, t.account.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        acc.status,
+        AccountStatus::Paused,
+        "3 of 100 bounced must pause the account"
+    );
+}

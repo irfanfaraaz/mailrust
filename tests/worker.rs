@@ -239,3 +239,18 @@ async fn a_lost_lease_is_not_renewed(pool: sqlx::PgPool) {
     // Still 'queued' (the reaper took it back), so the worker must not send it.
     assert!(!queue::renew_lease(&t.state.pool, id).await.unwrap());
 }
+
+#[sqlx::test]
+async fn attachments_reach_the_sent_message(pool: sqlx::PgPool) {
+    let t = common::app(pool).await;
+    common::verified_domain(&t, "shop.com").await;
+    let mut body = email(json!("a@x.com"));
+    body["attachments"] = json!([{ "filename": "invoice-42.txt", "content": "aGVsbG8=", "content_type": "text/plain" }]);
+    let id = common::send_email(&t, body).await;
+    worker::tick(&t.state, &limiter()).await.unwrap();
+    let eml = std::fs::read_to_string(t.outbox.join(format!("{id}.eml"))).unwrap();
+    assert!(
+        eml.contains("invoice-42.txt"),
+        "attachment missing from the sent message"
+    );
+}

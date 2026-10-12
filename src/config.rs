@@ -151,6 +151,21 @@ mod tests {
     }
 
     #[test]
+    fn a_set_rate_is_used_and_private_webhooks_need_true() {
+        let c = Config::from_map(&base()).unwrap();
+        assert!(
+            !c.allow_private_webhooks,
+            "private webhooks must be off by default"
+        );
+        let mut env = base();
+        env.insert("SES_MAX_SEND_RATE".into(), "20".into());
+        env.insert("MAILRUST_ALLOW_HTTP_WEBHOOKS".into(), "true".into());
+        let c = Config::from_map(&env).unwrap();
+        assert_eq!(c.ses_max_send_rate, 20);
+        assert!(c.allow_private_webhooks);
+    }
+
+    #[test]
     fn ses_sender_requires_region() {
         let mut env = base();
         env.insert("MAILRUST_SENDER".into(), "ses".into());

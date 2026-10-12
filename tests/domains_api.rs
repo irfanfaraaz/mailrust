@@ -152,3 +152,71 @@ async fn sending_keys_and_other_accounts_are_kept_out(pool: sqlx::PgPool) {
     .await;
     assert_eq!(s, StatusCode::NOT_FOUND);
 }
+
+struct PendingSender;
+
+#[async_trait::async_trait]
+impl mailrust::sender::Sender for PendingSender {
+    async fn provision_account(
+        &self,
+        _: &mailrust::sender::TenantRef,
+    ) -> Result<(), mailrust::sender::SenderError> {
+        Ok(())
+    }
+    async fn create_domain(
+        &self,
+        _: &mailrust::sender::TenantRef,
+        _: &str,
+    ) -> Result<Vec<mailrust::sender::DnsRecord>, mailrust::sender::SenderError> {
+        Ok(vec![])
+    }
+    async fn domain_state(
+        &self,
+        _: &mailrust::sender::TenantRef,
+        _: &str,
+    ) -> Result<mailrust::sender::DomainState, mailrust::sender::SenderError> {
+        Ok(mailrust::sender::DomainState::Pending)
+    }
+    async fn send(
+        &self,
+        _: &mailrust::sender::OutgoingEmail,
+    ) -> Result<String, mailrust::sender::SenderError> {
+        unreachable!()
+    }
+}
+
+#[sqlx::test]
+async fn a_domain_that_never_verifies_fails_after_its_window(pool: sqlx::PgPool) {
+    use mailrust::domains::{self, AddDomain, DomainStatus};
+    let t = common::app_with_sender(pool, std::sync::Arc::new(PendingSender)).await;
+    let add = |name: &str| AddDomain {
+        name: name.into(),
+        tracking_subdomain: None,
+        open_tracking: false,
+        click_tracking: false,
+    };
+    let fresh = domains::add(&t.state, &t.account, add("fresh.com"))
+        .await
+        .unwrap();
+    assert_eq!(
+        domains::check(&t.state, &fresh).await.unwrap().status,
+        DomainStatus::Pending
+    );
+
+    let old = domains::add(&t.state, &t.account, add("old.com"))
+        .await
+        .unwrap();
+    sqlx::query("UPDATE domains SET verify_until = now() - interval '1 minute' WHERE id = $1")
+        .bind(old.id)
+        .execute(&t.state.pool)
+        .await
+        .unwrap();
+    let old = domains::get_by_id(&t.state.pool, old.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        domains::check(&t.state, &old).await.unwrap().status,
+        DomainStatus::Failed
+    );
+}

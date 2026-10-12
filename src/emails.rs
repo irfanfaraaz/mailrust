@@ -515,6 +515,81 @@ mod tests {
     }
 
     #[test]
+    fn limits_are_inclusive() {
+        let now = Utc::now();
+        let mut v = base();
+        v["to"] = json!((0..50).map(|i| format!("u{i}@x.com")).collect::<Vec<_>>());
+        v["subject"] = json!("s".repeat(998));
+        v["headers"] = json!(
+            (0..50)
+                .map(|i| (format!("X-H{i}"), "v".to_string()))
+                .collect::<BTreeMap<_, _>>()
+        );
+        v["tags"] = json!(
+            (0..20)
+                .map(|i| (format!("t_{i}"), "a-b".to_string()))
+                .collect::<BTreeMap<_, _>>()
+        );
+        validate(req(v), now).expect("exactly at every limit is allowed");
+    }
+
+    #[test]
+    fn rejects_bad_headers_and_tags() {
+        let now = Utc::now();
+        let with = |k: &str, val: serde_json::Value| {
+            let mut v = base();
+            v[k] = val;
+            v
+        };
+        let cases = [
+            with(
+                "headers",
+                json!(
+                    (0..51)
+                        .map(|i| (format!("X-H{i}"), "v".to_string()))
+                        .collect::<BTreeMap<_, _>>()
+                ),
+            ),
+            with("headers", json!({ "X Bad": "v" })),
+            with("headers", json!({ "X-Ok": "caf\u{e9}" })),
+            with(
+                "tags",
+                json!(
+                    (0..21)
+                        .map(|i| (format!("t{i}"), "v".to_string()))
+                        .collect::<BTreeMap<_, _>>()
+                ),
+            ),
+            with("tags", json!({ "a.b": "v" })),
+            with("tags", json!({ "ok": "" })),
+            with("tags", json!({ "ok": "has space" })),
+        ];
+        for c in cases {
+            assert!(
+                matches!(validate(req(c.clone()), now), Err(ApiError::Validation(_))),
+                "should reject {c}"
+            );
+        }
+    }
+
+    #[test]
+    fn attachments_over_40_mb_in_total_are_too_large() {
+        assert_eq!(MAX_TOTAL_BYTES, 40 * 1024 * 1024);
+        // The JSON body carries base64 (4/3 bigger), so the body limit must fit 40 MB of attachments.
+        const { assert!(crate::api::MAX_BODY_BYTES > MAX_TOTAL_BYTES / 3 * 4 + 1024 * 1024) };
+        let half = STANDARD.encode(vec![0u8; MAX_TOTAL_BYTES / 2 + 1]);
+        let mut v = base();
+        v["attachments"] = json!([
+            { "filename": "a.bin", "content": half },
+            { "filename": "b.bin", "content": half }
+        ]);
+        assert!(matches!(
+            validate(req(v), Utc::now()),
+            Err(ApiError::TooLarge)
+        ));
+    }
+
+    #[test]
     fn past_schedule_becomes_now_and_scheduled_status_shows() {
         let now = Utc::now();
         let mut v = base();
