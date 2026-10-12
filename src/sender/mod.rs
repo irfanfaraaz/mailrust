@@ -48,6 +48,9 @@ pub enum SenderError {
     Retryable(String),
     #[error("permanent sender error: {0}")]
     Permanent(String),
+    /// Timed out or the answer was lost: SES may or may not have the email.
+    #[error("sender outcome unknown: {0}")]
+    Unknown(String),
     #[error("the sender paused this tenant")]
     TenantPaused,
     #[error("sender is not configured: {0}")]

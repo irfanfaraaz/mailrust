@@ -220,3 +220,32 @@ async fn a_domain_that_never_verifies_fails_after_its_window(pool: sqlx::PgPool)
         DomainStatus::Failed
     );
 }
+
+#[sqlx::test]
+async fn a_domain_belongs_to_one_account_only(pool: sqlx::PgPool) {
+    let t = common::app(pool).await;
+    common::verified_domain(&t, "shop.com").await;
+    let other = accounts::create(&t.state.pool, "Other").await.unwrap();
+    let other_key = keys::create(&t.state.pool, other.id, "o", KeyAccess::Full)
+        .await
+        .unwrap()
+        .token;
+
+    let (s, d) = common::call(
+        &t.router,
+        common::req(
+            "POST",
+            "/domains",
+            Some(&other_key),
+            Some(json!({ "name": "Shop.com" })),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{d}");
+    let (_, l) = common::call(
+        &t.router,
+        common::req("GET", "/domains", Some(&other_key), None),
+    )
+    .await;
+    assert_eq!(l["data"].as_array().unwrap().len(), 0);
+}

@@ -158,10 +158,14 @@ pub async fn add(
             Some(t)
         }
     };
-    if find_by_name(&state.pool, account.id, &name)
-        .await?
-        .is_some()
-    {
+    // Checked across all accounts, before the sender links the identity to this account's tenant.
+    let taken = sqlx::query_scalar!(
+        r#"SELECT EXISTS (SELECT 1 FROM domains WHERE name = $1) AS "taken!""#,
+        name
+    )
+    .fetch_one(&state.pool)
+    .await?;
+    if taken {
         return Err(AddDomainError::Exists);
     }
 

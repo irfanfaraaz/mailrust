@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE emails SET lease_until = now() + make_interval(secs => $2), updated_at = now()\n         WHERE id = $1 AND status = 'sending' AND attempts = $3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Float8",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "99603cd514ae785567a4ad542139c8a62381feaa6283df2debb293a7ed7942d7"
+}

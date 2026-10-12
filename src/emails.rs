@@ -9,10 +9,16 @@ use uuid::Uuid;
 
 use crate::{error::ApiError, render::AttachmentData};
 
+/// SES: at most 50 recipients per message, To + CC + BCC together.
+pub const MAX_RECIPIENTS: usize = 50;
 pub const MAX_RECIPIENTS_PER_FIELD: usize = 50;
+/// SES: 40 MB per message, measured after base64 encoding.
 pub const MAX_TOTAL_BYTES: usize = 40 * 1024 * 1024;
+/// Room for the MIME headers and part boundaries around the content.
+const MIME_OVERHEAD_BYTES: usize = 64 * 1024;
 pub const MAX_SCHEDULE_DAYS: i64 = 30;
 pub const MAX_BATCH: usize = 100;
+pub const MAX_ATTACHMENTS: usize = 100;
 const RESERVED_HEADERS: [&str; 13] = [
     "from",
     "to",
@@ -170,6 +176,12 @@ fn check_list(field: &str, list: &[String], min: usize) -> Result<(), ApiError> 
     Ok(())
 }
 
+/// Size of `n` bytes as MIME base64: 4 chars per 3 bytes, plus CRLF after every 76 chars.
+fn base64_wire_len(n: usize) -> usize {
+    let chars = n.div_ceil(3) * 4;
+    chars + chars.div_ceil(76) * 2
+}
+
 fn is_tag_part(s: &str) -> bool {
     (1..=256).contains(&s.len())
         && s.chars()
@@ -186,6 +198,11 @@ pub fn validate(req: SendEmailRequest, now: DateTime<Utc>) -> Result<ValidEmail,
     check_list("cc", &req.cc, 0)?;
     check_list("bcc", &req.bcc, 0)?;
     check_list("reply_to", &req.reply_to, 0)?;
+    if req.to.len() + req.cc.len() + req.bcc.len() > MAX_RECIPIENTS {
+        return Err(bad(format!(
+            "to, cc and bcc together can have at most {MAX_RECIPIENTS} addresses"
+        )));
+    }
 
     if req.subject.trim().is_empty()
         || req.subject.chars().count() > 998
@@ -206,7 +223,12 @@ pub fn validate(req: SendEmailRequest, now: DateTime<Utc>) -> Result<ValidEmail,
         if !name_ok {
             return Err(bad(format!("header name {k} is not allowed")));
         }
-        if RESERVED_HEADERS.contains(&k.to_ascii_lowercase().as_str()) {
+        let lower = k.to_ascii_lowercase();
+        // SES obeys X-SES-* headers in raw mail (tags, configuration set), so customers must not set them.
+        if lower.starts_with("x-ses-") {
+            return Err(bad(format!("header {k} is reserved for the sender")));
+        }
+        if RESERVED_HEADERS.contains(&lower.as_str()) {
             return Err(bad(format!(
                 "header {k} is set by Mailrust; use the matching field instead"
             )));
@@ -229,13 +251,22 @@ pub fn validate(req: SendEmailRequest, now: DateTime<Utc>) -> Result<ValidEmail,
         }
     }
 
-    let mut total =
-        req.html.as_ref().map_or(0, String::len) + req.text.as_ref().map_or(0, String::len);
+    if req.attachments.len() > MAX_ATTACHMENTS {
+        return Err(bad(format!("at most {MAX_ATTACHMENTS} attachments")));
+    }
+    // Worst case every part goes out as base64, as SES measures it.
+    let mut total = MIME_OVERHEAD_BYTES
+        + base64_wire_len(req.html.as_ref().map_or(0, String::len))
+        + base64_wire_len(req.text.as_ref().map_or(0, String::len));
     let mut attachments = Vec::with_capacity(req.attachments.len());
     for a in req.attachments {
-        if a.filename.is_empty() || a.filename.len() > 255 || a.filename.contains(['/', '\\']) {
+        if a.filename.is_empty()
+            || a.filename.len() > 255
+            || a.filename.contains(['/', '\\'])
+            || a.filename.chars().any(char::is_control)
+        {
             return Err(bad(
-                "attachment filename must be 1-255 characters without slashes",
+                "attachment filename must be 1-255 characters without slashes or control characters",
             ));
         }
         let content = STANDARD
@@ -246,7 +277,7 @@ pub fn validate(req: SendEmailRequest, now: DateTime<Utc>) -> Result<ValidEmail,
             .unwrap_or_else(|| "application/octet-stream".into());
         ContentType::parse(&content_type)
             .map_err(|_| bad(format!("attachment {}: bad content_type", a.filename)))?;
-        total += content.len();
+        total += base64_wire_len(content.len());
         attachments.push(AttachmentData {
             filename: a.filename,
             content_type,
@@ -585,6 +616,75 @@ mod tests {
         ]);
         assert!(matches!(
             validate(req(v), Utc::now()),
+            Err(ApiError::TooLarge)
+        ));
+    }
+
+    #[test]
+    fn at_most_50_recipients_across_to_cc_and_bcc() {
+        let now = Utc::now();
+        let list = |n: usize, p: &str| (0..n).map(|i| format!("{p}{i}@x.com")).collect::<Vec<_>>();
+        let mut v = base();
+        v["to"] = json!(list(20, "t"));
+        v["cc"] = json!(list(20, "c"));
+        v["bcc"] = json!(list(10, "b"));
+        validate(req(v.clone()), now).expect("50 in total is allowed");
+        v["bcc"] = json!(list(11, "b"));
+        assert!(matches!(
+            validate(req(v), now),
+            Err(ApiError::Validation(_))
+        ));
+    }
+
+    #[test]
+    fn ses_control_headers_are_rejected() {
+        for name in [
+            "X-SES-MESSAGE-TAGS",
+            "x-ses-configuration-set",
+            "X-Ses-Source-Arn",
+        ] {
+            let mut v = base();
+            v["headers"] = json!({ name: "mailrust_email_id=someone-else" });
+            assert!(
+                matches!(validate(req(v), Utc::now()), Err(ApiError::Validation(_))),
+                "should reject {name}"
+            );
+        }
+    }
+
+    #[test]
+    fn attachment_count_and_filenames_are_limited() {
+        let now = Utc::now();
+        let one = json!({ "filename": "a.txt", "content": "" });
+        let mut v = base();
+        v["attachments"] = json!(vec![one.clone(); MAX_ATTACHMENTS]);
+        validate(req(v.clone()), now).expect("exactly the limit is allowed");
+        v["attachments"] = json!(vec![one; MAX_ATTACHMENTS + 1]);
+        assert!(matches!(
+            validate(req(v), now),
+            Err(ApiError::Validation(_))
+        ));
+        for bad_name in ["a\r\nX-Evil: 1.txt", "tab\there.txt", "nul\u{0}.txt"] {
+            let mut v = base();
+            v["attachments"] = json!([{ "filename": bad_name, "content": "" }]);
+            assert!(
+                matches!(validate(req(v), now), Err(ApiError::Validation(_))),
+                "should reject {bad_name:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn size_is_measured_after_base64_like_ses_does() {
+        let now = Utc::now();
+        let file = |mb: usize| {
+            let mut v = base();
+            v["attachments"] = json!([{ "filename": "f.bin", "content": STANDARD.encode(vec![0u8; mb * 1024 * 1024]) }]);
+            v
+        };
+        validate(req(file(28)), now).expect("28 MB of files is about 38 MB on the wire");
+        assert!(matches!(
+            validate(req(file(30)), now),
             Err(ApiError::TooLarge)
         ));
     }

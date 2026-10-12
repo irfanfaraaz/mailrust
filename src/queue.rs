@@ -79,12 +79,14 @@ pub async fn save_links(pool: &PgPool, id: Uuid, links: &[String]) -> sqlx::Resu
 }
 
 /// Called right before the send. False if the reaper already took this email back (lease ran out while we waited).
-pub async fn renew_lease(pool: &PgPool, id: Uuid) -> sqlx::Result<bool> {
+/// `attempts` is the claim's ticket: a re-claim bumps it, so an old claim can never renew a newer one.
+pub async fn renew_lease(pool: &PgPool, email: &ClaimedEmail) -> sqlx::Result<bool> {
     Ok(sqlx::query!(
         "UPDATE emails SET lease_until = now() + make_interval(secs => $2), updated_at = now()
-         WHERE id = $1 AND status = 'sending'",
-        id,
-        LEASE_SECS as f64
+         WHERE id = $1 AND status = 'sending' AND attempts = $3",
+        email.id,
+        LEASE_SECS as f64,
+        email.attempts
     )
     .execute(pool)
     .await?
@@ -100,29 +102,53 @@ pub async fn mark_sent(
 ) -> sqlx::Result<()> {
     let mut tx = pool.begin().await?;
     // An SES event may have arrived first (e.g. delivered). Keep that status, but always save the provider id.
+    // 'queued': SES answered after the reaper had already put it back in line; SES has it, so it must not go again.
     sqlx::query!(
         "UPDATE emails SET provider_message_id = $2, sent_at = COALESCE(sent_at, now()), lease_until = NULL,
                 unknown_since = NULL, last_error = NULL, updated_at = now(),
-                status = CASE WHEN status IN ('sending', 'unknown') THEN 'sent'::email_status ELSE status END
+                status = CASE WHEN status IN ('sending', 'unknown', 'queued') THEN 'sent'::email_status ELSE status END
          WHERE id = $1",
         email.id,
         provider_id
     )
     .execute(&mut *tx)
     .await?;
-    email_events::record(
-        &mut tx,
-        NewEvent {
-            account_id: email.account_id,
-            email_id: email.id,
-            kind: EventKind::Sent,
-            recipient: None,
-            data: json!({ "recipients": recipients, "provider_message_id": provider_id }),
-            likely_bot: false,
-        },
+    // The SES "Send" event may have recorded it already. The UPDATE above holds the row lock, so this check is safe.
+    let recorded = sqlx::query_scalar!(
+        r#"SELECT EXISTS (SELECT 1 FROM email_events WHERE email_id = $1 AND type = 'sent') AS "recorded!""#,
+        email.id
     )
+    .fetch_one(&mut *tx)
     .await?;
+    if !recorded {
+        email_events::record(
+            &mut tx,
+            NewEvent {
+                account_id: email.account_id,
+                email_id: email.id,
+                kind: EventKind::Sent,
+                recipient: None,
+                data: json!({ "recipients": recipients, "provider_message_id": provider_id }),
+                likely_bot: false,
+            },
+        )
+        .await?;
+    }
     tx.commit().await
+}
+
+/// SES may or may not have it (timeout, lost answer). Same path as a crashed worker: wait out the grace period
+/// for the SES "Send" event, then send again only if none came.
+pub async fn mark_unknown(pool: &PgPool, id: Uuid, error: &str) -> sqlx::Result<()> {
+    sqlx::query!(
+        "UPDATE emails SET status = 'unknown', unknown_since = now(), lease_until = NULL, last_error = $2, updated_at = now()
+         WHERE id = $1 AND status = 'sending'",
+        id,
+        error
+    )
+    .execute(pool)
+    .await?;
+    Ok(())
 }
 
 pub async fn mark_retry(pool: &PgPool, id: Uuid, error: &str, delay: Duration) -> sqlx::Result<()> {
@@ -143,7 +169,7 @@ pub async fn mark_failed(pool: &PgPool, email: &ClaimedEmail, error: &str) -> sq
     let mut tx = pool.begin().await?;
     sqlx::query!(
         "UPDATE emails SET status = 'failed', last_error = $2, lease_until = NULL, updated_at = now()
-         WHERE id = $1 AND status IN ('sending', 'queued')",
+         WHERE id = $1 AND status IN ('sending', 'unknown', 'queued')",
         email.id,
         error
     )
@@ -171,7 +197,7 @@ pub async fn mark_suppressed(
 ) -> sqlx::Result<()> {
     let mut tx = pool.begin().await?;
     sqlx::query!(
-        "UPDATE emails SET status = 'suppressed', lease_until = NULL, updated_at = now() WHERE id = $1 AND status = 'sending'",
+        "UPDATE emails SET status = 'suppressed', lease_until = NULL, updated_at = now() WHERE id = $1 AND status IN ('sending', 'unknown')",
         email.id
     )
     .execute(&mut *tx)

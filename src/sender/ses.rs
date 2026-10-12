@@ -18,6 +18,9 @@ use aws_sdk_sesv2::{
 use super::{DnsRecord, DomainState, EMAIL_ID_TAG, OutgoingEmail, Sender, SenderError, TenantRef};
 use crate::config::SesConfig;
 
+pub const SEND_TIMEOUT_SECS: u64 = 60;
+const _: () = assert!(SEND_TIMEOUT_SECS < crate::queue::LEASE_SECS as u64);
+
 pub struct SesSender {
     client: Client,
     region: String,
@@ -33,6 +36,13 @@ impl SesSender {
     pub async fn new(cfg: &SesConfig) -> anyhow::Result<Self> {
         let shared = aws_config::defaults(aws_config::BehaviorVersion::latest())
             .region(aws_config::Region::new(cfg.region.clone()))
+            // Well under the 5-minute queue lease (renewed right before each send), so a hung call can never
+            // outlive the lease and let a second worker send the same email.
+            .timeout_config(
+                aws_config::timeout::TimeoutConfig::builder()
+                    .operation_timeout(std::time::Duration::from_secs(SEND_TIMEOUT_SECS))
+                    .build(),
+            )
             .load()
             .await;
         let identity = aws_sdk_sts::Client::new(&shared)
@@ -267,9 +277,16 @@ impl Sender for SesSender {
         }
         match req.send().await {
             Ok(out) => Ok(out.message_id().unwrap_or_default().to_string()),
-            Err(e) => Err(match e.as_service_error() {
-                Some(se) => map_send_error(se),
-                None => SenderError::Retryable(ctx(&e)),
+            Err(e) => Err(match &e {
+                // The request may have reached SES; sending again could send twice.
+                SdkError::TimeoutError(_) | SdkError::ResponseError(_) => {
+                    SenderError::Unknown(ctx(&e))
+                }
+                SdkError::DispatchFailure(d) if d.is_timeout() => SenderError::Unknown(ctx(&e)),
+                _ => match e.as_service_error() {
+                    Some(se) => map_send_error(se),
+                    None => SenderError::Retryable(ctx(&e)),
+                },
             }),
         }
     }

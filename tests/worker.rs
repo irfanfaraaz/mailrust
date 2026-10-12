@@ -237,7 +237,9 @@ async fn a_lost_lease_is_not_renewed(pool: sqlx::PgPool) {
     common::verified_domain(&t, "shop.com").await;
     let id = common::send_email(&t, email(json!("a@x.com"))).await;
     // Still 'queued' (the reaper took it back), so the worker must not send it.
-    assert!(!queue::renew_lease(&t.state.pool, id).await.unwrap());
+    let claimed = queue::claim(&t.state.pool, 1).await.unwrap().remove(0);
+    lose_lease(&t.state.pool, id).await;
+    assert!(!queue::renew_lease(&t.state.pool, &claimed).await.unwrap());
 }
 
 #[sqlx::test]
@@ -253,4 +255,146 @@ async fn attachments_reach_the_sent_message(pool: sqlx::PgPool) {
         eml.contains("invoice-42.txt"),
         "attachment missing from the sent message"
     );
+}
+
+/// The reaper takes the email back (lease ran out, no SES "Send" event in the grace period) and puts it in line again.
+async fn lose_lease(pool: &sqlx::PgPool, id: uuid::Uuid) {
+    sqlx::query("UPDATE emails SET lease_until = now() - interval '1 second' WHERE id = $1")
+        .bind(id)
+        .execute(pool)
+        .await
+        .unwrap();
+    queue::expire_leases(pool).await.unwrap();
+    sqlx::query("UPDATE emails SET unknown_since = now() - interval '1 hour' WHERE id = $1")
+        .bind(id)
+        .execute(pool)
+        .await
+        .unwrap();
+    queue::requeue_unknown(pool).await.unwrap();
+}
+
+async fn sent_events(pool: &sqlx::PgPool, id: uuid::Uuid) -> i64 {
+    sqlx::query_scalar("SELECT count(*) FROM email_events WHERE email_id = $1 AND type = 'sent'")
+        .bind(id)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+fn ses_send_event(id: uuid::Uuid) -> mailrust::events::SesEvent {
+    mailrust::events::SesEvent {
+        event_type: "Send".into(),
+        mail: mailrust::events::SesMail {
+            message_id: "ses-1".into(),
+            destination: vec!["a@x.com".into()],
+            tags: [(
+                mailrust::sender::EMAIL_ID_TAG.to_string(),
+                vec![id.to_string()],
+            )]
+            .into(),
+        },
+        ..Default::default()
+    }
+}
+
+#[sqlx::test]
+async fn an_old_claim_cannot_renew_after_another_worker_took_the_email(pool: sqlx::PgPool) {
+    let t = common::app(pool).await;
+    common::verified_domain(&t, "shop.com").await;
+    let id = common::send_email(&t, email(json!("a@x.com"))).await;
+    let first = queue::claim(&t.state.pool, 1).await.unwrap().remove(0);
+    lose_lease(&t.state.pool, id).await;
+    let second = queue::claim(&t.state.pool, 1).await.unwrap().remove(0);
+    assert!(
+        !queue::renew_lease(&t.state.pool, &first).await.unwrap(),
+        "the first worker must not send"
+    );
+    assert!(queue::renew_lease(&t.state.pool, &second).await.unwrap());
+}
+
+#[sqlx::test]
+async fn ses_ok_after_a_long_hang_wins_over_the_requeue(pool: sqlx::PgPool) {
+    let t = common::app(pool).await;
+    common::verified_domain(&t, "shop.com").await;
+    let id = common::send_email(&t, email(json!("a@x.com"))).await;
+    let first = queue::claim(&t.state.pool, 1).await.unwrap().remove(0);
+    lose_lease(&t.state.pool, id).await;
+    assert_eq!(common::status_of(&t.state.pool, id).await, "queued");
+    queue::mark_sent(&t.state.pool, &first, "ses-1", &["a@x.com".into()])
+        .await
+        .unwrap();
+    assert_eq!(
+        common::status_of(&t.state.pool, id).await,
+        "sent",
+        "must not be sent again"
+    );
+}
+
+#[sqlx::test]
+async fn fail_and_suppress_still_apply_after_the_reaper_marked_unknown(pool: sqlx::PgPool) {
+    let t = common::app(pool).await;
+    common::verified_domain(&t, "shop.com").await;
+    let a = common::send_email(&t, email(json!("a@x.com"))).await;
+    let b = common::send_email(&t, email(json!("b@x.com"))).await;
+    let claimed = queue::claim(&t.state.pool, 2).await.unwrap();
+    sqlx::query("UPDATE emails SET lease_until = now() - interval '1 second'")
+        .execute(&t.state.pool)
+        .await
+        .unwrap();
+    queue::expire_leases(&t.state.pool).await.unwrap();
+    let ea = claimed.iter().find(|e| e.id == a).unwrap();
+    let eb = claimed.iter().find(|e| e.id == b).unwrap();
+    queue::mark_failed(&t.state.pool, ea, "boom").await.unwrap();
+    queue::mark_suppressed(&t.state.pool, eb, &["b@x.com".into()])
+        .await
+        .unwrap();
+    assert_eq!(common::status_of(&t.state.pool, a).await, "failed");
+    assert_eq!(common::status_of(&t.state.pool, b).await, "suppressed");
+}
+
+#[sqlx::test]
+async fn a_late_ses_send_event_stops_the_second_worker(pool: sqlx::PgPool) {
+    let t = common::app(pool).await;
+    common::verified_domain(&t, "shop.com").await;
+    let id = common::send_email(&t, email(json!("a@x.com"))).await;
+    queue::claim(&t.state.pool, 1).await.unwrap();
+    lose_lease(&t.state.pool, id).await;
+    let second = queue::claim(&t.state.pool, 1).await.unwrap().remove(0);
+    mailrust::events::ingest(&t.state.pool, &ses_send_event(id), None)
+        .await
+        .unwrap();
+    assert_eq!(common::status_of(&t.state.pool, id).await, "sent");
+    assert!(
+        !queue::renew_lease(&t.state.pool, &second).await.unwrap(),
+        "SES already has it"
+    );
+}
+
+#[sqlx::test]
+async fn sent_is_recorded_once_when_the_ses_event_beats_the_worker(pool: sqlx::PgPool) {
+    let t = common::app(pool).await;
+    common::verified_domain(&t, "shop.com").await;
+    let id = common::send_email(&t, email(json!("a@x.com"))).await;
+    let claimed = queue::claim(&t.state.pool, 1).await.unwrap().remove(0);
+    mailrust::events::ingest(&t.state.pool, &ses_send_event(id), None)
+        .await
+        .unwrap();
+    queue::mark_sent(&t.state.pool, &claimed, "ses-1", &["a@x.com".into()])
+        .await
+        .unwrap();
+    assert_eq!(common::status_of(&t.state.pool, id).await, "sent");
+    assert_eq!(sent_events(&t.state.pool, id).await, 1);
+}
+
+#[sqlx::test]
+async fn a_send_with_an_unknown_outcome_waits_for_ses_instead_of_resending(pool: sqlx::PgPool) {
+    let t = common::app_with_sender(
+        pool,
+        common::RecordingSender::failing(|| SenderError::Unknown("timed out".into())),
+    )
+    .await;
+    common::verified_domain(&t, "shop.com").await;
+    let id = common::send_email(&t, email(json!("a@x.com"))).await;
+    worker::tick(&t.state, &limiter()).await.unwrap();
+    assert_eq!(common::status_of(&t.state.pool, id).await, "unknown");
 }

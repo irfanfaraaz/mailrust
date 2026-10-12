@@ -175,7 +175,7 @@ async fn process(
         )
         .await;
     // The limiter wait can be longer than the lease; never send an email the reaper already gave to someone else.
-    if !queue::renew_lease(pool, email.id).await? {
+    if !queue::renew_lease(pool, &email).await? {
         tracing::warn!(email_id = %email.id, "lease lost while waiting to send; skipped");
         return Ok(());
     }
@@ -198,6 +198,7 @@ async fn process(
                 }
             }
         }
+        Err(SenderError::Unknown(m)) => queue::mark_unknown(pool, email.id, &m).await?,
         Err(SenderError::Retryable(m)) => match queue::retry_delay(email.attempts) {
             Some(d) => queue::mark_retry(pool, email.id, &m, d).await?,
             None => queue::mark_failed(pool, &email, &m).await?,
