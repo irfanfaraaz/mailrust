@@ -426,3 +426,26 @@ async fn an_idempotent_replay_returns_the_stored_priority(pool: sqlx::PgPool) {
     assert_eq!(again["priority"], "normal");
     assert_eq!(first["id"], again["id"]);
 }
+
+#[sqlx::test]
+async fn a_batch_counts_its_own_emails_toward_the_cap(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    common::verified_domain(&t, "shop.com").await;
+    common::seed_emails(&pool, t.account.id, "urgent", "sent", 100, 1.0).await;
+    common::seed_emails(&pool, t.account.id, "normal", "sent", 1000, 1.0).await;
+    let batch: Vec<Value> = (0..30).map(|i| urgent(&format!("u{i}@x.com"))).collect();
+    let (s, b) = common::call(
+        &t.router,
+        common::req("POST", "/emails/batch", Some(&t.key), Some(json!(batch))),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    // Each email (urgent or downgraded) raises the total, so the cap opens again later in the batch.
+    let got: String = b["data"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| if e["priority"] == "urgent" { 'U' } else { 'N' })
+        .collect();
+    assert_eq!(got, "UUUUUUUUUUUNNNNNNNNNUNNNNNNNNN");
+}

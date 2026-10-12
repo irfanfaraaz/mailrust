@@ -349,37 +349,60 @@ pub fn validate(req: SendEmailRequest, now: DateTime<Utc>) -> Result<ValidEmail,
 pub const URGENT_FLOOR: i64 = 100;
 
 /// Urgent use is capped so the urgent reserve keeps working. Over the cap, the email still goes, as normal.
-async fn allowed_priority(
-    conn: &mut PgConnection,
-    account_id: Uuid,
-    wanted: Priority,
-) -> sqlx::Result<Priority> {
-    if wanted != Priority::Urgent {
-        return Ok(wanted);
+/// One per request: the account's 24-hour counts are read once (on the first urgent email), then kept
+/// up to date as this request inserts more, so a 100-email batch does not re-count the account 100 times.
+#[derive(Debug, Default)]
+pub struct UrgentCap {
+    /// (urgent, total) in the last 24 h, including what this request already inserted.
+    counts: Option<(i64, i64)>,
+}
+
+impl UrgentCap {
+    async fn allowed(
+        &mut self,
+        conn: &mut PgConnection,
+        account_id: Uuid,
+        wanted: Priority,
+    ) -> sqlx::Result<Priority> {
+        if wanted != Priority::Urgent {
+            return Ok(wanted);
+        }
+        let (urgent, total) = match self.counts {
+            Some(c) => c,
+            None => {
+                // One urgent request per account at a time, so two cannot both slip past the cap.
+                sqlx::query!(
+                    "SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))",
+                    account_id.to_string()
+                )
+                .execute(&mut *conn)
+                .await?;
+                let c = sqlx::query!(
+                    r#"SELECT count(*) FILTER (WHERE priority = 'urgent') AS "urgent!", count(*) AS "total!"
+                       FROM emails WHERE account_id = $1 AND created_at > now() - interval '24 hours'"#,
+                    account_id
+                )
+                .fetch_one(&mut *conn)
+                .await?;
+                *self.counts.insert((c.urgent, c.total))
+            }
+        };
+        Ok(if urgent < URGENT_FLOOR.max(total / 10) {
+            Priority::Urgent
+        } else {
+            Priority::Normal
+        })
     }
-    // One urgent insert per account at a time, so two requests cannot both slip past the cap.
-    sqlx::query!(
-        "SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))",
-        account_id.to_string()
-    )
-    .execute(&mut *conn)
-    .await?;
-    let urgent = sqlx::query_scalar!(
-        r#"SELECT count(*) AS "n!" FROM emails WHERE account_id = $1 AND priority = 'urgent' AND created_at > now() - interval '24 hours'"#,
-        account_id
-    ).fetch_one(&mut *conn).await?;
-    if urgent < URGENT_FLOOR {
-        return Ok(Priority::Urgent);
+
+    /// Called after every insert, so later emails in the same request see it.
+    fn record(&mut self, stored: Priority) {
+        if let Some((u, t)) = &mut self.counts {
+            *t += 1;
+            if stored == Priority::Urgent {
+                *u += 1;
+            }
+        }
     }
-    let total = sqlx::query_scalar!(
-        r#"SELECT count(*) AS "n!" FROM emails WHERE account_id = $1 AND created_at > now() - interval '24 hours'"#,
-        account_id
-    ).fetch_one(&mut *conn).await?;
-    Ok(if urgent < total / 10 {
-        Priority::Urgent
-    } else {
-        Priority::Normal
-    })
 }
 
 pub async fn insert(
@@ -388,8 +411,9 @@ pub async fn insert(
     domain_id: Uuid,
     e: &ValidEmail,
     idempotency: Option<(&str, &[u8])>,
+    cap: &mut UrgentCap,
 ) -> sqlx::Result<(Uuid, Priority)> {
-    let priority = allowed_priority(&mut *conn, account_id, e.priority).await?;
+    let priority = cap.allowed(&mut *conn, account_id, e.priority).await?;
     let id = Uuid::now_v7();
     let (key, hash) = match idempotency {
         Some((k, h)) => (Some(k), Some(h)),
@@ -433,6 +457,7 @@ pub async fn insert(
         .execute(&mut *conn)
         .await?;
     }
+    cap.record(priority);
     Ok((id, priority))
 }
 

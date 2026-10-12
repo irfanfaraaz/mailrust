@@ -151,17 +151,25 @@ pub(crate) async fn send(
         }
     }
     let idem = key.as_deref().map(|k| (k, hash.as_slice()));
-    let (id, priority) =
-        match emails::insert(&mut tx, auth.account_id(), domain_id, &email, idem).await {
-            Ok(done) => done,
-            Err(e) if is_idempotency_race(&e) => {
-                return Err(ApiError::Conflict(
-                    "idempotency_conflict",
-                    "a request with this Idempotency-Key is already being processed".into(),
-                ));
-            }
-            Err(e) => return Err(e.into()),
-        };
+    let (id, priority) = match emails::insert(
+        &mut tx,
+        auth.account_id(),
+        domain_id,
+        &email,
+        idem,
+        &mut emails::UrgentCap::default(),
+    )
+    .await
+    {
+        Ok(done) => done,
+        Err(e) if is_idempotency_race(&e) => {
+            return Err(ApiError::Conflict(
+                "idempotency_conflict",
+                "a request with this Idempotency-Key is already being processed".into(),
+            ));
+        }
+        Err(e) => return Err(e.into()),
+    };
     tx.commit().await?;
     Ok(Json(SendResponse { id, priority }))
 }
@@ -206,9 +214,10 @@ pub(crate) async fn batch(
     }
     let mut tx = state.pool.begin().await?;
     let mut data = Vec::with_capacity(valid.len());
+    let mut cap = emails::UrgentCap::default();
     for (e, domain_id) in &valid {
         let (id, priority) =
-            emails::insert(&mut tx, auth.account_id(), *domain_id, e, None).await?;
+            emails::insert(&mut tx, auth.account_id(), *domain_id, e, None, &mut cap).await?;
         data.push(SendResponse { id, priority });
     }
     tx.commit().await?;
