@@ -18,6 +18,7 @@ pub fn spawn_all(
         state.clone(),
         shutdown.clone(),
     ));
+    tasks.spawn(crate::quota::sync_loop(state.clone(), shutdown.clone()));
     tasks.spawn(maintenance_loop(state, shutdown));
 }
 

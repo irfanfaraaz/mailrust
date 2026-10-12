@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO sender_quota (id, max_send_rate, max_24h_send, sent_last_24h, synced_at)\n         VALUES (true, $1, $2, $3, now())\n         ON CONFLICT (id) DO UPDATE SET\n             max_send_rate = EXCLUDED.max_send_rate, max_24h_send = EXCLUDED.max_24h_send,\n             sent_last_24h = EXCLUDED.sent_last_24h, synced_at = EXCLUDED.synced_at,\n             paused_until = CASE WHEN EXCLUDED.max_24h_send <= 0 OR EXCLUDED.sent_last_24h < $4 * EXCLUDED.max_24h_send\n                                 THEN NULL ELSE sender_quota.paused_until END,\n             pause_reason = CASE WHEN EXCLUDED.max_24h_send <= 0 OR EXCLUDED.sent_last_24h < $4 * EXCLUDED.max_24h_send\n                                 THEN NULL ELSE sender_quota.pause_reason END",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Float8",
+        "Float8",
+        "Float8",
+        "Float8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "dbf2a7fe0f360495232a02aff7e3f9b13b5312601c21546814ef7623880e2c9e"
+}

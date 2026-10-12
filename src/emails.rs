@@ -86,6 +86,30 @@ impl EmailStatus {
     }
 }
 
+/// Claim order: urgent, then normal, then bulk. The caller picks it.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    sqlx::Type,
+    Serialize,
+    Deserialize,
+    utoipa::ToSchema,
+)]
+#[sqlx(type_name = "email_priority", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum Priority {
+    Urgent,
+    #[default]
+    Normal,
+    Bulk,
+}
+
 pub fn api_status(status: EmailStatus, send_at: DateTime<Utc>, now: DateTime<Utc>) -> &'static str {
     if status == EmailStatus::Queued && send_at > now {
         "scheduled"
@@ -129,6 +153,9 @@ pub struct SendEmailRequest {
     #[serde(default)]
     pub attachments: Vec<AttachmentInput>,
     pub scheduled_at: Option<DateTime<Utc>>,
+    /// urgent (login codes, resets), normal (default) or bulk (newsletters).
+    #[serde(default)]
+    pub priority: Priority,
 }
 
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
@@ -155,6 +182,7 @@ pub struct ValidEmail {
     pub attachments: Vec<AttachmentData>,
     /// None = send now, stamped by the database clock (the same clock `queue::claim` compares against).
     pub send_at: Option<DateTime<Utc>>,
+    pub priority: Priority,
 }
 
 fn bad(msg: impl Into<String>) -> ApiError {
@@ -313,7 +341,68 @@ pub fn validate(req: SendEmailRequest, now: DateTime<Utc>) -> Result<ValidEmail,
         tags: req.tags,
         attachments,
         send_at,
+        priority: req.priority,
     })
+}
+
+/// Every account may send this many urgent emails a day, or 10% of its mail if that is more.
+pub const URGENT_FLOOR: i64 = 100;
+
+/// Urgent use is capped so the urgent reserve keeps working. Over the cap, the email still goes, as normal.
+/// One per request: the account's 24-hour counts are read once (on the first urgent email), then kept
+/// up to date as this request inserts more, so a 100-email batch does not re-count the account 100 times.
+#[derive(Debug, Default)]
+pub struct UrgentCap {
+    /// (urgent, total) in the last 24 h, including what this request already inserted.
+    counts: Option<(i64, i64)>,
+}
+
+impl UrgentCap {
+    async fn allowed(
+        &mut self,
+        conn: &mut PgConnection,
+        account_id: Uuid,
+        wanted: Priority,
+    ) -> sqlx::Result<Priority> {
+        if wanted != Priority::Urgent {
+            return Ok(wanted);
+        }
+        let (urgent, total) = match self.counts {
+            Some(c) => c,
+            None => {
+                // One urgent request per account at a time, so two cannot both slip past the cap.
+                sqlx::query!(
+                    "SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))",
+                    account_id.to_string()
+                )
+                .execute(&mut *conn)
+                .await?;
+                let c = sqlx::query!(
+                    r#"SELECT count(*) FILTER (WHERE priority = 'urgent') AS "urgent!", count(*) AS "total!"
+                       FROM emails WHERE account_id = $1 AND created_at > now() - interval '24 hours'"#,
+                    account_id
+                )
+                .fetch_one(&mut *conn)
+                .await?;
+                *self.counts.insert((c.urgent, c.total))
+            }
+        };
+        Ok(if urgent < URGENT_FLOOR.max(total / 10) {
+            Priority::Urgent
+        } else {
+            Priority::Normal
+        })
+    }
+
+    /// Called after every insert, so later emails in the same request see it.
+    fn record(&mut self, stored: Priority) {
+        if let Some((u, t)) = &mut self.counts {
+            *t += 1;
+            if stored == Priority::Urgent {
+                *u += 1;
+            }
+        }
+    }
 }
 
 pub async fn insert(
@@ -322,7 +411,9 @@ pub async fn insert(
     domain_id: Uuid,
     e: &ValidEmail,
     idempotency: Option<(&str, &[u8])>,
-) -> sqlx::Result<Uuid> {
+    cap: &mut UrgentCap,
+) -> sqlx::Result<(Uuid, Priority)> {
+    let priority = cap.allowed(&mut *conn, account_id, e.priority).await?;
     let id = Uuid::now_v7();
     let (key, hash) = match idempotency {
         Some((k, h)) => (Some(k), Some(h)),
@@ -330,8 +421,8 @@ pub async fn insert(
     };
     sqlx::query!(
         "INSERT INTO emails (id, account_id, domain_id, from_address, to_addresses, cc_addresses, bcc_addresses,
-                             reply_to, subject, html, text_body, headers, tags, send_at, idempotency_key, request_hash)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, COALESCE($14, now()), $15, $16)",
+                             reply_to, subject, html, text_body, headers, tags, send_at, idempotency_key, request_hash, priority)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, COALESCE($14, now()), $15, $16, $17)",
         id,
         account_id,
         domain_id,
@@ -347,7 +438,8 @@ pub async fn insert(
         Json(&e.tags) as _,
         e.send_at,
         key,
-        hash
+        hash,
+        priority as Priority
     )
     .execute(&mut *conn)
     .await?;
@@ -365,7 +457,8 @@ pub async fn insert(
         .execute(&mut *conn)
         .await?;
     }
-    Ok(id)
+    cap.record(priority);
+    Ok((id, priority))
 }
 
 pub async fn load_attachments(pool: &PgPool, email_id: Uuid) -> sqlx::Result<Vec<AttachmentData>> {
@@ -381,6 +474,7 @@ pub async fn load_attachments(pool: &PgPool, email_id: Uuid) -> sqlx::Result<Vec
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct SendResponse {
     pub id: Uuid,
+    pub priority: Priority,
 }
 
 #[derive(Debug, Serialize, utoipa::ToSchema)]
@@ -403,6 +497,7 @@ pub struct EmailView {
     pub html: Option<String>,
     pub text: Option<String>,
     pub status: String,
+    pub priority: Priority,
     pub scheduled_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
     pub sent_at: Option<DateTime<Utc>>,
@@ -418,6 +513,7 @@ pub struct EmailSummary {
     pub to: Vec<String>,
     pub subject: String,
     pub status: String,
+    pub priority: Priority,
     pub scheduled_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
 }
@@ -425,7 +521,7 @@ pub struct EmailSummary {
 pub async fn view(pool: &PgPool, account_id: Uuid, id: Uuid) -> sqlx::Result<Option<EmailView>> {
     let Some(r) = sqlx::query!(
         r#"SELECT id, from_address, to_addresses, cc_addresses, bcc_addresses, reply_to, subject, html, text_body,
-                  status AS "status: EmailStatus", send_at, created_at, sent_at, last_error,
+                  status AS "status: EmailStatus", priority AS "priority: Priority", send_at, created_at, sent_at, last_error,
                   tags AS "tags: Json<BTreeMap<String, String>>"
            FROM emails WHERE id = $1 AND account_id = $2"#,
         id,
@@ -454,6 +550,7 @@ pub async fn view(pool: &PgPool, account_id: Uuid, id: Uuid) -> sqlx::Result<Opt
         html: r.html,
         text: r.text_body,
         status: api_status(r.status, r.send_at, Utc::now()).to_string(),
+        priority: r.priority,
         scheduled_at: r.send_at,
         created_at: r.created_at,
         sent_at: r.sent_at,
@@ -471,7 +568,7 @@ pub async fn list(
     limit: i64,
 ) -> sqlx::Result<Vec<EmailSummary>> {
     let rows = sqlx::query!(
-        r#"SELECT id, from_address, to_addresses, subject, status AS "status: EmailStatus", send_at, created_at
+        r#"SELECT id, from_address, to_addresses, subject, status AS "status: EmailStatus", priority AS "priority: Priority", send_at, created_at
            FROM emails
            WHERE account_id = $1 AND ($2::email_status IS NULL OR status = $2) AND ($3::uuid IS NULL OR id < $3)
            ORDER BY id DESC LIMIT $4"#,
@@ -491,6 +588,7 @@ pub async fn list(
             to: r.to_addresses,
             subject: r.subject,
             status: api_status(r.status, r.send_at, now).to_string(),
+            priority: r.priority,
             scheduled_at: r.send_at,
             created_at: r.created_at,
         })
@@ -508,6 +606,21 @@ mod tests {
 
     fn base() -> serde_json::Value {
         json!({ "from": "Shop <hi@Shop.com>", "to": "a@x.com", "subject": "Hi", "text": "yo" })
+    }
+
+    #[test]
+    fn priority_is_kept_and_lanes_sort_urgent_first() {
+        let mut v = base();
+        v["priority"] = json!("bulk");
+        assert_eq!(
+            validate(req(v), Utc::now()).unwrap().priority,
+            Priority::Bulk
+        );
+        assert_eq!(
+            validate(req(base()), Utc::now()).unwrap().priority,
+            Priority::Normal
+        );
+        assert!(Priority::Urgent < Priority::Normal && Priority::Normal < Priority::Bulk);
     }
 
     #[test]

@@ -86,17 +86,30 @@ async fn too_many_bounces_pause_only_that_account(pool: sqlx::PgPool) {
 
 #[sqlx::test]
 async fn simulated_bounces_trip_the_pause_through_the_worker(pool: sqlx::PgPool) {
-    let t = common::app(pool).await;
+    let mut t = common::app(pool).await;
+    let mut cfg = (*t.state.config).clone();
+    cfg.worker_concurrency = 1; // one at a time: no timing luck
+    t.state.config = std::sync::Arc::new(cfg);
     common::verified_domain(&t, "shop.com").await;
     let id = common::send_email(
         &t,
         json!({ "from": "hi@shop.com", "to": "a@x.com", "subject": "Hi", "text": "x" }),
     )
     .await;
-    seed(&t.state.pool, t.account.id, id, 120, 0).await;
-    for _ in 0..3 {
-        common::send_email(&t, json!({ "from": "hi@shop.com", "to": events::SIM_BOUNCE, "subject": "Hi", "text": "x" })).await;
-    }
+    // 2 of 100 is exactly the 2% limit: not paused yet. The worker's one simulated bounce tips it over.
+    // (Only one bounce email: the first bounce blocks the address, so more would just be suppressed.)
+    seed(&t.state.pool, t.account.id, id, 100, 2).await;
+    assert!(
+        safety::check_account(&t.state.pool, t.account.id)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    common::send_email(
+        &t,
+        json!({ "from": "hi@shop.com", "to": events::SIM_BOUNCE, "subject": "Hi", "text": "x" }),
+    )
+    .await;
     worker::tick(&t.state, &SendLimiter::new(10_000, 1))
         .await
         .unwrap();

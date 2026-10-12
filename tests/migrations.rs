@@ -13,6 +13,7 @@ async fn migrations_create_every_table(pool: sqlx::PgPool) {
         "domains",
         "email_events",
         "emails",
+        "sender_quota",
         "sns_messages",
         "suppressions",
         "webhook_deliveries",

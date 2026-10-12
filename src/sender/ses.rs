@@ -2,7 +2,7 @@ use anyhow::Context;
 use async_trait::async_trait;
 use aws_sdk_sesv2::{
     Client,
-    error::{DisplayErrorContext, SdkError},
+    error::{DisplayErrorContext, ProvideErrorMetadata, SdkError},
     operation::{
         create_email_identity::CreateEmailIdentityError, create_tenant::CreateTenantError,
         create_tenant_resource_association::CreateTenantResourceAssociationError,
@@ -15,8 +15,13 @@ use aws_sdk_sesv2::{
     },
 };
 
-use super::{DnsRecord, DomainState, EMAIL_ID_TAG, OutgoingEmail, Sender, SenderError, TenantRef};
+use super::{
+    DnsRecord, DomainState, EMAIL_ID_TAG, OutgoingEmail, SendQuota, Sender, SenderError, TenantRef,
+};
 use crate::config::SesConfig;
+
+/// SES says this (as a throttling error) when the 24-hour quota is used up.
+pub const DAILY_QUOTA_TEXT: &str = "Daily message quota exceeded";
 
 pub const SEND_TIMEOUT_SECS: u64 = 60;
 const _: () = assert!(SEND_TIMEOUT_SECS < crate::queue::LEASE_SECS as u64);
@@ -244,6 +249,20 @@ impl Sender for SesSender {
         })
     }
 
+    async fn quota(&self) -> Result<Option<SendQuota>, SenderError> {
+        let out = self
+            .client
+            .get_account()
+            .send()
+            .await
+            .map_err(|e| SenderError::Retryable(ctx(&e)))?;
+        Ok(out.send_quota().map(|q| SendQuota {
+            max_send_rate: q.max_send_rate(),
+            max_24h_send: q.max24_hour_send(),
+            sent_last_24h: q.sent_last24_hours(),
+        }))
+    }
+
     async fn send(&self, email: &OutgoingEmail) -> Result<String, SenderError> {
         let raw = RawMessage::builder()
             .data(Blob::new(email.raw.clone()))
@@ -281,6 +300,12 @@ impl Sender for SesSender {
             .retry_config(aws_config::retry::RetryConfig::disabled());
         match req.customize().config_override(no_retry).send().await {
             Ok(out) => Ok(out.message_id().unwrap_or_default().to_string()),
+            Err(e)
+                if e.message().is_some_and(|m| m.contains(DAILY_QUOTA_TEXT))
+                    || ctx(&e).contains(DAILY_QUOTA_TEXT) =>
+            {
+                Err(SenderError::DailyQuota(ctx(&e)))
+            }
             Err(e) => Err(match &e {
                 // The request may have reached SES; sending again could send twice.
                 SdkError::TimeoutError(_) | SdkError::ResponseError(_) => {
@@ -303,6 +328,99 @@ mod tests {
         MessageRejected, SendingPausedException, TooManyRequestsException,
     };
 
+    fn test_ses(http: impl aws_sdk_sesv2::config::HttpClient + 'static) -> SesSender {
+        let conf = aws_sdk_sesv2::Config::builder()
+            .behavior_version(aws_config::BehaviorVersion::latest())
+            .region(aws_config::Region::new("us-east-1"))
+            .credentials_provider(aws_sdk_sesv2::config::Credentials::new(
+                "a", "b", None, None, "test",
+            ))
+            .http_client(http)
+            .build();
+        SesSender {
+            client: Client::from_conf(conf),
+            region: "us-east-1".into(),
+            configuration_set: "cs".into(),
+            aws_account_id: "123456789012".into(),
+        }
+    }
+
+    fn mail() -> OutgoingEmail {
+        OutgoingEmail {
+            email_id: uuid::Uuid::now_v7(),
+            tenant: TenantRef {
+                account_id: uuid::Uuid::now_v7(),
+                tenant_name: "t".into(),
+            },
+            from: "a@shop.com".into(),
+            recipients: vec!["b@x.com".into()],
+            tags: Default::default(),
+            raw: b"Subject: hi\r\n\r\nhi".to_vec(),
+        }
+    }
+
+    fn answer(status: u16, error_type: &'static str, message: &'static str) -> SesSender {
+        test_ses(aws_smithy_http_client::test_util::infallible_client_fn(
+            move |_| {
+                axum::http::Response::builder()
+                    .status(status)
+                    .header("x-amzn-ErrorType", error_type)
+                    .header("content-type", "application/json")
+                    .body(format!(r#"{{"message":"{message}"}}"#))
+                    .unwrap()
+            },
+        ))
+    }
+
+    #[tokio::test]
+    async fn the_daily_cap_is_told_apart_from_the_per_second_throttle() {
+        let daily = answer(400, "ThrottlingException", "Daily message quota exceeded.")
+            .send(&mail())
+            .await;
+        assert!(
+            matches!(&daily, Err(SenderError::DailyQuota(m)) if m.contains(DAILY_QUOTA_TEXT)),
+            "the pause reason must keep the SES text: {daily:?}"
+        );
+        let daily429 = answer(
+            429,
+            "TooManyRequestsException",
+            "Daily message quota exceeded.",
+        )
+        .send(&mail())
+        .await;
+        assert!(
+            matches!(daily429, Err(SenderError::DailyQuota(_))),
+            "{daily429:?}"
+        );
+        let rate = answer(
+            429,
+            "TooManyRequestsException",
+            "Maximum sending rate exceeded.",
+        )
+        .send(&mail())
+        .await;
+        assert!(matches!(rate, Err(SenderError::Retryable(_))), "{rate:?}");
+    }
+
+    #[tokio::test]
+    async fn quota_reads_the_ses_account_limits() {
+        let http = aws_smithy_http_client::test_util::infallible_client_fn(|_| {
+            axum::http::Response::builder()
+                .status(200)
+                .body(r#"{"SendQuota":{"Max24HourSend":200.0,"MaxSendRate":1.0,"SentLast24Hours":5.0}}"#)
+                .unwrap()
+        });
+        let got = test_ses(http).quota().await.unwrap();
+        assert_eq!(
+            got,
+            Some(SendQuota {
+                max_send_rate: 1.0,
+                max_24h_send: 200.0,
+                sent_last_24h: 5.0
+            })
+        );
+    }
+
     /// A retry after a timeout could reach SES twice. Mailrust's own unknown → grace → requeue path handles it instead.
     #[tokio::test]
     async fn the_sdk_never_retries_a_send_by_itself() {
@@ -319,31 +437,8 @@ mod tests {
                 .body("")
                 .unwrap()
         });
-        let conf = aws_sdk_sesv2::Config::builder()
-            .behavior_version(aws_config::BehaviorVersion::latest())
-            .region(aws_config::Region::new("us-east-1"))
-            .credentials_provider(aws_sdk_sesv2::config::Credentials::new(
-                "a", "b", None, None, "test",
-            ))
-            .http_client(http)
-            .build();
-        let ses = SesSender {
-            client: Client::from_conf(conf),
-            region: "us-east-1".into(),
-            configuration_set: "cs".into(),
-            aws_account_id: "123456789012".into(),
-        };
-        let email = OutgoingEmail {
-            email_id: uuid::Uuid::now_v7(),
-            tenant: TenantRef {
-                account_id: uuid::Uuid::now_v7(),
-                tenant_name: "t".into(),
-            },
-            from: "a@shop.com".into(),
-            recipients: vec!["b@x.com".into()],
-            tags: Default::default(),
-            raw: b"Subject: hi\r\n\r\nhi".to_vec(),
-        };
+        let ses = test_ses(http);
+        let email = mail();
         assert!(ses.send(&email).await.is_err());
         assert_eq!(calls.load(Ordering::SeqCst), 1, "the SDK retried the send");
     }

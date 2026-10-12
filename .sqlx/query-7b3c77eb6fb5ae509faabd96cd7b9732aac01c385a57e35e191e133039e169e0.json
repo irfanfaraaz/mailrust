@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO sender_quota (id, paused_until, pause_reason) VALUES (true, now() + make_interval(secs => $1), $2)\n         ON CONFLICT (id) DO UPDATE SET paused_until = EXCLUDED.paused_until, pause_reason = EXCLUDED.pause_reason",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Float8",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7b3c77eb6fb5ae509faabd96cd7b9732aac01c385a57e35e191e133039e169e0"
+}

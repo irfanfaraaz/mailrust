@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT max_send_rate, max_24h_send, sent_last_24h, synced_at, paused_until, pause_reason FROM sender_quota",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "max_send_rate",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 1,
+        "name": "max_24h_send",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 2,
+        "name": "sent_last_24h",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 3,
+        "name": "synced_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "paused_until",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "pause_reason",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "b9088a143c5147d38c0a1e880a234b90af02ac5966498a28e8bcaa4629f08580"
+}

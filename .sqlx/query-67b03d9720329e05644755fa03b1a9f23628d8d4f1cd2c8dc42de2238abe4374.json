@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE emails SET status = 'canceled', updated_at = now()\n         WHERE id = $1 AND account_id = $2 AND status = 'queued' RETURNING id, priority AS \"priority: Priority\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "priority: Priority",
+        "type_info": {
+          "Custom": {
+            "name": "email_priority",
+            "kind": {
+              "Enum": [
+                "urgent",
+                "normal",
+                "bulk"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "67b03d9720329e05644755fa03b1a9f23628d8d4f1cd2c8dc42de2238abe4374"
+}

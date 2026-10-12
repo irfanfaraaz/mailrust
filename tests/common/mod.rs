@@ -114,12 +114,15 @@ pub async fn verified_domain(t: &TestApp, name: &str) -> mailrust::domains::Doma
     d
 }
 
-use mailrust::sender::{DnsRecord, DomainState, OutgoingEmail, SenderError, TenantRef};
+use mailrust::sender::{DnsRecord, DomainState, OutgoingEmail, SendQuota, SenderError, TenantRef};
 
 /// Records what it was asked to send. `fail_with` makes every send fail with that error.
 pub struct RecordingSender {
     pub sent: std::sync::Mutex<Vec<OutgoingEmail>>,
     pub fail_with: Option<fn() -> SenderError>,
+    pub quota: std::sync::Mutex<Option<Result<SendQuota, String>>>,
+    /// Every call to `send`, failed ones too.
+    pub calls: std::sync::atomic::AtomicUsize,
 }
 
 impl RecordingSender {
@@ -127,12 +130,16 @@ impl RecordingSender {
         Arc::new(Self {
             sent: Default::default(),
             fail_with: None,
+            quota: Default::default(),
+            calls: Default::default(),
         })
     }
     pub fn failing(f: fn() -> SenderError) -> Arc<Self> {
         Arc::new(Self {
             sent: Default::default(),
             fail_with: Some(f),
+            quota: Default::default(),
+            calls: Default::default(),
         })
     }
     pub fn sent(&self) -> Vec<OutgoingEmail> {
@@ -152,11 +159,19 @@ impl Sender for RecordingSender {
         Ok(DomainState::Verified)
     }
     async fn send(&self, email: &OutgoingEmail) -> Result<String, SenderError> {
+        self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         if let Some(f) = self.fail_with {
             return Err(f());
         }
         self.sent.lock().unwrap().push(email.clone());
         Ok(format!("rec-{}", email.email_id))
+    }
+    async fn quota(&self) -> Result<Option<SendQuota>, SenderError> {
+        match self.quota.lock().unwrap().clone() {
+            None => Ok(None),
+            Some(Ok(q)) => Ok(Some(q)),
+            Some(Err(m)) => Err(SenderError::Retryable(m)),
+        }
     }
 }
 
@@ -172,4 +187,23 @@ pub async fn status_of(pool: &PgPool, id: uuid::Uuid) -> String {
         .fetch_one(pool)
         .await
         .unwrap()
+}
+
+/// Inserts `n` bare emails straight into the table (no domain). `created_at` and `send_at` are `hours_ago` back.
+pub async fn seed_emails(
+    pool: &PgPool,
+    account_id: Uuid,
+    priority: &str,
+    status: &str,
+    n: i64,
+    hours_ago: f64,
+) -> Vec<Uuid> {
+    sqlx::query_scalar(
+        "INSERT INTO emails (id, account_id, from_address, to_addresses, subject, text_body, priority, status, created_at, send_at)
+         SELECT gen_random_uuid(), $1, 'hi@shop.com', ARRAY['to@x.com'], 's', 't', $2::email_priority, $3::email_status,
+                now() - make_interval(secs => $5), now() - make_interval(secs => $5)
+         FROM generate_series(1, $4) RETURNING id",
+    )
+    .bind(account_id).bind(priority).bind(status).bind(n).bind(hours_ago * 3600.0)
+    .fetch_all(pool).await.unwrap()
 }

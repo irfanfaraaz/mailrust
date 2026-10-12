@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE sender_quota SET paused_until = NULL, pause_reason = NULL WHERE paused_until <= now()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "5a5f8dd711550a1d493392d6b066664d81b3bd102c91195e23cf8f2519486bfd"
+}
