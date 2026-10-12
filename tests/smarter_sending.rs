@@ -153,3 +153,15 @@ async fn after_a_daily_cap_hit_the_next_round_claims_nothing(pool: sqlx::PgPool)
     assert_eq!(worker::tick(&t.state, &limiter).await.unwrap(), 1);
     assert_eq!(worker::tick(&t.state, &limiter).await.unwrap(), 0);
 }
+
+#[sqlx::test]
+async fn the_worker_paces_itself_by_the_synced_rate(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    let limiter = SendLimiter::new(t.state.config.ses_max_send_rate, 1); // 14
+    quota::save(&pool, &q(2.0, 1000.0, 0.0)).await.unwrap();
+    worker::tick(&t.state, &limiter).await.unwrap();
+    assert_eq!(limiter.global_rate(), 2);
+    quota::save(&pool, &q(500.0, 1000.0, 0.0)).await.unwrap();
+    worker::tick(&t.state, &limiter).await.unwrap();
+    assert_eq!(limiter.global_rate(), 14);
+}
