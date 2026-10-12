@@ -35,6 +35,9 @@ enum Command {
     /// Manage API keys
     #[command(subcommand)]
     Key(KeyCmd),
+    /// Manage sending domains
+    #[command(subcommand)]
+    Domain(DomainCmd),
     /// Run the API and/or the background workers
     Serve {
         #[arg(long, value_enum, default_value_t = Role::All)]
@@ -67,6 +70,18 @@ enum AccountCmd {
 }
 
 #[derive(Subcommand)]
+enum DomainCmd {
+    /// Add a domain to an account and print the DNS records to create
+    Add {
+        #[arg(long)]
+        account: Uuid,
+        name: String,
+        #[arg(long)]
+        tracking_subdomain: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
 enum KeyCmd {
     /// Create a key. It is printed once and never shown again.
     Create {
@@ -95,6 +110,19 @@ pub async fn run() -> anyhow::Result<()> {
         }
         Command::Account(cmd) => account_cmd(&pool, &config, cmd).await?,
         Command::Key(cmd) => key_cmd(&pool, cmd).await?,
+        Command::Domain(DomainCmd::Add { account, name, tracking_subdomain }) => {
+            let sender = sender::from_config(&config).await?;
+            let state = crate::api::AppState::new(pool.clone(), config.clone(), sender);
+            let acc = accounts::get(&pool, account).await?.ok_or_else(|| anyhow::anyhow!("no account {account}"))?;
+            let d = crate::domains::add(&state, &acc, crate::domains::AddDomain {
+                name, tracking_subdomain, open_tracking: false, click_tracking: false,
+            }).await?;
+            println!("domain {} ({:?})\nadd these DNS records:", d.name, d.status);
+            for r in d.dns_records.iter() {
+                println!("  {:<6} {:<45} {}   # {}", r.record_type, r.name, r.value, r.purpose);
+            }
+        }
+    
         Command::Serve { role } => {
             let sender = sender::from_config(&config).await?;
             let state = crate::api::AppState::new(pool, config, sender);

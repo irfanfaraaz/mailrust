@@ -7,7 +7,7 @@ use crate::api::AppState;
 
 /// Starts every background loop. Later tasks add their loops here.
 pub fn spawn_all(tasks: &mut JoinSet<anyhow::Result<()>>, state: AppState, shutdown: CancellationToken) {
-    let _ = (tasks, state, shutdown);
+    tasks.spawn(crate::domains::verify_loop(state.clone(), shutdown.clone()));
 }
 
 /// Runs `f` now and then every `period` until shutdown.

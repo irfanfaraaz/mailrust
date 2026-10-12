@@ -1,0 +1,27 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE domains SET status = $2, tracking_verified = $3 WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "domain_status",
+            "kind": {
+              "Enum": [
+                "pending",
+                "verified",
+                "failed"
+              ]
+            }
+          }
+        },
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f99f896a0b629883847c2ab834cdcc8e96f1d0ec85ef1f65ee552e26d811c8ac"
+}

@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id FROM domains\n             WHERE status = 'pending'\n                OR (tracking_subdomain IS NOT NULL AND NOT tracking_verified\n                    AND created_at > now() - make_interval(hours => $1))",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "6df35a1bfc67febc4f9241b0cbef8a6b3b8ed84ea9a07d531b723adec853511b"
+}

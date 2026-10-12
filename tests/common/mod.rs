@@ -77,3 +77,16 @@ pub async fn call(router: &Router, req: Request<Body>) -> (StatusCode, Value) {
     let json = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
     (status, json)
 }
+
+pub async fn verified_domain(t: &TestApp, name: &str) -> mailrust::domains::Domain {
+    let d = mailrust::domains::add(&t.state, &t.account, mailrust::domains::AddDomain {
+        name: name.into(),
+        tracking_subdomain: None,
+        open_tracking: false,
+        click_tracking: false,
+    })
+    .await
+    .unwrap();
+    assert_eq!(d.status, mailrust::domains::DomainStatus::Verified);
+    d
+}

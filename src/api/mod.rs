@@ -10,6 +10,7 @@ use uuid::Uuid;
 use crate::{config::Config, sender::Sender};
 
 pub mod auth;
+pub mod domains;
 pub mod health;
 pub mod json;
 
@@ -42,7 +43,7 @@ impl AppState {
 pub fn router(state: AppState) -> Router {
     Router::new()
         .merge(health::routes())
-        // Later tasks add: .merge(domains::routes()) etc.
+        .merge(domains::routes())
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
         .layer(TraceLayer::new_for_http())
         .with_state(state)
