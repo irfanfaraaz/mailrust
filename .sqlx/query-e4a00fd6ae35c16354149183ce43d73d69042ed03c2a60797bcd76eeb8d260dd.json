@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO suppressions (account_id, address, reason, source_email_id) VALUES ($1, $2, $3, $4)\n         ON CONFLICT (account_id, address) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        {
+          "Custom": {
+            "name": "suppression_reason",
+            "kind": {
+              "Enum": [
+                "bounce",
+                "complaint",
+                "manual"
+              ]
+            }
+          }
+        },
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e4a00fd6ae35c16354149183ce43d73d69042ed03c2a60797bcd76eeb8d260dd"
+}

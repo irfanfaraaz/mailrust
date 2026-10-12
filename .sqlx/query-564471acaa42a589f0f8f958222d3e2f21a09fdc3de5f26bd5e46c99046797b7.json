@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n             COALESCE(SUM(CASE WHEN type = 'sent' THEN jsonb_array_length(data->'recipients') ELSE 0 END), 0)::bigint AS \"sent!\",\n             COUNT(*) FILTER (WHERE type = 'bounced') AS \"bounced!\",\n             COUNT(*) FILTER (WHERE type = 'complained') AS \"complained!\"\n           FROM email_events\n           WHERE account_id = $1 AND created_at > now() - interval '7 days'\n             AND type IN ('sent', 'bounced', 'complained')",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "sent!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "bounced!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "complained!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "564471acaa42a589f0f8f958222d3e2f21a09fdc3de5f26bd5e46c99046797b7"
+}

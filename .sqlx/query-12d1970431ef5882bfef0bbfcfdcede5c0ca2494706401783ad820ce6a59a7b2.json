@@ -1,0 +1,62 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, name, prefix, access AS \"access: KeyAccess\", last_used_at, created_at\n           FROM api_keys WHERE account_id = $1 AND revoked_at IS NULL ORDER BY created_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "prefix",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "access: KeyAccess",
+        "type_info": {
+          "Custom": {
+            "name": "key_access",
+            "kind": {
+              "Enum": [
+                "full",
+                "sending"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "last_used_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "12d1970431ef5882bfef0bbfcfdcede5c0ca2494706401783ad820ce6a59a7b2"
+}

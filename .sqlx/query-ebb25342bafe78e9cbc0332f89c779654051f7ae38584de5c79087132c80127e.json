@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE emails SET provider_message_id = $2, sent_at = COALESCE(sent_at, now()), lease_until = NULL,\n                unknown_since = NULL, last_error = NULL, updated_at = now(),\n                status = CASE WHEN status IN ('sending', 'unknown', 'queued') THEN 'sent'::email_status ELSE status END\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ebb25342bafe78e9cbc0332f89c779654051f7ae38584de5c79087132c80127e"
+}

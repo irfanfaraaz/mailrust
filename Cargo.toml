@@ -1,0 +1,46 @@
+[package]
+name = "mailrust"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+rust-version = "1.85"
+
+[dependencies]
+anyhow = "1"
+async-trait = "0.1"
+aws-config = { version = "1", features = ["behavior-version-latest"] }
+aws-sdk-sesv2 = "1.140"
+aws-sdk-sts = "1"
+axum = { version = "0.8", features = ["macros"] }
+base64 = "0.22"
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4", features = ["derive", "env"] }
+dotenvy = "0.15"
+futures = "0.3"
+governor = "0.8"
+hickory-resolver = "0.24"
+hmac = "0.12"
+lettre = { version = "0.11", default-features = false, features = ["builder"] }
+lol_html = "2"
+rand = "0.8"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+rsa = { version = "0.9", features = ["sha2"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha1 = { version = "0.10", features = ["oid"] }
+sha2 = { version = "0.10", features = ["oid"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "macros", "migrate", "uuid", "chrono", "json"] }
+thiserror = "2"
+tokio = { version = "1", features = ["full"] }
+tokio-util = "0.7"
+tower-http = { version = "0.6", features = ["trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+url = "2"
+utoipa = { version = "5", features = ["axum_extras", "uuid", "chrono"] }
+uuid = { version = "1", features = ["v7", "v4", "serde"] }
+x509-parser = "0.16"
+
+[dev-dependencies]
+http-body-util = "0.1"
+tower = { version = "0.5", features = ["util"] }

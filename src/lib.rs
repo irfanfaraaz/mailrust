@@ -1,0 +1,25 @@
+// src/lib.rs
+pub mod accounts;
+pub mod api;
+pub mod background;
+pub mod cli;
+pub mod config;
+pub mod db;
+pub mod dns;
+pub mod domains;
+pub mod email_events;
+pub mod emails;
+pub mod error;
+pub mod events;
+pub mod keys;
+pub mod limiter;
+pub mod openapi;
+pub mod queue;
+pub mod render;
+pub mod safety;
+pub mod sender;
+pub mod telemetry;
+pub mod tokens;
+pub mod tracking;
+pub mod webhooks;
+pub mod worker;

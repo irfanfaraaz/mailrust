@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT address, reason AS \"reason: SuppressionReason\", created_at FROM suppressions WHERE account_id = $1 AND address = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "address",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "reason: SuppressionReason",
+        "type_info": {
+          "Custom": {
+            "name": "suppression_reason",
+            "kind": {
+              "Enum": [
+                "bounce",
+                "complaint",
+                "manual"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "a650386471a3a1321ae0d07cd732669b3af0b93802793829b2d3307e96187c5d"
+}

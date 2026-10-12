@@ -1,0 +1,101 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE emails\n           SET status = 'sending', lease_until = now() + make_interval(secs => $2), attempts = attempts + 1, updated_at = now()\n           WHERE id IN (\n               SELECT e.id FROM emails e JOIN accounts a ON a.id = e.account_id\n               WHERE e.status = 'queued' AND e.send_at <= now() AND a.status = 'active'\n               ORDER BY e.send_at\n               LIMIT $1\n               FOR UPDATE OF e SKIP LOCKED)\n           RETURNING id, account_id, domain_id, from_address, to_addresses, cc_addresses, bcc_addresses, reply_to,\n                     subject, html, text_body,\n                     headers AS \"headers: Json<BTreeMap<String, String>>\",\n                     tags AS \"tags: Json<BTreeMap<String, String>>\",\n                     attempts",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "account_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "domain_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "from_address",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "to_addresses",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 5,
+        "name": "cc_addresses",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 6,
+        "name": "bcc_addresses",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 7,
+        "name": "reply_to",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 8,
+        "name": "subject",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "html",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "text_body",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
+        "name": "headers: Json<BTreeMap<String, String>>",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 12,
+        "name": "tags: Json<BTreeMap<String, String>>",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 13,
+        "name": "attempts",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Float8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "fd7cf5f4911cacc8cc29890716598c2789890f68ece3a99ae1f49aaf593960fc"
+}

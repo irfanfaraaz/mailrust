@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT links AS \"links: Json<Vec<String>>\", sent_at FROM emails WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "links: Json<Vec<String>>",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 1,
+        "name": "sent_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "0d85aa452fdb008146bdae9f75e03eadaafbdd9bbe56b1aac6ebb11670578b73"
+}

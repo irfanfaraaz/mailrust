@@ -1,0 +1,66 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT k.id AS key_id, k.account_id, k.access AS \"access: KeyAccess\",\n                  a.status AS \"account_status: AccountStatus\", a.paused_reason\n           FROM api_keys k JOIN accounts a ON a.id = k.account_id\n           WHERE k.key_hash = $1 AND k.revoked_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "key_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "account_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "access: KeyAccess",
+        "type_info": {
+          "Custom": {
+            "name": "key_access",
+            "kind": {
+              "Enum": [
+                "full",
+                "sending"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "account_status: AccountStatus",
+        "type_info": {
+          "Custom": {
+            "name": "account_status",
+            "kind": {
+              "Enum": [
+                "active",
+                "paused"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "paused_reason",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "604b0ef33e6f25545d8144c9ee4a53a256c6609da810f6ab9f07707a7561bea6"
+}

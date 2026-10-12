@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE emails SET status = 'suppressed', lease_until = NULL, updated_at = now() WHERE id = $1 AND status IN ('sending', 'unknown')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7ba38da195f2bc103ea16687d133f72b88fb4840d96192161fb53760cf2a9706"
+}

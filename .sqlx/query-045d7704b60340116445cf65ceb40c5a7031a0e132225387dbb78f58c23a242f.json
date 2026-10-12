@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE emails SET status = 'queued', attempts = GREATEST(attempts - 1, 0), lease_until = NULL, updated_at = now()\n         WHERE id = $1 AND status = 'sending'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "045d7704b60340116445cf65ceb40c5a7031a0e132225387dbb78f58c23a242f"
+}

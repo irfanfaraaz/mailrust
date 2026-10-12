@@ -1,0 +1,29 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: mailrust
+          POSTGRES_PASSWORD: mailrust
+          POSTGRES_DB: mailrust
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U mailrust"
+          --health-interval 2s
+          --health-retries 30
+    env:
+      DATABASE_URL: postgres://mailrust:mailrust@localhost:5432/mailrust
+      SQLX_OFFLINE: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test

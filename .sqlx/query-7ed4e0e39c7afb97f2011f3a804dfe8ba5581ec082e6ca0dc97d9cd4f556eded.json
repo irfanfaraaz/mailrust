@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE emails SET provider_message_id = COALESCE(provider_message_id, $2) WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7ed4e0e39c7afb97f2011f3a804dfe8ba5581ec082e6ca0dc97d9cd4f556eded"
+}

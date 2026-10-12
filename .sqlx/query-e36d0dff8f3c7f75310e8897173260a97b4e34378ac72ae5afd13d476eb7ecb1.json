@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT type AS \"type\", recipient, likely_bot, created_at FROM email_events WHERE email_id = $1 ORDER BY created_at, id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "type",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "recipient",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "likely_bot",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 3,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "e36d0dff8f3c7f75310e8897173260a97b4e34378ac72ae5afd13d476eb7ecb1"
+}

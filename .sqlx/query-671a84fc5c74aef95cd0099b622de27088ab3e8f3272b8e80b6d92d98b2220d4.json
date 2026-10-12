@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE emails SET idempotency_key = NULL WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "671a84fc5c74aef95cd0099b622de27088ab3e8f3272b8e80b6d92d98b2220d4"
+}

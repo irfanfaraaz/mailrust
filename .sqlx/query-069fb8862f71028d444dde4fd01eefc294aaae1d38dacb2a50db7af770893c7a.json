@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO webhook_deliveries (id, account_id, webhook_id, event_type, payload)\n         SELECT gen_random_uuid(), $1, w.id, $2, $3 FROM webhooks w\n         WHERE w.account_id = $1 AND w.enabled AND $2 = ANY(w.event_types)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "069fb8862f71028d444dde4fd01eefc294aaae1d38dacb2a50db7af770893c7a"
+}

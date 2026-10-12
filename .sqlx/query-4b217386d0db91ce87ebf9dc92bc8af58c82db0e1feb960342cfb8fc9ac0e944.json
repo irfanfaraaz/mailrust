@@ -1,0 +1,126 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, from_address, to_addresses, cc_addresses, bcc_addresses, reply_to, subject, html, text_body,\n                  status AS \"status: EmailStatus\", send_at, created_at, sent_at, last_error,\n                  tags AS \"tags: Json<BTreeMap<String, String>>\"\n           FROM emails WHERE id = $1 AND account_id = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "from_address",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "to_addresses",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 3,
+        "name": "cc_addresses",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 4,
+        "name": "bcc_addresses",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 5,
+        "name": "reply_to",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 6,
+        "name": "subject",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "html",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "text_body",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "status: EmailStatus",
+        "type_info": {
+          "Custom": {
+            "name": "email_status",
+            "kind": {
+              "Enum": [
+                "queued",
+                "sending",
+                "unknown",
+                "sent",
+                "delivered",
+                "delivery_delayed",
+                "bounced",
+                "complained",
+                "failed",
+                "suppressed",
+                "canceled"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "send_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 11,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 12,
+        "name": "sent_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 13,
+        "name": "last_error",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 14,
+        "name": "tags: Json<BTreeMap<String, String>>",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "4b217386d0db91ce87ebf9dc92bc8af58c82db0e1feb960342cfb8fc9ac0e944"
+}

@@ -1,0 +1,93 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, account_id, name, status AS \"status: DomainStatus\",\n                  dns_records AS \"dns_records: Json<Vec<DnsRecord>>\", tracking_subdomain, tracking_verified,\n                  open_tracking, click_tracking, verify_until, created_at\n           FROM domains WHERE account_id = $1 ORDER BY created_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "account_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "status: DomainStatus",
+        "type_info": {
+          "Custom": {
+            "name": "domain_status",
+            "kind": {
+              "Enum": [
+                "pending",
+                "verified",
+                "failed"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "dns_records: Json<Vec<DnsRecord>>",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 5,
+        "name": "tracking_subdomain",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "tracking_verified",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 7,
+        "name": "open_tracking",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 8,
+        "name": "click_tracking",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 9,
+        "name": "verify_until",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 10,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "0df8d46a409a05f3d4688ba80a8b42c89a679869e4344e1616c0b5d73305028f"
+}

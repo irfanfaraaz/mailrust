@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE emails SET status = 'unknown', unknown_since = now(), lease_until = NULL, updated_at = now()\n         WHERE status = 'sending' AND lease_until < now()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "d69e2f20daa7c3cf66b08c4d92815a859e3f91d9328bdc5030c208026155388a"
+}
