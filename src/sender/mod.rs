@@ -59,6 +59,9 @@ pub enum SenderError {
     /// Timed out or the answer was lost: SES may or may not have the email.
     #[error("sender outcome unknown: {0}")]
     Unknown(String),
+    /// The provider's 24-hour quota is used up. Not this email's fault: no try is used, everyone waits.
+    #[error("sender daily quota used up: {0}")]
+    DailyQuota(String),
     #[error("the sender paused this tenant")]
     TenantPaused,
     #[error("sender is not configured: {0}")]

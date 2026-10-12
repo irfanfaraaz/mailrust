@@ -2,7 +2,7 @@ use anyhow::Context;
 use async_trait::async_trait;
 use aws_sdk_sesv2::{
     Client,
-    error::{DisplayErrorContext, SdkError},
+    error::{DisplayErrorContext, ProvideErrorMetadata, SdkError},
     operation::{
         create_email_identity::CreateEmailIdentityError, create_tenant::CreateTenantError,
         create_tenant_resource_association::CreateTenantResourceAssociationError,
@@ -19,6 +19,9 @@ use super::{
     DnsRecord, DomainState, EMAIL_ID_TAG, OutgoingEmail, SendQuota, Sender, SenderError, TenantRef,
 };
 use crate::config::SesConfig;
+
+/// SES says this (as a throttling error) when the 24-hour quota is used up.
+pub const DAILY_QUOTA_TEXT: &str = "Daily message quota exceeded";
 
 pub const SEND_TIMEOUT_SECS: u64 = 60;
 const _: () = assert!(SEND_TIMEOUT_SECS < crate::queue::LEASE_SECS as u64);
@@ -297,6 +300,12 @@ impl Sender for SesSender {
             .retry_config(aws_config::retry::RetryConfig::disabled());
         match req.customize().config_override(no_retry).send().await {
             Ok(out) => Ok(out.message_id().unwrap_or_default().to_string()),
+            Err(e)
+                if e.message().is_some_and(|m| m.contains(DAILY_QUOTA_TEXT))
+                    || ctx(&e).contains(DAILY_QUOTA_TEXT) =>
+            {
+                Err(SenderError::DailyQuota(ctx(&e)))
+            }
             Err(e) => Err(match &e {
                 // The request may have reached SES; sending again could send twice.
                 SdkError::TimeoutError(_) | SdkError::ResponseError(_) => {
@@ -348,6 +357,41 @@ mod tests {
             tags: Default::default(),
             raw: b"Subject: hi\r\n\r\nhi".to_vec(),
         }
+    }
+
+    fn answer(status: u16, error_type: &'static str, message: &'static str) -> SesSender {
+        test_ses(aws_smithy_http_client::test_util::infallible_client_fn(
+            move |_| {
+                axum::http::Response::builder()
+                    .status(status)
+                    .header("x-amzn-ErrorType", error_type)
+                    .header("content-type", "application/json")
+                    .body(format!(r#"{{"message":"{message}"}}"#))
+                    .unwrap()
+            },
+        ))
+    }
+
+    #[tokio::test]
+    async fn the_daily_cap_is_told_apart_from_the_per_second_throttle() {
+        let daily = answer(400, "ThrottlingException", "Daily message quota exceeded.")
+            .send(&mail())
+            .await;
+        assert!(
+            matches!(&daily, Err(SenderError::DailyQuota(m)) if m.contains(DAILY_QUOTA_TEXT)),
+            "the pause reason must keep the SES text: {daily:?}"
+        );
+        let daily429 = answer(429, "TooManyRequestsException", "Daily message quota exceeded.")
+            .send(&mail())
+            .await;
+        assert!(
+            matches!(daily429, Err(SenderError::DailyQuota(_))),
+            "{daily429:?}"
+        );
+        let rate = answer(429, "TooManyRequestsException", "Maximum sending rate exceeded.")
+            .send(&mail())
+            .await;
+        assert!(matches!(rate, Err(SenderError::Retryable(_))), "{rate:?}");
     }
 
     #[tokio::test]

@@ -50,6 +50,19 @@ pub async fn save(pool: &PgPool, q: &SendQuota) -> sqlx::Result<()> {
     Ok(())
 }
 
+/// SES said the 24-hour quota is used up: nobody sends until the pause ends or a sync shows room.
+pub async fn pause(pool: &PgPool, reason: &str) -> sqlx::Result<()> {
+    sqlx::query!(
+        "INSERT INTO sender_quota (id, paused_until, pause_reason) VALUES (true, now() + make_interval(secs => $1), $2)
+         ON CONFLICT (id) DO UPDATE SET paused_until = EXCLUDED.paused_until, pause_reason = EXCLUDED.pause_reason",
+        DAILY_CAP_PAUSE_SECS as f64,
+        reason
+    )
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 pub async fn sync_once(state: &AppState) -> anyhow::Result<()> {
     if let Some(q) = state.sender.quota().await? {
         save(&state.pool, &q).await?;

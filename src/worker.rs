@@ -207,6 +207,11 @@ async fn process(
         Err(SenderError::Permanent(m)) | Err(SenderError::NotConfigured(m)) => {
             queue::mark_failed(pool, &email, &m).await?
         }
+        Err(SenderError::DailyQuota(m)) => {
+            tracing::warn!(email_id = %email.id, "daily sending quota used up; pausing all sending");
+            queue::requeue_paused(pool, email.id).await?;
+            crate::quota::pause(pool, &m).await?;
+        }
         Err(SenderError::TenantPaused) => {
             accounts::pause(
                 pool,
