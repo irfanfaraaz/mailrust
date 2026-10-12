@@ -22,7 +22,10 @@ use crate::{
 pub const CONCURRENCY: usize = 10;
 
 pub async fn run(state: AppState, shutdown: CancellationToken) -> anyhow::Result<()> {
-    let limiter = Arc::new(SendLimiter::new(state.config.ses_max_send_rate, state.config.worker_processes));
+    let limiter = Arc::new(SendLimiter::new(
+        state.config.ses_max_send_rate,
+        state.config.worker_processes,
+    ));
     tracing::info!("worker started");
     while !shutdown.is_cancelled() {
         let idle = match tick(&state, &limiter).await {
@@ -60,8 +63,12 @@ pub async fn tick(state: &AppState, limiter: &SendLimiter) -> anyhow::Result<usi
     Ok(claimed)
 }
 
-async fn after_batch(_state: &AppState, _accounts: HashSet<Uuid>) {
-    // Task 10 checks auto-pause here.
+async fn after_batch(state: &AppState, accounts: HashSet<Uuid>) {
+    for id in accounts {
+        if let Err(e) = safety::check_account(&state.pool, id).await {
+            tracing::error!(account_id = %id, error = ?e, "auto-pause check failed");
+        }
+    }
 }
 
 fn tracking_for<'a>(config: &'a Config, domain: &Domain) -> Option<Tracking<'a>> {
@@ -72,12 +79,23 @@ fn tracking_for<'a>(config: &'a Config, domain: &Domain) -> Option<Tracking<'a>>
         (Some(host), true) => format!("https://{host}"),
         _ => config.public_base(),
     };
-    Some(Tracking { base_url, secret: &config.tracking_secret, opens: domain.open_tracking, clicks: domain.click_tracking })
+    Some(Tracking {
+        base_url,
+        secret: &config.tracking_secret,
+        opens: domain.open_tracking,
+        clicks: domain.click_tracking,
+    })
 }
 
-async fn process(state: &AppState, limiter: &SendLimiter, email: ClaimedEmail) -> anyhow::Result<()> {
+async fn process(
+    state: &AppState,
+    limiter: &SendLimiter,
+    email: ClaimedEmail,
+) -> anyhow::Result<()> {
     let pool = &state.pool;
-    let Some(account) = accounts::get(pool, email.account_id).await? else { return Ok(()) };
+    let Some(account) = accounts::get(pool, email.account_id).await? else {
+        return Ok(());
+    };
     if account.status == AccountStatus::Paused {
         queue::requeue_paused(pool, email.id).await?;
         return Ok(());
@@ -102,21 +120,25 @@ async fn process(state: &AppState, limiter: &SendLimiter, email: ClaimedEmail) -
         .filter(|a| seen.insert(a.clone()))
         .collect();
     let blocked = safety::suppressed_among(pool, account.id, &everyone).await?;
-    let (removed, recipients): (Vec<String>, Vec<String>) = everyone.into_iter().partition(|a| blocked.contains(a));
+    let (removed, recipients): (Vec<String>, Vec<String>) =
+        everyone.into_iter().partition(|a| blocked.contains(a));
     if recipients.is_empty() {
         queue::mark_suppressed(pool, &email, &removed).await?;
         return Ok(());
     }
     if !removed.is_empty() {
         let mut conn = pool.acquire().await?;
-        email_events::record(&mut conn, NewEvent {
-            account_id: account.id,
-            email_id: email.id,
-            kind: EventKind::Suppressed,
-            recipient: None,
-            data: json!({ "recipients": removed, "partial": true }),
-            likely_bot: false,
-        })
+        email_events::record(
+            &mut conn,
+            NewEvent {
+                account_id: account.id,
+                email_id: email.id,
+                kind: EventKind::Suppressed,
+                recipient: None,
+                data: json!({ "recipients": removed, "partial": true }),
+                likely_bot: false,
+            },
+        )
         .await?;
     }
 
@@ -145,7 +167,13 @@ async fn process(state: &AppState, limiter: &SendLimiter, email: ClaimedEmail) -
         queue::save_links(pool, email.id, &rendered.links).await?;
     }
 
-    limiter.wait(account.id, account.send_rate_per_sec.max(1) as u32, recipients.len()).await;
+    limiter
+        .wait(
+            account.id,
+            account.send_rate_per_sec.max(1) as u32,
+            recipients.len(),
+        )
+        .await;
     let out = OutgoingEmail {
         email_id: email.id,
         tenant: account.tenant(),
@@ -158,7 +186,9 @@ async fn process(state: &AppState, limiter: &SendLimiter, email: ClaimedEmail) -
         Ok(provider_id) => {
             queue::mark_sent(pool, &email, &provider_id, &out.recipients).await?;
             if state.config.sender == crate::config::SenderKind::Fake {
-                if let Err(e) = crate::events::simulate(pool, email.id, &provider_id, &out.recipients).await {
+                if let Err(e) =
+                    crate::events::simulate(pool, email.id, &provider_id, &out.recipients).await
+                {
                     tracing::warn!(email_id = %email.id, error = ?e, "simulated events failed");
                 }
             }
@@ -167,9 +197,16 @@ async fn process(state: &AppState, limiter: &SendLimiter, email: ClaimedEmail) -
             Some(d) => queue::mark_retry(pool, email.id, &m, d).await?,
             None => queue::mark_failed(pool, &email, &m).await?,
         },
-        Err(SenderError::Permanent(m)) | Err(SenderError::NotConfigured(m)) => queue::mark_failed(pool, &email, &m).await?,
+        Err(SenderError::Permanent(m)) | Err(SenderError::NotConfigured(m)) => {
+            queue::mark_failed(pool, &email, &m).await?
+        }
         Err(SenderError::TenantPaused) => {
-            accounts::pause(pool, account.id, "the sender paused this account (ses_tenant_paused)").await?;
+            accounts::pause(
+                pool,
+                account.id,
+                "the sender paused this account (ses_tenant_paused)",
+            )
+            .await?;
             queue::requeue_paused(pool, email.id).await?;
         }
     }
