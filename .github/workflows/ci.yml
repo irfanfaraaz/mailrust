@@ -33,7 +33,10 @@ jobs:
       SQLX_OFFLINE: "true"
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.94.1
+      # The version lives in `with`, not in the ref, so Dependabot does not bump it.
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.94.1
       - uses: Swatinem/rust-cache@v2
       - run: cargo check --all-targets --locked
   deny:
