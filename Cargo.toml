@@ -42,5 +42,6 @@ uuid = { version = "1", features = ["v7", "v4", "serde"] }
 x509-parser = "0.16"
 
 [dev-dependencies]
+aws-smithy-http-client = { version = "1.5", features = ["test-util"] }
 http-body-util = "0.1"
 tower = { version = "0.5", features = ["util"] }
