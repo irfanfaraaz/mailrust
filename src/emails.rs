@@ -334,6 +334,31 @@ pub fn validate(req: SendEmailRequest, now: DateTime<Utc>) -> Result<ValidEmail,
     })
 }
 
+/// Every account may send this many urgent emails a day, or 10% of its mail if that is more.
+pub const URGENT_FLOOR: i64 = 100;
+
+/// Urgent use is capped so the urgent reserve keeps working. Over the cap, the email still goes, as normal.
+async fn allowed_priority(conn: &mut PgConnection, account_id: Uuid, wanted: Priority) -> sqlx::Result<Priority> {
+    if wanted != Priority::Urgent {
+        return Ok(wanted);
+    }
+    // One urgent insert per account at a time, so two requests cannot both slip past the cap.
+    sqlx::query!("SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))", account_id.to_string())
+        .execute(&mut *conn).await?;
+    let urgent = sqlx::query_scalar!(
+        r#"SELECT count(*) AS "n!" FROM emails WHERE account_id = $1 AND priority = 'urgent' AND created_at > now() - interval '24 hours'"#,
+        account_id
+    ).fetch_one(&mut *conn).await?;
+    if urgent < URGENT_FLOOR {
+        return Ok(Priority::Urgent);
+    }
+    let total = sqlx::query_scalar!(
+        r#"SELECT count(*) AS "n!" FROM emails WHERE account_id = $1 AND created_at > now() - interval '24 hours'"#,
+        account_id
+    ).fetch_one(&mut *conn).await?;
+    Ok(if urgent < total / 10 { Priority::Urgent } else { Priority::Normal })
+}
+
 pub async fn insert(
     conn: &mut PgConnection,
     account_id: Uuid,
@@ -341,6 +366,7 @@ pub async fn insert(
     e: &ValidEmail,
     idempotency: Option<(&str, &[u8])>,
 ) -> sqlx::Result<(Uuid, Priority)> {
+    let priority = allowed_priority(&mut *conn, account_id, e.priority).await?;
     let id = Uuid::now_v7();
     let (key, hash) = match idempotency {
         Some((k, h)) => (Some(k), Some(h)),
@@ -366,7 +392,7 @@ pub async fn insert(
         e.send_at,
         key,
         hash,
-        e.priority as Priority
+        priority as Priority
     )
     .execute(&mut *conn)
     .await?;
@@ -384,7 +410,7 @@ pub async fn insert(
         .execute(&mut *conn)
         .await?;
     }
-    Ok((id, e.priority))
+    Ok((id, priority))
 }
 
 pub async fn load_attachments(pool: &PgPool, email_id: Uuid) -> sqlx::Result<Vec<AttachmentData>> {

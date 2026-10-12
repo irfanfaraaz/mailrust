@@ -321,3 +321,57 @@ async fn unknown_priority_is_a_validation_error(pool: sqlx::PgPool) {
     assert_eq!(s, StatusCode::BAD_REQUEST);
     assert_eq!(b["error"]["code"], "validation_error");
 }
+
+fn urgent(to: &str) -> Value {
+    let mut e = email(to);
+    e["priority"] = json!("urgent");
+    e
+}
+
+#[sqlx::test]
+async fn urgent_over_the_cap_is_stored_as_normal(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    common::verified_domain(&t, "shop.com").await;
+    common::seed_emails(&pool, t.account.id, "urgent", "sent", 100, 1.0).await;
+    common::seed_emails(&pool, t.account.id, "normal", "sent", 899, 1.0).await; // 999 + this one = 1,000 → cap 100
+    let (s, b) = common::call(&t.router, common::req("POST", "/emails", Some(&t.key), Some(urgent("a@x.com")))).await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    assert_eq!(b["priority"], "normal");
+}
+
+#[sqlx::test]
+async fn the_cap_grows_with_volume_and_old_mail_does_not_count(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    common::verified_domain(&t, "shop.com").await;
+    common::seed_emails(&pool, t.account.id, "urgent", "sent", 100, 25.0).await; // older than 24 h
+    let (_, b) = common::call(&t.router, common::req("POST", "/emails", Some(&t.key), Some(urgent("a@x.com")))).await;
+    assert_eq!(b["priority"], "urgent");
+    common::seed_emails(&pool, t.account.id, "urgent", "sent", 100, 1.0).await;
+    common::seed_emails(&pool, t.account.id, "normal", "sent", 1100, 1.0).await; // ~1,200 → cap 120
+    let (_, b) = common::call(&t.router, common::req("POST", "/emails", Some(&t.key), Some(urgent("b@x.com")))).await;
+    assert_eq!(b["priority"], "urgent");
+}
+
+#[sqlx::test]
+async fn a_batch_crossing_the_cap_downgrades_only_the_extra(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    common::verified_domain(&t, "shop.com").await;
+    common::seed_emails(&pool, t.account.id, "urgent", "sent", 99, 1.0).await;
+    let (s, b) = common::call(&t.router, common::req("POST", "/emails/batch", Some(&t.key), Some(json!([urgent("a@x.com"), urgent("b@x.com")])))).await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    assert_eq!(b["data"][0]["priority"], "urgent");
+    assert_eq!(b["data"][1]["priority"], "normal");
+}
+
+#[sqlx::test]
+async fn an_idempotent_replay_returns_the_stored_priority(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    common::verified_domain(&t, "shop.com").await;
+    common::seed_emails(&pool, t.account.id, "urgent", "sent", 100, 1.0).await;
+    let body = urgent("a@x.com");
+    let (_, first) = common::call(&t.router, with_key_header(&t.key, "k1", &body)).await;
+    let (_, again) = common::call(&t.router, with_key_header(&t.key, "k1", &body)).await;
+    assert_eq!(first["priority"], "normal");
+    assert_eq!(again["priority"], "normal");
+    assert_eq!(first["id"], again["id"]);
+}
