@@ -22,3 +22,17 @@ async fn migrations_create_every_table(pool: sqlx::PgPool) {
         assert!(tables.iter().any(|x| x == t), "missing table {t}");
     }
 }
+
+#[sqlx::test]
+async fn the_unused_urgent_index_is_gone(pool: sqlx::PgPool) {
+    let found: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'emails_account_urgent')",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert!(
+        !found,
+        "emails_account_urgent is never used and slows inserts"
+    );
+}

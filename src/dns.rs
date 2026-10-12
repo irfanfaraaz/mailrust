@@ -1,14 +1,14 @@
 use hickory_resolver::{
-    TokioAsyncResolver,
+    TokioResolver,
     proto::rr::{RData, RecordType},
 };
 
 /// Returns the CNAME target of `host` without the trailing dot, if any.
 pub async fn cname_target(host: &str) -> Option<String> {
-    let resolver = TokioAsyncResolver::tokio_from_system_conf().ok()?;
+    let resolver = TokioResolver::builder_tokio().ok()?.build().ok()?;
     let lookup = resolver.lookup(host, RecordType::CNAME).await.ok()?;
-    lookup.record_iter().find_map(|r| match r.data() {
-        Some(RData::CNAME(c)) => Some(c.0.to_utf8().trim_end_matches('.').to_ascii_lowercase()),
+    lookup.answers().iter().find_map(|r| match &r.data {
+        RData::CNAME(c) => Some(c.0.to_utf8().trim_end_matches('.').to_ascii_lowercase()),
         _ => None,
     })
 }

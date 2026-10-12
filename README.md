@@ -1,9 +1,13 @@
 # Mailrust
 
+[![ci](https://github.com/irfanfaraaz/mailrust/actions/workflows/ci.yml/badge.svg)](https://github.com/irfanfaraaz/mailrust/actions/workflows/ci.yml)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
+
 Self-hosted email platform with two doors: a sending API (like Resend) and a newsletter app (like beehiiv, coming next). One Rust engine sends everything through your own Amazon SES account.
 
 - **Sending API** — `POST /emails`, batch, scheduled send, idempotency keys, attachments, webhooks, open/click tracking.
 - **Safe for many accounts** — each account is its own SES tenant with its own block list, and Mailrust pauses an account itself when bounces go over 2% or complaints over 0.08%.
+- **Smart sending** — `"priority": "urgent" | "normal" | "bulk"` puts login codes ahead of newsletters. The send rate follows your SES limits, a hit on the SES daily cap pauses sending instead of failing emails, and the last 10% of the daily quota is kept for urgent mail.
 - **No extra services** — Postgres is the queue (`FOR UPDATE SKIP LOCKED`). No Redis.
 
 ## Quick start (no AWS needed)
@@ -55,6 +59,12 @@ cargo test                       # needs the dev Postgres from docker compose
 cargo sqlx prepare -- --all-targets   # after changing SQL; commit .sqlx/
 ```
 
+## Contributing
+
+Mailrust does not take pull requests yet. Bug reports and ideas are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md), and report security problems as [SECURITY.md](SECURITY.md) says.
+
+Changes per version are in [CHANGELOG.md](CHANGELOG.md).
+
 ## License
 
-AGPL-3.0. See [LICENSE](LICENSE).
+AGPL-3.0-or-later. See [LICENSE](LICENSE).

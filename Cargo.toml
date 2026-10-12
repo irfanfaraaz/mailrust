@@ -3,14 +3,23 @@ name = "mailrust"
 version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
-rust-version = "1.85"
+# The AWS SDK sets this floor; CI checks it.
+rust-version = "1.94.1"
+description = "Self-hosted email platform: a sending API and a newsletter app, on your own Amazon SES"
+repository = "https://github.com/irfanfaraaz/mailrust"
+readme = "README.md"
+keywords = ["email", "amazon-ses", "self-hosted", "newsletter", "api"]
+categories = ["email", "web-programming::http-server"]
+publish = false
 
 [dependencies]
 anyhow = "1"
 async-trait = "0.1"
 aws-config = { version = "1", features = ["behavior-version-latest"] }
-aws-sdk-sesv2 = "1.140"
-aws-sdk-sts = "1"
+# Not "rustls": that is the old hyper 0.14 / rustls 0.21 stack with known holes.
+aws-sdk-sesv2 = { version = "1.140", default-features = false, features = ["default-https-client", "rt-tokio", "behavior-version-latest"] }
+# Not "rustls": that is the old hyper 0.14 / rustls 0.21 stack with known holes.
+aws-sdk-sts = { version = "1", default-features = false, features = ["default-https-client", "rt-tokio", "behavior-version-latest"] }
 axum = { version = "0.8", features = ["macros"] }
 base64 = "0.22"
 chrono = { version = "0.4", features = ["serde"] }
@@ -18,7 +27,7 @@ clap = { version = "4", features = ["derive", "env"] }
 dotenvy = "0.15"
 futures = "0.3"
 governor = "0.8"
-hickory-resolver = "0.24"
+hickory-resolver = "0.26"
 hmac = "0.12"
 lettre = { version = "0.11", default-features = false, features = ["builder"] }
 lol_html = "2"

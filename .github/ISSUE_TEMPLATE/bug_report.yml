@@ -1,0 +1,40 @@
+name: Bug report
+description: Something does not work as the README or the API reference says.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you got instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The commands or API calls, with secrets and API keys removed.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: The relevant log lines, with secrets removed.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: Mailrust version or commit
+    validations:
+      required: true
+  - type: dropdown
+    id: sender
+    attributes:
+      label: Sender
+      options:
+        - fake
+        - ses
+    validations:
+      required: true
