@@ -11,3 +11,5 @@ pub mod api;
 pub mod background;
 pub mod dns;
 pub mod domains;
+pub mod render;
+pub mod tokens;
