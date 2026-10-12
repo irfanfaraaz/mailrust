@@ -19,4 +19,5 @@ pub mod safety;
 pub mod sender;
 pub mod telemetry;
 pub mod tokens;
+pub mod webhooks;
 pub mod worker;

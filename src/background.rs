@@ -14,6 +14,10 @@ pub fn spawn_all(
     tasks.spawn(crate::domains::verify_loop(state.clone(), shutdown.clone()));
     tasks.spawn(crate::worker::run(state.clone(), shutdown.clone()));
     tasks.spawn(crate::queue::reaper_loop(state.clone(), shutdown.clone()));
+    tasks.spawn(crate::webhooks::delivery_loop(
+        state.clone(),
+        shutdown.clone(),
+    ));
     tasks.spawn(maintenance_loop(state, shutdown));
 }
 

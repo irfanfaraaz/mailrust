@@ -73,5 +73,14 @@ pub async fn record(conn: &mut PgConnection, ev: NewEvent<'_>) -> sqlx::Result<U
     )
     .execute(&mut *conn)
     .await?;
+    if let Some(event_type) = ev.kind.webhook_type() {
+        let data = serde_json::json!({
+            "email_id": ev.email_id,
+            "recipient": ev.recipient,
+            "likely_bot": ev.likely_bot,
+            "details": ev.data,
+        });
+        crate::webhooks::enqueue(conn, ev.account_id, event_type, data).await?;
+    }
     Ok(id)
 }

@@ -120,7 +120,14 @@ pub async fn check_account(pool: &PgPool, account_id: Uuid) -> anyhow::Result<Op
     };
     if accounts::pause(pool, account_id, &reason).await? {
         tracing::warn!(%account_id, %reason, "account auto-paused");
-        // Task 11 queues the account.paused webhook here.
+        let mut conn = pool.acquire().await?;
+        crate::webhooks::enqueue(
+            &mut conn,
+            account_id,
+            "account.paused",
+            serde_json::json!({ "account_id": account_id, "reason": reason }),
+        )
+        .await?;
         return Ok(Some(reason));
     }
     Ok(None)

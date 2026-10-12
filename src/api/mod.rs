@@ -15,6 +15,7 @@ pub mod emails;
 pub mod health;
 pub mod json;
 pub mod ses;
+pub mod webhooks;
 
 // shortcut: in-memory, per process; keys never expire from the map. Fine for one API process.
 pub type KeyLimiter = governor::DefaultKeyedRateLimiter<Uuid>;
@@ -50,6 +51,7 @@ pub fn router(state: AppState) -> Router {
         .merge(domains::routes())
         .merge(emails::routes())
         .merge(ses::routes())
+        .merge(webhooks::routes())
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
         .layer(TraceLayer::new_for_http())
         .with_state(state)
