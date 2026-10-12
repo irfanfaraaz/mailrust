@@ -4,7 +4,10 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use governor::{DefaultDirectRateLimiter, Quota, RateLimiter};
+use governor::{
+    DefaultDirectRateLimiter, Quota, RateLimiter,
+    clock::{Clock, DefaultClock},
+};
 use uuid::Uuid;
 
 // shortcut: per-process limiters; each process gets rate / WORKER_PROCESSES. Upgrade to a Postgres-backed limiter if we run many workers.
@@ -47,11 +50,19 @@ impl SendLimiter {
     pub fn set_global_rate(&self, rate: u32) {
         let mut g = self.global.lock().unwrap_or_else(|p| p.into_inner());
         if g.0 != rate {
-            *g = (
-                rate,
-                Arc::new(RateLimiter::direct(quota(rate, self.divisor))),
-            );
+            let fresh = RateLimiter::direct(quota(rate, self.divisor));
+            // Start empty: a fresh limiter's full burst would come on top of what the old one just sent.
+            while fresh.check().is_ok() {}
+            *g = (rate, Arc::new(fresh));
         }
+    }
+
+    fn global(&self) -> Arc<DefaultDirectRateLimiter> {
+        self.global
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .1
+            .clone()
     }
 
     fn account(&self, id: Uuid, rate: u32) -> Arc<DefaultDirectRateLimiter> {
@@ -69,14 +80,17 @@ impl SendLimiter {
     /// Account limit counts emails; the SES limit counts recipients (that is how SES counts).
     pub async fn wait(&self, account_id: Uuid, account_rate: u32, recipients: usize) {
         self.account(account_id, account_rate).until_ready().await;
-        let global = self
-            .global
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .1
-            .clone();
         for _ in 0..recipients.max(1) {
-            global.until_ready().await;
+            // Re-read the limiter on every try: after a rate change, waiters move to the new one.
+            loop {
+                match self.global().check() {
+                    Ok(()) => break,
+                    Err(later) => {
+                        tokio::time::sleep(later.wait_time_from(DefaultClock::default().now()))
+                            .await
+                    }
+                }
+            }
         }
     }
 }
@@ -106,6 +120,22 @@ mod tests {
         l.set_global_rate(2);
         assert_eq!(l.global_rate(), 2);
         assert!(!Arc::ptr_eq(&before, &l.global.lock().unwrap().1));
+    }
+
+    /// A fresh governor limiter starts with a full burst. After a rate change that burst would come on top
+    /// of what the old limiter just sent, so the new one must start empty.
+    #[tokio::test]
+    async fn a_new_rate_starts_without_a_free_burst() {
+        let l = SendLimiter::new(1000, 1);
+        l.set_global_rate(5);
+        let id = Uuid::now_v7();
+        let start = Instant::now();
+        l.wait(id, 1000, 5).await; // 5 recipients at 5/s, no burst: about 1 s
+        assert!(
+            start.elapsed().as_millis() >= 700,
+            "took {:?}",
+            start.elapsed()
+        );
     }
 
     #[tokio::test]
