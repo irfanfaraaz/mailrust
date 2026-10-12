@@ -1,4 +1,5 @@
-# Monthly, one grouped PR per ecosystem, to keep the noise low.
+# Monthly, one grouped PR per ecosystem, minor and patch updates only.
+# Major updates change APIs, so they are done by hand, one at a time.
 # Security updates still come as soon as GitHub finds a problem.
 version: 2
 updates:
@@ -6,7 +7,12 @@ updates:
     directory: /
     schedule: { interval: monthly }
     groups:
-      cargo: { patterns: ["*"] }
+      cargo:
+        patterns: ["*"]
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: monthly }
