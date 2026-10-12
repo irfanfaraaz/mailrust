@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE emails SET status = 'canceled', updated_at = now()\n         WHERE id = $1 AND account_id = $2 AND status = 'queued' RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "0e8530e9e297fdfdc8890422124f9178ad24aee161e1399de35b095ad9dface8"
+}

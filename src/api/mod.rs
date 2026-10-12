@@ -11,6 +11,7 @@ use crate::{config::Config, sender::Sender};
 
 pub mod auth;
 pub mod domains;
+pub mod emails;
 pub mod health;
 pub mod json;
 
@@ -44,6 +45,7 @@ pub fn router(state: AppState) -> Router {
     Router::new()
         .merge(health::routes())
         .merge(domains::routes())
+        .merge(emails::routes())
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
         .layer(TraceLayer::new_for_http())
         .with_state(state)

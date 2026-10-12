@@ -13,3 +13,4 @@ pub mod dns;
 pub mod domains;
 pub mod render;
 pub mod tokens;
+pub mod emails;
