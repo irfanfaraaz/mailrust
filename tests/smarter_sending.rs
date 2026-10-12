@@ -253,3 +253,10 @@ async fn emails_already_claimed_wait_once_the_pause_starts(pool: sqlx::PgPool) {
         assert_eq!(attempts, 0);
     }
 }
+
+#[sqlx::test]
+async fn one_gate_read_gives_the_rate_too(pool: sqlx::PgPool) {
+    assert_eq!(quota::gate(&pool).await.unwrap().max_send_rate, None);
+    quota::save(&pool, &q(2.0, 1000.0, 0.0)).await.unwrap();
+    assert_eq!(quota::gate(&pool).await.unwrap().max_send_rate, Some(2.0));
+}

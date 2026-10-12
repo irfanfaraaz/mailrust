@@ -39,7 +39,15 @@ pub struct ClaimedEmail {
 /// Nothing while the daily cap pause holds; only urgent near the daily quota (`quota::gate`).
 /// SKIP LOCKED: two workers never get the same row and never wait on each other.
 pub async fn claim(pool: &PgPool, limit: i64) -> sqlx::Result<Vec<ClaimedEmail>> {
-    let gate = crate::quota::gate(pool).await?;
+    claim_through(pool, limit, &crate::quota::gate(pool).await?).await
+}
+
+/// `claim` with a gate the caller already read (the worker reads it once per round).
+pub async fn claim_through(
+    pool: &PgPool,
+    limit: i64,
+    gate: &crate::quota::Gate,
+) -> sqlx::Result<Vec<ClaimedEmail>> {
     if gate.paused {
         return Ok(vec![]);
     }

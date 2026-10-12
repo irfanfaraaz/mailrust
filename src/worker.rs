@@ -45,14 +45,13 @@ pub async fn run(state: AppState, shutdown: CancellationToken) -> anyhow::Result
 
 /// Claims one batch and processes it. Returns how many emails it claimed.
 pub async fn tick(state: &AppState, limiter: &SendLimiter) -> anyhow::Result<usize> {
-    let ses_rate = crate::quota::load(&state.pool)
-        .await?
-        .and_then(|q| q.max_send_rate);
+    let gate = crate::quota::gate(&state.pool).await?;
     limiter.set_global_rate(crate::limiter::effective_rate(
         state.config.ses_max_send_rate,
-        ses_rate,
+        gate.max_send_rate,
     ));
-    let batch = queue::claim(&state.pool, i64::from(state.config.worker_batch)).await?;
+    let batch =
+        queue::claim_through(&state.pool, i64::from(state.config.worker_batch), &gate).await?;
     let claimed = batch.len();
     let touched: HashSet<Uuid> = batch.iter().map(|e| e.account_id).collect();
     futures::stream::iter(batch)

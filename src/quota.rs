@@ -96,18 +96,19 @@ pub async fn paused(pool: &PgPool) -> sqlx::Result<bool> {
     .await
 }
 
-/// What `queue::claim` may take this round.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+/// What `queue::claim` may take this round, and the SES rate to pace it by (one read per round).
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct Gate {
     pub paused: bool,
     pub only_urgent: bool,
+    pub max_send_rate: Option<f64>,
 }
 
 /// Before the first sync there is no row: no pause, no reserve.
 /// The estimate adds recipients sent since the sync, because SES's count is up to 5 minutes old.
 pub async fn gate(pool: &PgPool) -> sqlx::Result<Gate> {
     let row = sqlx::query!(
-        r#"SELECT COALESCE(q.paused_until > now(), false) AS "paused!",
+        r#"SELECT q.max_send_rate, COALESCE(q.paused_until > now(), false) AS "paused!",
                   COALESCE(q.max_24h_send > 0 AND q.synced_at > now() - make_interval(secs => $2) AND
                       q.sent_last_24h + (SELECT COALESCE(sum(cardinality(e.to_addresses) + cardinality(e.cc_addresses)
                                                              + cardinality(e.bcc_addresses)), 0)
@@ -123,6 +124,7 @@ pub async fn gate(pool: &PgPool) -> sqlx::Result<Gate> {
         .map(|r| Gate {
             paused: r.paused,
             only_urgent: r.only_urgent,
+            max_send_rate: r.max_send_rate,
         })
         .unwrap_or_default())
 }
