@@ -19,8 +19,6 @@ use crate::{
     sender::{OutgoingEmail, SenderError},
 };
 
-pub const CONCURRENCY: usize = 10;
-
 pub async fn run(state: AppState, shutdown: CancellationToken) -> anyhow::Result<()> {
     let limiter = Arc::new(SendLimiter::new(
         state.config.ses_max_send_rate,
@@ -47,17 +45,20 @@ pub async fn run(state: AppState, shutdown: CancellationToken) -> anyhow::Result
 
 /// Claims one batch and processes it. Returns how many emails it claimed.
 pub async fn tick(state: &AppState, limiter: &SendLimiter) -> anyhow::Result<usize> {
-    let batch = queue::claim(&state.pool, queue::BATCH).await?;
+    let batch = queue::claim(&state.pool, i64::from(state.config.worker_batch)).await?;
     let claimed = batch.len();
     let touched: HashSet<Uuid> = batch.iter().map(|e| e.account_id).collect();
     futures::stream::iter(batch)
-        .for_each_concurrent(CONCURRENCY, |email| async move {
-            let id = email.id;
-            // On error the row stays 'sending'; the reaper turns it into 'unknown' and retries it.
-            if let Err(e) = process(state, limiter, email).await {
-                tracing::error!(email_id = %id, error = ?e, "processing failed");
-            }
-        })
+        .for_each_concurrent(
+            state.config.worker_concurrency as usize,
+            |email| async move {
+                let id = email.id;
+                // On error the row stays 'sending'; the reaper turns it into 'unknown' and retries it.
+                if let Err(e) = process(state, limiter, email).await {
+                    tracing::error!(email_id = %id, error = ?e, "processing failed");
+                }
+            },
+        )
         .await;
     after_batch(state, touched).await;
     Ok(claimed)

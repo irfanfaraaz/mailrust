@@ -23,6 +23,10 @@ pub struct Config {
     pub tracking_secret: Vec<u8>,
     pub ses_max_send_rate: u32,
     pub worker_processes: u32,
+    /// Emails one worker claims per round.
+    pub worker_batch: u32,
+    /// Emails one worker sends at the same time.
+    pub worker_concurrency: u32,
     pub allow_private_webhooks: bool,
     pub outbox_dir: PathBuf,
     pub log_json: bool,
@@ -109,6 +113,8 @@ impl Config {
             tracking_secret,
             ses_max_send_rate: num("SES_MAX_SEND_RATE", 14)?,
             worker_processes: num("WORKER_PROCESSES", 1)?,
+            worker_batch: num("WORKER_BATCH", 50)?,
+            worker_concurrency: num("WORKER_CONCURRENCY", 10)?,
             allow_private_webhooks: get("MAILRUST_ALLOW_HTTP_WEBHOOKS").as_deref() == Some("true"),
             outbox_dir: PathBuf::from(get("OUTBOX_DIR").unwrap_or_else(|| "./outbox".into())),
             log_json: get("RUST_LOG_FORMAT").as_deref() == Some("json"),
@@ -163,6 +169,22 @@ mod tests {
         let c = Config::from_map(&env).unwrap();
         assert_eq!(c.ses_max_send_rate, 20);
         assert!(c.allow_private_webhooks);
+    }
+
+    #[test]
+    fn worker_batch_and_concurrency_default_and_can_be_set() {
+        let c = Config::from_map(&base()).unwrap();
+        assert_eq!((c.worker_batch, c.worker_concurrency), (50, 10));
+        let mut env = base();
+        env.insert("WORKER_BATCH".into(), "200".into());
+        env.insert("WORKER_CONCURRENCY".into(), "40".into());
+        let c = Config::from_map(&env).unwrap();
+        assert_eq!((c.worker_batch, c.worker_concurrency), (200, 40));
+        for k in ["WORKER_BATCH", "WORKER_CONCURRENCY"] {
+            let mut env = base();
+            env.insert(k.into(), "0".into());
+            assert!(matches!(Config::from_map(&env), Err(ConfigError::Invalid(n, _)) if n == k));
+        }
     }
 
     #[test]

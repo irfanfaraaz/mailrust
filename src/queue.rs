@@ -12,7 +12,6 @@ use crate::{
     email_events::{self, EventKind, NewEvent},
 };
 
-pub const BATCH: i64 = 50;
 pub const LEASE_SECS: i64 = 300;
 pub const UNKNOWN_GRACE_SECS: i64 = 120;
 pub const BACKOFF_SECS: [i64; 5] = [30, 120, 600, 3600, 21600];
