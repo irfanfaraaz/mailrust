@@ -13,6 +13,7 @@ pub mod error;
 pub mod events;
 pub mod keys;
 pub mod limiter;
+pub mod openapi;
 pub mod queue;
 pub mod render;
 pub mod safety;

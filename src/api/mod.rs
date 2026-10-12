@@ -57,6 +57,7 @@ pub fn router(state: AppState) -> Router {
         .merge(keys::routes())
         .merge(suppressions::routes())
         .merge(crate::tracking::routes())
+        .merge(crate::openapi::routes())
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
         .layer(TraceLayer::new_for_http())
         .with_state(state)
