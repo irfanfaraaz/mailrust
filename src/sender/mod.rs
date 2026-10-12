@@ -7,6 +7,7 @@ use uuid::Uuid;
 use crate::config::{Config, SenderKind};
 
 pub mod fake;
+pub mod ses;
 
 pub const EMAIL_ID_TAG: &str = "mailrust_email_id";
 
@@ -73,7 +74,12 @@ pub trait Sender: Send + Sync {
 pub async fn from_config(config: &Config) -> anyhow::Result<Arc<dyn Sender>> {
     match config.sender {
         SenderKind::Fake => Ok(Arc::new(fake::FakeSender::new(config.outbox_dir.clone()))),
-        // Task 14 replaces this arm with the real SesSender.
-        SenderKind::Ses => anyhow::bail!("MAILRUST_SENDER=ses is not available in this build yet"),
+        SenderKind::Ses => {
+            let ses_cfg = config
+                .ses
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("MAILRUST_SENDER=ses needs the SES settings"))?;
+            Ok(Arc::new(ses::SesSender::new(ses_cfg).await?))
+        }
     }
 }
