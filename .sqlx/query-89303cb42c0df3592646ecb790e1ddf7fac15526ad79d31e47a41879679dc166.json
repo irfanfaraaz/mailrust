@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO api_keys (id, account_id, name, prefix, key_hash, access) VALUES ($1, $2, $3, $4, $5, $6)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Bytea",
+        {
+          "Custom": {
+            "name": "key_access",
+            "kind": {
+              "Enum": [
+                "full",
+                "sending"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "89303cb42c0df3592646ecb790e1ddf7fac15526ad79d31e47a41879679dc166"
+}

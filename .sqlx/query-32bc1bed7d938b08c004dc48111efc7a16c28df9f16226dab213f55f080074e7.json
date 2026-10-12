@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE accounts SET status = 'active', paused_reason = NULL, paused_at = NULL\n         WHERE id = $1 AND status = 'paused'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "32bc1bed7d938b08c004dc48111efc7a16c28df9f16226dab213f55f080074e7"
+}
