@@ -27,7 +27,7 @@ pub const EVENT_TYPES: [&str; 10] = [
 ];
 pub const RETRY_SECS: [i64; 7] = [5, 300, 1800, 7200, 18000, 36000, 50400];
 pub const PER_TICK: i64 = 20;
-pub const TIMEOUT: Duration = Duration::from_secs(10);
+pub const TIMEOUT: Duration = Duration::from_secs(10); // PER_TICK * TIMEOUT must stay under the 5-minute claim lease
 
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct WebhookView {
@@ -140,7 +140,7 @@ async fn claim_due(pool: &PgPool, limit: i64) -> sqlx::Result<Vec<Due>> {
                ORDER BY next_attempt_at LIMIT $1
                FOR UPDATE SKIP LOCKED),
            upd AS (
-               UPDATE webhook_deliveries d SET lease_until = now() + interval '2 minutes', attempts = d.attempts + 1
+               UPDATE webhook_deliveries d SET lease_until = now() + interval '5 minutes', attempts = d.attempts + 1
                FROM due WHERE d.id = due.id
                RETURNING d.id, d.webhook_id, d.payload, d.attempts)
            SELECT upd.id AS "id!", upd.payload AS "payload!", upd.attempts AS "attempts!",

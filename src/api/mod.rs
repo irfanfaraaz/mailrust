@@ -23,7 +23,7 @@ pub mod webhooks;
 pub type KeyLimiter = governor::DefaultKeyedRateLimiter<Uuid>;
 
 pub const REQUESTS_PER_SECOND_PER_KEY: u32 = 10;
-pub const MAX_BODY_BYTES: usize = 50 * 1024 * 1024;
+pub const MAX_BODY_BYTES: usize = 64 * 1024 * 1024; // 40 MB of attachments is ~54 MB as base64 JSON
 
 #[derive(Clone)]
 pub struct AppState {

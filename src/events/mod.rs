@@ -177,8 +177,9 @@ pub async fn apply(conn: &mut PgConnection, ev: &SesEvent) -> anyhow::Result<App
     let mut affects_safety = false;
     match ev.event_type.as_str() {
         "Send" => {
-            // Only matters for crash recovery: SES did get it, so do not send again.
-            if t.status == EmailStatus::Unknown {
+            // Only matters for crash recovery: SES did get it, so do not send again
+            // (also when the grace period already put it back in the queue).
+            if matches!(t.status, EmailStatus::Unknown | EmailStatus::Queued) {
                 sqlx::query!(
                     "UPDATE emails SET status = 'sent', sent_at = COALESCE(sent_at, now()), unknown_since = NULL, updated_at = now()
                      WHERE id = $1",

@@ -219,3 +219,23 @@ async fn removed_domain_fails_the_email(pool: sqlx::PgPool) {
     worker::tick(&t.state, &limiter()).await.unwrap();
     assert_eq!(common::status_of(&t.state.pool, id).await, "failed");
 }
+
+#[sqlx::test]
+async fn an_email_lost_too_many_times_fails_instead_of_looping(pool: sqlx::PgPool) {
+    let t = common::app(pool).await;
+    common::verified_domain(&t, "shop.com").await;
+    let id = common::send_email(&t, email(json!("a@x.com"))).await;
+    sqlx::query("UPDATE emails SET status = 'unknown', attempts = $2, unknown_since = now() - interval '1 hour' WHERE id = $1")
+        .bind(id).bind(queue::MAX_ATTEMPTS).execute(&t.state.pool).await.unwrap();
+    queue::requeue_unknown(&t.state.pool).await.unwrap();
+    assert_eq!(common::status_of(&t.state.pool, id).await, "failed");
+}
+
+#[sqlx::test]
+async fn a_lost_lease_is_not_renewed(pool: sqlx::PgPool) {
+    let t = common::app(pool).await;
+    common::verified_domain(&t, "shop.com").await;
+    let id = common::send_email(&t, email(json!("a@x.com"))).await;
+    // Still 'queued' (the reaper took it back), so the worker must not send it.
+    assert!(!queue::renew_lease(&t.state.pool, id).await.unwrap());
+}

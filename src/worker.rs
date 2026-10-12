@@ -174,6 +174,11 @@ async fn process(
             recipients.len(),
         )
         .await;
+    // The limiter wait can be longer than the lease; never send an email the reaper already gave to someone else.
+    if !queue::renew_lease(pool, email.id).await? {
+        tracing::warn!(email_id = %email.id, "lease lost while waiting to send; skipped");
+        return Ok(());
+    }
     let out = OutgoingEmail {
         email_id: email.id,
         tenant: account.tenant(),

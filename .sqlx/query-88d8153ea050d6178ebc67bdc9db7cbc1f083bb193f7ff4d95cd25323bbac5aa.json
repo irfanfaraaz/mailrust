@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE emails SET status = 'failed', last_error = 'gave up: the worker lost this email too many times',\n                unknown_since = NULL, updated_at = now()\n         WHERE status = 'unknown' AND unknown_since < now() - make_interval(secs => $1) AND attempts >= $2\n         RETURNING id, account_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "account_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Float8",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "88d8153ea050d6178ebc67bdc9db7cbc1f083bb193f7ff4d95cd25323bbac5aa"
+}

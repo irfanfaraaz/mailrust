@@ -78,6 +78,20 @@ pub async fn save_links(pool: &PgPool, id: Uuid, links: &[String]) -> sqlx::Resu
     Ok(())
 }
 
+/// Called right before the send. False if the reaper already took this email back (lease ran out while we waited).
+pub async fn renew_lease(pool: &PgPool, id: Uuid) -> sqlx::Result<bool> {
+    Ok(sqlx::query!(
+        "UPDATE emails SET lease_until = now() + make_interval(secs => $2), updated_at = now()
+         WHERE id = $1 AND status = 'sending'",
+        id,
+        LEASE_SECS as f64
+    )
+    .execute(pool)
+    .await?
+    .rows_affected()
+        == 1)
+}
+
 pub async fn mark_sent(
     pool: &PgPool,
     email: &ClaimedEmail,
@@ -200,16 +214,44 @@ pub async fn expire_leases(pool: &PgPool) -> sqlx::Result<u64> {
     .rows_affected())
 }
 
-/// No SES "Send" event arrived in the grace period, so SES never got it: send again.
+/// No SES "Send" event arrived in the grace period, so SES never got it: send again,
+/// unless every try is used up (an email that keeps crashing the worker must not loop forever).
 pub async fn requeue_unknown(pool: &PgPool) -> sqlx::Result<u64> {
-    Ok(sqlx::query!(
+    let mut tx = pool.begin().await?;
+    let gave_up = sqlx::query!(
+        "UPDATE emails SET status = 'failed', last_error = 'gave up: the worker lost this email too many times',
+                unknown_since = NULL, updated_at = now()
+         WHERE status = 'unknown' AND unknown_since < now() - make_interval(secs => $1) AND attempts >= $2
+         RETURNING id, account_id",
+        UNKNOWN_GRACE_SECS as f64,
+        MAX_ATTEMPTS
+    )
+    .fetch_all(&mut *tx)
+    .await?;
+    for r in &gave_up {
+        email_events::record(
+            &mut tx,
+            NewEvent {
+                account_id: r.account_id,
+                email_id: r.id,
+                kind: EventKind::Failed,
+                recipient: None,
+                data: json!({ "error": "gave up: the worker lost this email too many times" }),
+                likely_bot: false,
+            },
+        )
+        .await?;
+    }
+    let requeued = sqlx::query!(
         "UPDATE emails SET status = 'queued', send_at = now(), unknown_since = NULL, updated_at = now()
          WHERE status = 'unknown' AND unknown_since < now() - make_interval(secs => $1)",
         UNKNOWN_GRACE_SECS as f64
     )
-    .execute(pool)
+    .execute(&mut *tx)
     .await?
-    .rows_affected())
+    .rows_affected();
+    tx.commit().await?;
+    Ok(requeued + gave_up.len() as u64)
 }
 
 pub async fn reaper_loop(state: AppState, shutdown: CancellationToken) -> anyhow::Result<()> {
