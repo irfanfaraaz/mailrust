@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE emails\n           SET status = 'sending', lease_until = now() + make_interval(secs => $2), attempts = attempts + 1, updated_at = now()\n           WHERE id IN (\n               SELECT e.id FROM emails e JOIN accounts a ON a.id = e.account_id\n               WHERE e.status = 'queued' AND e.send_at <= now() AND a.status = 'active'\n               ORDER BY e.send_at\n               LIMIT $1\n               FOR UPDATE OF e SKIP LOCKED)\n           RETURNING id, account_id, domain_id, from_address, to_addresses, cc_addresses, bcc_addresses, reply_to,\n                     subject, html, text_body,\n                     headers AS \"headers: Json<BTreeMap<String, String>>\",\n                     tags AS \"tags: Json<BTreeMap<String, String>>\",\n                     attempts",
+  "query": "UPDATE emails\n           SET status = 'sending', lease_until = now() + make_interval(secs => $2), attempts = attempts + 1, updated_at = now()\n           WHERE id IN (\n               SELECT e.id FROM emails e JOIN accounts a ON a.id = e.account_id\n               WHERE e.status = 'queued' AND e.send_at <= now() AND a.status = 'active'\n               ORDER BY e.priority, e.send_at\n               LIMIT $1\n               FOR UPDATE OF e SKIP LOCKED)\n           RETURNING id, account_id, domain_id, from_address, to_addresses, cc_addresses, bcc_addresses, reply_to,\n                     subject, html, text_body,\n                     headers AS \"headers: Json<BTreeMap<String, String>>\",\n                     tags AS \"tags: Json<BTreeMap<String, String>>\",\n                     attempts",
   "describe": {
     "columns": [
       {
@@ -97,5 +97,5 @@
       false
     ]
   },
-  "hash": "fd7cf5f4911cacc8cc29890716598c2789890f68ece3a99ae1f49aaf593960fc"
+  "hash": "508467a7e9ca4bbee9ff3c8969c52ee7647129814490f56a917d31f5a6eeea3e"
 }

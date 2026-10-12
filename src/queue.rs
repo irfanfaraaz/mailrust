@@ -35,7 +35,8 @@ pub struct ClaimedEmail {
     pub attempts: i32,
 }
 
-/// Takes up to `limit` due emails. SKIP LOCKED: two workers never get the same row and never wait on each other.
+/// Takes up to `limit` due emails: urgent first, then normal, then bulk; oldest first inside a lane.
+/// SKIP LOCKED: two workers never get the same row and never wait on each other.
 pub async fn claim(pool: &PgPool, limit: i64) -> sqlx::Result<Vec<ClaimedEmail>> {
     sqlx::query_as!(
         ClaimedEmail,
@@ -44,7 +45,7 @@ pub async fn claim(pool: &PgPool, limit: i64) -> sqlx::Result<Vec<ClaimedEmail>>
            WHERE id IN (
                SELECT e.id FROM emails e JOIN accounts a ON a.id = e.account_id
                WHERE e.status = 'queued' AND e.send_at <= now() AND a.status = 'active'
-               ORDER BY e.send_at
+               ORDER BY e.priority, e.send_at
                LIMIT $1
                FOR UPDATE OF e SKIP LOCKED)
            RETURNING id, account_id, domain_id, from_address, to_addresses, cc_addresses, bcc_addresses, reply_to,
