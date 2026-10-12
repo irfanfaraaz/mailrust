@@ -79,3 +79,33 @@ pub async fn sync_loop(state: AppState, shutdown: CancellationToken) -> anyhow::
     .await;
     Ok(())
 }
+
+/// What `queue::claim` may take this round.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Gate {
+    pub paused: bool,
+    pub only_urgent: bool,
+}
+
+/// Before the first sync there is no row: no pause, no reserve.
+/// The estimate adds recipients sent since the sync, because SES's count is up to 5 minutes old.
+pub async fn gate(pool: &PgPool) -> sqlx::Result<Gate> {
+    let row = sqlx::query!(
+        r#"SELECT COALESCE(q.paused_until > now(), false) AS "paused!",
+                  COALESCE(q.max_24h_send IS NOT NULL AND q.synced_at IS NOT NULL AND
+                      q.sent_last_24h + (SELECT COALESCE(sum(cardinality(e.to_addresses) + cardinality(e.cc_addresses)
+                                                             + cardinality(e.bcc_addresses)), 0)
+                                         FROM emails e WHERE e.sent_at > q.synced_at)::float8
+                      >= $1 * q.max_24h_send, false) AS "only_urgent!"
+           FROM sender_quota q"#,
+        RESERVE_AT
+    )
+    .fetch_optional(pool)
+    .await?;
+    Ok(row
+        .map(|r| Gate {
+            paused: r.paused,
+            only_urgent: r.only_urgent,
+        })
+        .unwrap_or_default())
+}

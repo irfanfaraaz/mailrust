@@ -96,3 +96,60 @@ async fn sync_ends_a_pause_only_when_there_is_room(pool: sqlx::PgPool) {
     assert!(quota::load(&pool).await.unwrap().unwrap().paused_until.is_none());
     drop(t);
 }
+
+#[sqlx::test]
+async fn nothing_is_claimed_while_paused(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    common::seed_emails(&pool, t.account.id, "urgent", "queued", 3, 0.0).await;
+    quota::pause(&pool, "cap").await.unwrap();
+    assert!(queue::claim(&pool, 10).await.unwrap().is_empty());
+}
+
+#[sqlx::test]
+async fn near_the_daily_quota_only_urgent_goes(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    common::seed_emails(&pool, t.account.id, "bulk", "queued", 3, 1.0).await;
+    let urgent = common::seed_emails(&pool, t.account.id, "urgent", "queued", 1, 0.0).await;
+    quota::save(&pool, &q(14.0, 1000.0, 900.0)).await.unwrap();
+    let got: Vec<_> = queue::claim(&pool, 10)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|e| e.id)
+        .collect();
+    assert_eq!(got, urgent);
+    quota::save(&pool, &q(14.0, 1000.0, 100.0)).await.unwrap();
+    assert_eq!(queue::claim(&pool, 10).await.unwrap().len(), 3);
+}
+
+#[sqlx::test]
+async fn the_reserve_counts_mail_sent_since_the_last_sync(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    quota::save(&pool, &q(14.0, 1000.0, 850.0)).await.unwrap();
+    // 60 recipients sent after the sync: 850 + 60 = 910, over 90% of 1,000.
+    let sent = common::seed_emails(&pool, t.account.id, "normal", "sent", 60, 0.0).await;
+    sqlx::query("UPDATE emails SET sent_at = now() WHERE id = ANY($1)")
+        .bind(sent)
+        .execute(&pool)
+        .await
+        .unwrap();
+    common::seed_emails(&pool, t.account.id, "bulk", "queued", 1, 0.0).await;
+    assert!(queue::claim(&pool, 10).await.unwrap().is_empty());
+}
+
+#[sqlx::test]
+async fn after_a_daily_cap_hit_the_next_round_claims_nothing(pool: sqlx::PgPool) {
+    let s = common::RecordingSender::failing(|| {
+        SenderError::DailyQuota("Daily message quota exceeded".into())
+    });
+    let t = common::app_with_sender(pool.clone(), s).await;
+    common::verified_domain(&t, "shop.com").await;
+    common::send_email(
+        &t,
+        serde_json::json!({ "from": "hi@shop.com", "to": "a@x.com", "subject": "Hi", "text": "x" }),
+    )
+    .await;
+    let limiter = SendLimiter::new(10_000, 1);
+    assert_eq!(worker::tick(&t.state, &limiter).await.unwrap(), 1);
+    assert_eq!(worker::tick(&t.state, &limiter).await.unwrap(), 0);
+}

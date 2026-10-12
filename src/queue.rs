@@ -36,8 +36,13 @@ pub struct ClaimedEmail {
 }
 
 /// Takes up to `limit` due emails: urgent first, then normal, then bulk; oldest first inside a lane.
+/// Nothing while the daily cap pause holds; only urgent near the daily quota (`quota::gate`).
 /// SKIP LOCKED: two workers never get the same row and never wait on each other.
 pub async fn claim(pool: &PgPool, limit: i64) -> sqlx::Result<Vec<ClaimedEmail>> {
+    let gate = crate::quota::gate(pool).await?;
+    if gate.paused {
+        return Ok(vec![]);
+    }
     sqlx::query_as!(
         ClaimedEmail,
         r#"UPDATE emails
@@ -45,6 +50,7 @@ pub async fn claim(pool: &PgPool, limit: i64) -> sqlx::Result<Vec<ClaimedEmail>>
            WHERE id IN (
                SELECT e.id FROM emails e JOIN accounts a ON a.id = e.account_id
                WHERE e.status = 'queued' AND e.send_at <= now() AND a.status = 'active'
+                 AND ($3 = false OR e.priority = 'urgent')
                ORDER BY e.priority, e.send_at
                LIMIT $1
                FOR UPDATE OF e SKIP LOCKED)
@@ -54,7 +60,8 @@ pub async fn claim(pool: &PgPool, limit: i64) -> sqlx::Result<Vec<ClaimedEmail>>
                      tags AS "tags: Json<BTreeMap<String, String>>",
                      attempts"#,
         limit,
-        LEASE_SECS as f64
+        LEASE_SECS as f64,
+        gate.only_urgent
     )
     .fetch_all(pool)
     .await
