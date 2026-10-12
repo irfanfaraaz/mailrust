@@ -88,7 +88,18 @@ impl EmailStatus {
 
 /// Claim order: urgent, then normal, then bulk. The caller picks it.
 #[derive(
-    Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, sqlx::Type, Serialize, Deserialize, utoipa::ToSchema,
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    sqlx::Type,
+    Serialize,
+    Deserialize,
+    utoipa::ToSchema,
 )]
 #[sqlx(type_name = "email_priority", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
@@ -338,13 +349,21 @@ pub fn validate(req: SendEmailRequest, now: DateTime<Utc>) -> Result<ValidEmail,
 pub const URGENT_FLOOR: i64 = 100;
 
 /// Urgent use is capped so the urgent reserve keeps working. Over the cap, the email still goes, as normal.
-async fn allowed_priority(conn: &mut PgConnection, account_id: Uuid, wanted: Priority) -> sqlx::Result<Priority> {
+async fn allowed_priority(
+    conn: &mut PgConnection,
+    account_id: Uuid,
+    wanted: Priority,
+) -> sqlx::Result<Priority> {
     if wanted != Priority::Urgent {
         return Ok(wanted);
     }
     // One urgent insert per account at a time, so two requests cannot both slip past the cap.
-    sqlx::query!("SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))", account_id.to_string())
-        .execute(&mut *conn).await?;
+    sqlx::query!(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))",
+        account_id.to_string()
+    )
+    .execute(&mut *conn)
+    .await?;
     let urgent = sqlx::query_scalar!(
         r#"SELECT count(*) AS "n!" FROM emails WHERE account_id = $1 AND priority = 'urgent' AND created_at > now() - interval '24 hours'"#,
         account_id
@@ -356,7 +375,11 @@ async fn allowed_priority(conn: &mut PgConnection, account_id: Uuid, wanted: Pri
         r#"SELECT count(*) AS "n!" FROM emails WHERE account_id = $1 AND created_at > now() - interval '24 hours'"#,
         account_id
     ).fetch_one(&mut *conn).await?;
-    Ok(if urgent < total / 10 { Priority::Urgent } else { Priority::Normal })
+    Ok(if urgent < total / 10 {
+        Priority::Urgent
+    } else {
+        Priority::Normal
+    })
 }
 
 pub async fn insert(
@@ -564,8 +587,14 @@ mod tests {
     fn priority_is_kept_and_lanes_sort_urgent_first() {
         let mut v = base();
         v["priority"] = json!("bulk");
-        assert_eq!(validate(req(v), Utc::now()).unwrap().priority, Priority::Bulk);
-        assert_eq!(validate(req(base()), Utc::now()).unwrap().priority, Priority::Normal);
+        assert_eq!(
+            validate(req(v), Utc::now()).unwrap().priority,
+            Priority::Bulk
+        );
+        assert_eq!(
+            validate(req(base()), Utc::now()).unwrap().priority,
+            Priority::Normal
+        );
         assert!(Priority::Urgent < Priority::Normal && Priority::Normal < Priority::Bulk);
     }
 

@@ -185,7 +185,14 @@ pub async fn status_of(pool: &PgPool, id: uuid::Uuid) -> String {
 }
 
 /// Inserts `n` bare emails straight into the table (no domain). `created_at` and `send_at` are `hours_ago` back.
-pub async fn seed_emails(pool: &PgPool, account_id: Uuid, priority: &str, status: &str, n: i64, hours_ago: f64) -> Vec<Uuid> {
+pub async fn seed_emails(
+    pool: &PgPool,
+    account_id: Uuid,
+    priority: &str,
+    status: &str,
+    n: i64,
+    hours_ago: f64,
+) -> Vec<Uuid> {
     sqlx::query_scalar(
         "INSERT INTO emails (id, account_id, from_address, to_addresses, subject, text_body, priority, status, created_at, send_at)
          SELECT gen_random_uuid(), $1, 'hi@shop.com', ARRAY['to@x.com'], 's', 't', $2::email_priority, $3::email_status,

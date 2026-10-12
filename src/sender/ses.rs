@@ -381,16 +381,24 @@ mod tests {
             matches!(&daily, Err(SenderError::DailyQuota(m)) if m.contains(DAILY_QUOTA_TEXT)),
             "the pause reason must keep the SES text: {daily:?}"
         );
-        let daily429 = answer(429, "TooManyRequestsException", "Daily message quota exceeded.")
-            .send(&mail())
-            .await;
+        let daily429 = answer(
+            429,
+            "TooManyRequestsException",
+            "Daily message quota exceeded.",
+        )
+        .send(&mail())
+        .await;
         assert!(
             matches!(daily429, Err(SenderError::DailyQuota(_))),
             "{daily429:?}"
         );
-        let rate = answer(429, "TooManyRequestsException", "Maximum sending rate exceeded.")
-            .send(&mail())
-            .await;
+        let rate = answer(
+            429,
+            "TooManyRequestsException",
+            "Maximum sending rate exceeded.",
+        )
+        .send(&mail())
+        .await;
         assert!(matches!(rate, Err(SenderError::Retryable(_))), "{rate:?}");
     }
 

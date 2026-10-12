@@ -285,15 +285,27 @@ async fn list_paginates_newest_first(pool: sqlx::PgPool) {
 async fn priority_defaults_to_normal_and_shows_everywhere(pool: sqlx::PgPool) {
     let t = common::app(pool).await;
     common::verified_domain(&t, "shop.com").await;
-    let (s, b) = common::call(&t.router, common::req("POST", "/emails", Some(&t.key), Some(email("a@x.com")))).await;
+    let (s, b) = common::call(
+        &t.router,
+        common::req("POST", "/emails", Some(&t.key), Some(email("a@x.com"))),
+    )
+    .await;
     assert_eq!(s, StatusCode::OK, "{b}");
     assert_eq!(b["priority"], "normal");
     let id = b["id"].as_str().unwrap();
-    let (_, v) = common::call(&t.router, common::req("GET", &format!("/emails/{id}"), Some(&t.key), None)).await;
+    let (_, v) = common::call(
+        &t.router,
+        common::req("GET", &format!("/emails/{id}"), Some(&t.key), None),
+    )
+    .await;
     assert_eq!(v["priority"], "normal");
     let (_, l) = common::call(&t.router, common::req("GET", "/emails", Some(&t.key), None)).await;
     assert_eq!(l["data"][0]["priority"], "normal");
-    let (_, c) = common::call(&t.router, common::req("POST", &format!("/emails/{id}/cancel"), Some(&t.key), None)).await;
+    let (_, c) = common::call(
+        &t.router,
+        common::req("POST", &format!("/emails/{id}/cancel"), Some(&t.key), None),
+    )
+    .await;
     assert_eq!(c["priority"], "normal");
 }
 
@@ -305,9 +317,23 @@ async fn priority_is_saved_per_batch_item(pool: sqlx::PgPool) {
     urgent["priority"] = json!("urgent");
     let mut bulk = email("b@x.com");
     bulk["priority"] = json!("bulk");
-    let (s, b) = common::call(&t.router, common::req("POST", "/emails/batch", Some(&t.key), Some(json!([urgent, bulk, email("c@x.com")])))).await;
+    let (s, b) = common::call(
+        &t.router,
+        common::req(
+            "POST",
+            "/emails/batch",
+            Some(&t.key),
+            Some(json!([urgent, bulk, email("c@x.com")])),
+        ),
+    )
+    .await;
     assert_eq!(s, StatusCode::OK, "{b}");
-    let got: Vec<&str> = b["data"].as_array().unwrap().iter().map(|e| e["priority"].as_str().unwrap()).collect();
+    let got: Vec<&str> = b["data"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e["priority"].as_str().unwrap())
+        .collect();
     assert_eq!(got, ["urgent", "bulk", "normal"]);
 }
 
@@ -317,7 +343,11 @@ async fn unknown_priority_is_a_validation_error(pool: sqlx::PgPool) {
     common::verified_domain(&t, "shop.com").await;
     let mut e = email("a@x.com");
     e["priority"] = json!("asap");
-    let (s, b) = common::call(&t.router, common::req("POST", "/emails", Some(&t.key), Some(e))).await;
+    let (s, b) = common::call(
+        &t.router,
+        common::req("POST", "/emails", Some(&t.key), Some(e)),
+    )
+    .await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
     assert_eq!(b["error"]["code"], "validation_error");
 }
@@ -334,7 +364,11 @@ async fn urgent_over_the_cap_is_stored_as_normal(pool: sqlx::PgPool) {
     common::verified_domain(&t, "shop.com").await;
     common::seed_emails(&pool, t.account.id, "urgent", "sent", 100, 1.0).await;
     common::seed_emails(&pool, t.account.id, "normal", "sent", 899, 1.0).await; // 999 + this one = 1,000 → cap 100
-    let (s, b) = common::call(&t.router, common::req("POST", "/emails", Some(&t.key), Some(urgent("a@x.com")))).await;
+    let (s, b) = common::call(
+        &t.router,
+        common::req("POST", "/emails", Some(&t.key), Some(urgent("a@x.com"))),
+    )
+    .await;
     assert_eq!(s, StatusCode::OK, "{b}");
     assert_eq!(b["priority"], "normal");
 }
@@ -344,11 +378,19 @@ async fn the_cap_grows_with_volume_and_old_mail_does_not_count(pool: sqlx::PgPoo
     let t = common::app(pool.clone()).await;
     common::verified_domain(&t, "shop.com").await;
     common::seed_emails(&pool, t.account.id, "urgent", "sent", 100, 25.0).await; // older than 24 h
-    let (_, b) = common::call(&t.router, common::req("POST", "/emails", Some(&t.key), Some(urgent("a@x.com")))).await;
+    let (_, b) = common::call(
+        &t.router,
+        common::req("POST", "/emails", Some(&t.key), Some(urgent("a@x.com"))),
+    )
+    .await;
     assert_eq!(b["priority"], "urgent");
     common::seed_emails(&pool, t.account.id, "urgent", "sent", 100, 1.0).await;
     common::seed_emails(&pool, t.account.id, "normal", "sent", 1100, 1.0).await; // ~1,200 → cap 120
-    let (_, b) = common::call(&t.router, common::req("POST", "/emails", Some(&t.key), Some(urgent("b@x.com")))).await;
+    let (_, b) = common::call(
+        &t.router,
+        common::req("POST", "/emails", Some(&t.key), Some(urgent("b@x.com"))),
+    )
+    .await;
     assert_eq!(b["priority"], "urgent");
 }
 
@@ -357,7 +399,16 @@ async fn a_batch_crossing_the_cap_downgrades_only_the_extra(pool: sqlx::PgPool) 
     let t = common::app(pool.clone()).await;
     common::verified_domain(&t, "shop.com").await;
     common::seed_emails(&pool, t.account.id, "urgent", "sent", 99, 1.0).await;
-    let (s, b) = common::call(&t.router, common::req("POST", "/emails/batch", Some(&t.key), Some(json!([urgent("a@x.com"), urgent("b@x.com")])))).await;
+    let (s, b) = common::call(
+        &t.router,
+        common::req(
+            "POST",
+            "/emails/batch",
+            Some(&t.key),
+            Some(json!([urgent("a@x.com"), urgent("b@x.com")])),
+        ),
+    )
+    .await;
     assert_eq!(s, StatusCode::OK, "{b}");
     assert_eq!(b["data"][0]["priority"], "urgent");
     assert_eq!(b["data"][1]["priority"], "normal");

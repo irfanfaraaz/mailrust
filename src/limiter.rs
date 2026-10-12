@@ -47,7 +47,10 @@ impl SendLimiter {
     pub fn set_global_rate(&self, rate: u32) {
         let mut g = self.global.lock().unwrap_or_else(|p| p.into_inner());
         if g.0 != rate {
-            *g = (rate, Arc::new(RateLimiter::direct(quota(rate, self.divisor))));
+            *g = (
+                rate,
+                Arc::new(RateLimiter::direct(quota(rate, self.divisor))),
+            );
         }
     }
 
@@ -66,7 +69,12 @@ impl SendLimiter {
     /// Account limit counts emails; the SES limit counts recipients (that is how SES counts).
     pub async fn wait(&self, account_id: Uuid, account_rate: u32, recipients: usize) {
         self.account(account_id, account_rate).until_ready().await;
-        let global = self.global.lock().unwrap_or_else(|p| p.into_inner()).1.clone();
+        let global = self
+            .global
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .1
+            .clone();
         for _ in 0..recipients.max(1) {
             global.until_ready().await;
         }

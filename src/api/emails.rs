@@ -19,8 +19,8 @@ use super::{AppState, auth::Auth};
 use crate::{
     domains::{self, DomainStatus},
     emails::{
-        self, EmailStatus, Priority, EmailSummary, EmailView, MAX_BATCH, SendEmailRequest, SendResponse,
-        ValidEmail,
+        self, EmailStatus, EmailSummary, EmailView, MAX_BATCH, Priority, SendEmailRequest,
+        SendResponse, ValidEmail,
     },
     error::ApiError,
 };
@@ -130,7 +130,10 @@ pub(crate) async fn send(
         if let Some(p) = prior {
             if p.created_at > now - Duration::hours(IDEMPOTENCY_HOURS) {
                 return if p.request_hash.as_deref() == Some(hash.as_slice()) {
-                    Ok(Json(SendResponse { id: p.id, priority: p.priority }))
+                    Ok(Json(SendResponse {
+                        id: p.id,
+                        priority: p.priority,
+                    }))
                 } else {
                     Err(ApiError::Conflict(
                         "idempotency_conflict",
@@ -148,16 +151,17 @@ pub(crate) async fn send(
         }
     }
     let idem = key.as_deref().map(|k| (k, hash.as_slice()));
-    let (id, priority) = match emails::insert(&mut tx, auth.account_id(), domain_id, &email, idem).await {
-        Ok(done) => done,
-        Err(e) if is_idempotency_race(&e) => {
-            return Err(ApiError::Conflict(
-                "idempotency_conflict",
-                "a request with this Idempotency-Key is already being processed".into(),
-            ));
-        }
-        Err(e) => return Err(e.into()),
-    };
+    let (id, priority) =
+        match emails::insert(&mut tx, auth.account_id(), domain_id, &email, idem).await {
+            Ok(done) => done,
+            Err(e) if is_idempotency_race(&e) => {
+                return Err(ApiError::Conflict(
+                    "idempotency_conflict",
+                    "a request with this Idempotency-Key is already being processed".into(),
+                ));
+            }
+            Err(e) => return Err(e.into()),
+        };
     tx.commit().await?;
     Ok(Json(SendResponse { id, priority }))
 }
@@ -254,7 +258,10 @@ pub(crate) async fn cancel(
     .fetch_optional(&state.pool)
     .await?;
     match done {
-        Some(r) => Ok(Json(SendResponse { id: r.id, priority: r.priority })),
+        Some(r) => Ok(Json(SendResponse {
+            id: r.id,
+            priority: r.priority,
+        })),
         None => match emails::view(&state.pool, auth.account_id(), id).await? {
             None => Err(ApiError::NotFound),
             Some(_) => Err(ApiError::Conflict(

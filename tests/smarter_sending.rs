@@ -91,9 +91,23 @@ async fn sync_ends_a_pause_only_when_there_is_room(pool: sqlx::PgPool) {
     let t = common::app(pool.clone()).await;
     quota::pause(&pool, "cap").await.unwrap();
     quota::save(&pool, &q(14.0, 200.0, 200.0)).await.unwrap();
-    assert!(quota::load(&pool).await.unwrap().unwrap().paused_until.is_some());
+    assert!(
+        quota::load(&pool)
+            .await
+            .unwrap()
+            .unwrap()
+            .paused_until
+            .is_some()
+    );
     quota::save(&pool, &q(14.0, 200.0, 150.0)).await.unwrap();
-    assert!(quota::load(&pool).await.unwrap().unwrap().paused_until.is_none());
+    assert!(
+        quota::load(&pool)
+            .await
+            .unwrap()
+            .unwrap()
+            .paused_until
+            .is_none()
+    );
     drop(t);
 }
 
