@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM suppressions WHERE account_id = $1 AND address = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "04fa1174f935922dfc630afc2ab735a88e97a5a9d60f4fcc598db6c2f7dd91b7"
+}
