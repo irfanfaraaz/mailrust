@@ -52,6 +52,7 @@ pub fn router(state: AppState) -> Router {
         .merge(emails::routes())
         .merge(ses::routes())
         .merge(webhooks::routes())
+        .merge(crate::tracking::routes())
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
         .layer(TraceLayer::new_for_http())
         .with_state(state)
