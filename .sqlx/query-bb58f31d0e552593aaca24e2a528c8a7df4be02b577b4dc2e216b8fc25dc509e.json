@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE emails SET status = 'queued', send_at = now(), unknown_since = NULL, updated_at = now()\n         WHERE status = 'unknown' AND unknown_since < now() - make_interval(secs => $1)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Float8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bb58f31d0e552593aaca24e2a528c8a7df4be02b577b4dc2e216b8fc25dc509e"
+}

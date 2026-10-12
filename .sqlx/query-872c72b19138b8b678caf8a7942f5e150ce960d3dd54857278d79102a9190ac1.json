@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM attachments a USING emails e\n             WHERE a.email_id = e.id AND e.status NOT IN ('queued', 'sending', 'unknown')\n               AND e.updated_at < now() - interval '7 days'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "872c72b19138b8b678caf8a7942f5e150ce960d3dd54857278d79102a9190ac1"
+}

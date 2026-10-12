@@ -90,3 +90,47 @@ pub async fn verified_domain(t: &TestApp, name: &str) -> mailrust::domains::Doma
     assert_eq!(d.status, mailrust::domains::DomainStatus::Verified);
     d
 }
+
+use mailrust::sender::{DnsRecord, DomainState, OutgoingEmail, SenderError, TenantRef};
+
+/// Records what it was asked to send. `fail_with` makes every send fail with that error.
+pub struct RecordingSender {
+    pub sent: std::sync::Mutex<Vec<OutgoingEmail>>,
+    pub fail_with: Option<fn() -> SenderError>,
+}
+
+impl RecordingSender {
+    pub fn ok() -> Arc<Self> {
+        Arc::new(Self { sent: Default::default(), fail_with: None })
+    }
+    pub fn failing(f: fn() -> SenderError) -> Arc<Self> {
+        Arc::new(Self { sent: Default::default(), fail_with: Some(f) })
+    }
+    pub fn sent(&self) -> Vec<OutgoingEmail> {
+        self.sent.lock().unwrap().clone()
+    }
+}
+
+#[async_trait::async_trait]
+impl Sender for RecordingSender {
+    async fn provision_account(&self, _: &TenantRef) -> Result<(), SenderError> { Ok(()) }
+    async fn create_domain(&self, _: &TenantRef, _: &str) -> Result<Vec<DnsRecord>, SenderError> { Ok(vec![]) }
+    async fn domain_state(&self, _: &TenantRef, _: &str) -> Result<DomainState, SenderError> { Ok(DomainState::Verified) }
+    async fn send(&self, email: &OutgoingEmail) -> Result<String, SenderError> {
+        if let Some(f) = self.fail_with {
+            return Err(f());
+        }
+        self.sent.lock().unwrap().push(email.clone());
+        Ok(format!("rec-{}", email.email_id))
+    }
+}
+
+pub async fn send_email(t: &TestApp, body: serde_json::Value) -> uuid::Uuid {
+    let (s, b) = call(&t.router, req("POST", "/emails", Some(&t.key), Some(body))).await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    b["id"].as_str().unwrap().parse().unwrap()
+}
+
+pub async fn status_of(pool: &PgPool, id: uuid::Uuid) -> String {
+    sqlx::query_scalar("SELECT status::text FROM emails WHERE id = $1").bind(id).fetch_one(pool).await.unwrap()
+}

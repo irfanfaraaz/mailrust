@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE emails SET status = 'queued', send_at = now() + make_interval(secs => $3), lease_until = NULL,\n                last_error = $2, updated_at = now()\n         WHERE id = $1 AND status = 'sending'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Float8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c4c05121ecda245a04c974604ac3a2635ca31c77fc4c8043bacda6973a3fadff"
+}
