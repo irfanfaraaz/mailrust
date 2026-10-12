@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE emails SET status = 'sent', sent_at = COALESCE(sent_at, now()), unknown_since = NULL, updated_at = now()\n                     WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "628818e879b262f622edc36a982d46f799495ff9712e4a11256716f1510c7b0d"
+}

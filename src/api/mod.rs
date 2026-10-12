@@ -14,6 +14,7 @@ pub mod domains;
 pub mod emails;
 pub mod health;
 pub mod json;
+pub mod ses;
 
 // shortcut: in-memory, per process; keys never expire from the map. Fine for one API process.
 pub type KeyLimiter = governor::DefaultKeyedRateLimiter<Uuid>;
@@ -27,6 +28,7 @@ pub struct AppState {
     pub config: Arc<Config>,
     pub sender: Arc<dyn Sender>,
     pub key_limiter: Arc<KeyLimiter>,
+    pub sns_certs: Arc<crate::events::sns::CertCache>,
 }
 
 impl AppState {
@@ -37,6 +39,7 @@ impl AppState {
             config: Arc::new(config),
             sender,
             key_limiter: Arc::new(RateLimiter::keyed(Quota::per_second(per_second))),
+            sns_certs: Arc::new(crate::events::sns::CertCache::new()),
         }
     }
 }
@@ -46,6 +49,7 @@ pub fn router(state: AppState) -> Router {
         .merge(health::routes())
         .merge(domains::routes())
         .merge(emails::routes())
+        .merge(ses::routes())
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
         .layer(TraceLayer::new_for_http())
         .with_state(state)

@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE emails SET status = $2, updated_at = now() WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "email_status",
+            "kind": {
+              "Enum": [
+                "queued",
+                "sending",
+                "unknown",
+                "sent",
+                "delivered",
+                "delivery_delayed",
+                "bounced",
+                "complained",
+                "failed",
+                "suppressed",
+                "canceled"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9c242fd5293e1b53807c4e8e0116cd907f23fc5d47c34e43645949a0a641f903"
+}

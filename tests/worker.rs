@@ -23,7 +23,7 @@ async fn sends_and_marks_sent_with_the_fake_sender(pool: sqlx::PgPool) {
     common::verified_domain(&t, "shop.com").await;
     let id = common::send_email(&t, email(json!("a@x.com"))).await;
     assert_eq!(worker::tick(&t.state, &limiter()).await.unwrap(), 1);
-    assert_eq!(common::status_of(&t.state.pool, id).await, "sent");
+    assert_eq!(common::status_of(&t.state.pool, id).await, "delivered"); // the fake sender also simulates SES events, so a good send ends as delivered
     assert!(t.outbox.join(format!("{id}.eml")).exists());
     let sent: i64 = sqlx::query_scalar("SELECT count(*) FROM email_events WHERE email_id = $1 AND type = 'sent'")
         .bind(id).fetch_one(&t.state.pool).await.unwrap();
@@ -72,7 +72,7 @@ async fn block_list_matches_display_names_and_case(pool: sqlx::PgPool) {
     worker::tick(&t.state, &limiter()).await.unwrap();
 
     assert_eq!(common::status_of(&t.state.pool, only_ann).await, "suppressed");
-    assert_eq!(common::status_of(&t.state.pool, mixed).await, "sent");
+    assert_eq!(common::status_of(&t.state.pool, mixed).await, "delivered");
     let sent = rec.sent();
     assert_eq!(sent.len(), 1);
     assert_eq!(sent[0].recipients, vec!["bob@x.com"]);

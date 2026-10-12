@@ -157,7 +157,11 @@ async fn process(state: &AppState, limiter: &SendLimiter, email: ClaimedEmail) -
     match state.sender.send(&out).await {
         Ok(provider_id) => {
             queue::mark_sent(pool, &email, &provider_id, &out.recipients).await?;
-            // Task 9 adds the fake-sender event simulation here.
+            if state.config.sender == crate::config::SenderKind::Fake {
+                if let Err(e) = crate::events::simulate(pool, email.id, &provider_id, &out.recipients).await {
+                    tracing::warn!(email_id = %email.id, error = ?e, "simulated events failed");
+                }
+            }
         }
         Err(SenderError::Retryable(m)) => match queue::retry_delay(email.attempts) {
             Some(d) => queue::mark_retry(pool, email.id, &m, d).await?,
