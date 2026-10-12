@@ -275,7 +275,11 @@ impl Sender for SesSender {
                 .map_err(|e| SenderError::Permanent(e.to_string()))?;
             req = req.email_tags(tag);
         }
-        match req.send().await {
+        // No SDK retries: a retry after a timeout could reach SES twice. A failed send goes back through
+        // Mailrust's own queue instead (retry backoff, or unknown → wait for the SES "Send" event).
+        let no_retry = aws_sdk_sesv2::config::Builder::default()
+            .retry_config(aws_config::retry::RetryConfig::disabled());
+        match req.customize().config_override(no_retry).send().await {
             Ok(out) => Ok(out.message_id().unwrap_or_default().to_string()),
             Err(e) => Err(match &e {
                 // The request may have reached SES; sending again could send twice.
@@ -298,6 +302,51 @@ mod tests {
     use aws_sdk_sesv2::types::error::{
         MessageRejected, SendingPausedException, TooManyRequestsException,
     };
+
+    /// A retry after a timeout could reach SES twice. Mailrust's own unknown → grace → requeue path handles it instead.
+    #[tokio::test]
+    async fn the_sdk_never_retries_a_send_by_itself() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        };
+        let calls = Arc::new(AtomicUsize::new(0));
+        let seen = calls.clone();
+        let http = aws_smithy_http_client::test_util::infallible_client_fn(move |_| {
+            seen.fetch_add(1, Ordering::SeqCst);
+            axum::http::Response::builder()
+                .status(500)
+                .body("")
+                .unwrap()
+        });
+        let conf = aws_sdk_sesv2::Config::builder()
+            .behavior_version(aws_config::BehaviorVersion::latest())
+            .region(aws_config::Region::new("us-east-1"))
+            .credentials_provider(aws_sdk_sesv2::config::Credentials::new(
+                "a", "b", None, None, "test",
+            ))
+            .http_client(http)
+            .build();
+        let ses = SesSender {
+            client: Client::from_conf(conf),
+            region: "us-east-1".into(),
+            configuration_set: "cs".into(),
+            aws_account_id: "123456789012".into(),
+        };
+        let email = OutgoingEmail {
+            email_id: uuid::Uuid::now_v7(),
+            tenant: TenantRef {
+                account_id: uuid::Uuid::now_v7(),
+                tenant_name: "t".into(),
+            },
+            from: "a@shop.com".into(),
+            recipients: vec!["b@x.com".into()],
+            tags: Default::default(),
+            raw: b"Subject: hi\r\n\r\nhi".to_vec(),
+        };
+        assert!(ses.send(&email).await.is_err());
+        assert_eq!(calls.load(Ordering::SeqCst), 1, "the SDK retried the send");
+    }
 
     #[test]
     fn dns_records_look_like_ses_expects() {

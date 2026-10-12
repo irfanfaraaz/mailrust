@@ -398,3 +398,23 @@ async fn a_send_with_an_unknown_outcome_waits_for_ses_instead_of_resending(pool:
     worker::tick(&t.state, &limiter()).await.unwrap();
     assert_eq!(common::status_of(&t.state.pool, id).await, "unknown");
 }
+
+#[sqlx::test]
+async fn an_app_clock_ahead_of_the_database_does_not_delay_a_send(pool: sqlx::PgPool) {
+    let t = common::app(pool).await;
+    let d = common::verified_domain(&t, "shop.com").await;
+    let req = serde_json::from_value(email(json!("a@x.com"))).unwrap();
+    // The app's clock runs 5 s ahead of Postgres.
+    let ahead = chrono::Utc::now() + chrono::Duration::seconds(5);
+    let valid = mailrust::emails::validate(req, ahead).unwrap();
+    let mut conn = t.state.pool.acquire().await.unwrap();
+    let id = mailrust::emails::insert(&mut conn, d.account_id, d.id, &valid, None)
+        .await
+        .unwrap();
+    drop(conn);
+    let claimed = queue::claim(&t.state.pool, 10).await.unwrap();
+    assert!(
+        claimed.iter().any(|e| e.id == id),
+        "a send-now email must be due at once"
+    );
+}

@@ -153,7 +153,8 @@ pub struct ValidEmail {
     pub headers: BTreeMap<String, String>,
     pub tags: BTreeMap<String, String>,
     pub attachments: Vec<AttachmentData>,
-    pub send_at: DateTime<Utc>,
+    /// None = send now, stamped by the database clock (the same clock `queue::claim` compares against).
+    pub send_at: Option<DateTime<Utc>>,
 }
 
 fn bad(msg: impl Into<String>) -> ApiError {
@@ -289,13 +290,13 @@ pub fn validate(req: SendEmailRequest, now: DateTime<Utc>) -> Result<ValidEmail,
     }
 
     let send_at = match req.scheduled_at {
-        None => now,
+        None => None,
         Some(t) if t > now + Duration::days(MAX_SCHEDULE_DAYS) => {
             return Err(bad(format!(
                 "scheduled_at can be at most {MAX_SCHEDULE_DAYS} days ahead"
             )));
         }
-        Some(t) => t.max(now),
+        Some(t) => (t > now).then_some(t),
     };
 
     Ok(ValidEmail {
@@ -330,7 +331,7 @@ pub async fn insert(
     sqlx::query!(
         "INSERT INTO emails (id, account_id, domain_id, from_address, to_addresses, cc_addresses, bcc_addresses,
                              reply_to, subject, html, text_body, headers, tags, send_at, idempotency_key, request_hash)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)",
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, COALESCE($14, now()), $15, $16)",
         id,
         account_id,
         domain_id,
@@ -694,7 +695,7 @@ mod tests {
         let now = Utc::now();
         let mut v = base();
         v["scheduled_at"] = json!((now - Duration::hours(1)).to_rfc3339());
-        assert_eq!(validate(req(v), now).unwrap().send_at, now);
+        assert_eq!(validate(req(v), now).unwrap().send_at, None);
         assert_eq!(
             api_status(EmailStatus::Queued, now + Duration::hours(1), now),
             "scheduled"
