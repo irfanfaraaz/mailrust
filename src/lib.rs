@@ -15,6 +15,7 @@ pub mod keys;
 pub mod limiter;
 pub mod openapi;
 pub mod queue;
+pub mod quota;
 pub mod render;
 pub mod safety;
 pub mod sender;

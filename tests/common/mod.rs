@@ -114,12 +114,13 @@ pub async fn verified_domain(t: &TestApp, name: &str) -> mailrust::domains::Doma
     d
 }
 
-use mailrust::sender::{DnsRecord, DomainState, OutgoingEmail, SenderError, TenantRef};
+use mailrust::sender::{DnsRecord, DomainState, OutgoingEmail, SendQuota, SenderError, TenantRef};
 
 /// Records what it was asked to send. `fail_with` makes every send fail with that error.
 pub struct RecordingSender {
     pub sent: std::sync::Mutex<Vec<OutgoingEmail>>,
     pub fail_with: Option<fn() -> SenderError>,
+    pub quota: std::sync::Mutex<Option<Result<SendQuota, String>>>,
 }
 
 impl RecordingSender {
@@ -127,12 +128,14 @@ impl RecordingSender {
         Arc::new(Self {
             sent: Default::default(),
             fail_with: None,
+            quota: Default::default(),
         })
     }
     pub fn failing(f: fn() -> SenderError) -> Arc<Self> {
         Arc::new(Self {
             sent: Default::default(),
             fail_with: Some(f),
+            quota: Default::default(),
         })
     }
     pub fn sent(&self) -> Vec<OutgoingEmail> {
@@ -157,6 +160,13 @@ impl Sender for RecordingSender {
         }
         self.sent.lock().unwrap().push(email.clone());
         Ok(format!("rec-{}", email.email_id))
+    }
+    async fn quota(&self) -> Result<Option<SendQuota>, SenderError> {
+        match self.quota.lock().unwrap().clone() {
+            None => Ok(None),
+            Some(Ok(q)) => Ok(Some(q)),
+            Some(Err(m)) => Err(SenderError::Retryable(m)),
+        }
     }
 }
 

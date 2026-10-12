@@ -42,6 +42,14 @@ pub struct OutgoingEmail {
     pub raw: Vec<u8>,
 }
 
+/// The provider's live limits (SES GetAccount). Counts are recipients, like SES counts them.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SendQuota {
+    pub max_send_rate: f64,
+    pub max_24h_send: f64,
+    pub sent_last_24h: f64,
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum SenderError {
     #[error("temporary sender error: {0}")]
@@ -72,6 +80,10 @@ pub trait Sender: Send + Sync {
         domain: &str,
     ) -> Result<DomainState, SenderError>;
     async fn send(&self, email: &OutgoingEmail) -> Result<String, SenderError>;
+    /// The provider's live limits. None: this sender has none to report (the fake sender).
+    async fn quota(&self) -> Result<Option<SendQuota>, SenderError> {
+        Ok(None)
+    }
 }
 
 pub async fn from_config(config: &Config) -> anyhow::Result<Arc<dyn Sender>> {
