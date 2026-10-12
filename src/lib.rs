@@ -7,3 +7,5 @@ pub mod telemetry;
 pub mod sender;
 pub mod accounts;
 pub mod keys;
+pub mod api;
+pub mod background;

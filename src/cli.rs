@@ -35,6 +35,11 @@ enum Command {
     /// Manage API keys
     #[command(subcommand)]
     Key(KeyCmd),
+    /// Run the API and/or the background workers
+    Serve {
+        #[arg(long, value_enum, default_value_t = Role::All)]
+        role: Role,
+    },
 }
 
 #[derive(Subcommand)]
@@ -90,6 +95,26 @@ pub async fn run() -> anyhow::Result<()> {
         }
         Command::Account(cmd) => account_cmd(&pool, &config, cmd).await?,
         Command::Key(cmd) => key_cmd(&pool, cmd).await?,
+        Command::Serve { role } => {
+            let sender = sender::from_config(&config).await?;
+            let state = crate::api::AppState::new(pool, config, sender);
+            let shutdown = tokio_util::sync::CancellationToken::new();
+            let mut tasks = tokio::task::JoinSet::new();
+            if role != Role::Worker {
+                tasks.spawn(crate::api::serve(state.clone(), shutdown.clone()));
+            }
+            if role != Role::Api {
+                crate::background::spawn_all(&mut tasks, state.clone(), shutdown.clone());
+            }
+            tokio::select! {
+                _ = tokio::signal::ctrl_c() => tracing::info!("shutting down"),
+                Some(res) = tasks.join_next() => {
+                    tracing::error!(?res, "a task stopped early, shutting down");
+                }
+            }
+            shutdown.cancel();
+            while tasks.join_next().await.is_some() {}
+        }
     }
     Ok(())
 }
