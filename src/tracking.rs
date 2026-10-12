@@ -69,10 +69,9 @@ async fn record(
 pub(crate) async fn open(State(state): State<AppState>, Path(file): Path<String>) -> Response {
     let token = file.strip_suffix(".gif").unwrap_or(&file);
     if let Some((email_id, TokenKind::Open)) = tokens::verify(&state.config.tracking_secret, token)
+        && let Err(e) = record(&state, email_id, EventKind::Opened, json!({}), false).await
     {
-        if let Err(e) = record(&state, email_id, EventKind::Opened, json!({}), false).await {
-            tracing::warn!(error = ?e, "could not record open");
-        }
+        tracing::warn!(error = ?e, "could not record open");
     }
     // Always the same answer, so the pixel says nothing about whether a token was valid.
     (

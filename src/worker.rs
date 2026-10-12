@@ -226,12 +226,11 @@ async fn process(
     match state.sender.send(&out).await {
         Ok(provider_id) => {
             queue::mark_sent(pool, &email, &provider_id, &out.recipients).await?;
-            if state.config.sender == crate::config::SenderKind::Fake {
-                if let Err(e) =
+            if state.config.sender == crate::config::SenderKind::Fake
+                && let Err(e) =
                     crate::events::simulate(pool, email.id, &provider_id, &out.recipients).await
-                {
-                    tracing::warn!(email_id = %email.id, error = ?e, "simulated events failed");
-                }
+            {
+                tracing::warn!(email_id = %email.id, error = ?e, "simulated events failed");
             }
         }
         Err(SenderError::Unknown(m)) => queue::mark_unknown(pool, email.id, &m).await?,

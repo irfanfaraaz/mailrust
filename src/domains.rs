@@ -271,10 +271,10 @@ pub async fn verify_loop(state: AppState, shutdown: CancellationToken) -> anyhow
             }
         };
         for id in ids {
-            if let Ok(Some(d)) = get_by_id(&state.pool, id).await {
-                if let Err(e) = check(&state, &d).await {
-                    tracing::warn!(error = ?e, domain = %d.name, "domain check failed");
-                }
+            if let Ok(Some(d)) = get_by_id(&state.pool, id).await
+                && let Err(e) = check(&state, &d).await
+            {
+                tracing::warn!(error = ?e, domain = %d.name, "domain check failed");
             }
         }
     })

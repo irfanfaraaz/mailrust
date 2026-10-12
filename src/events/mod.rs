@@ -344,10 +344,9 @@ async fn after_ingest(pool: &PgPool, applied: &Applied) {
         account_id,
         affects_safety: true,
     } = applied
+        && let Err(e) = safety::check_account(pool, *account_id).await
     {
-        if let Err(e) = safety::check_account(pool, *account_id).await {
-            tracing::error!(error = ?e, "auto-pause check failed");
-        }
+        tracing::error!(error = ?e, "auto-pause check failed");
     }
 }
 
