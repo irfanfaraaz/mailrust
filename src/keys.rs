@@ -8,7 +8,18 @@ use uuid::Uuid;
 
 use crate::accounts::AccountStatus;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type, Serialize, Deserialize, utoipa::ToSchema, clap::ValueEnum)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    sqlx::Type,
+    Serialize,
+    Deserialize,
+    utoipa::ToSchema,
+    clap::ValueEnum,
+)]
 #[sqlx(type_name = "key_access", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum KeyAccess {
@@ -62,7 +73,12 @@ pub fn display_prefix(token: &str) -> String {
     token.chars().take(TOKEN_PREFIX.len() + 6).collect()
 }
 
-pub async fn create(pool: &PgPool, account_id: Uuid, name: &str, access: KeyAccess) -> sqlx::Result<NewKey> {
+pub async fn create(
+    pool: &PgPool,
+    account_id: Uuid,
+    name: &str,
+    access: KeyAccess,
+) -> sqlx::Result<NewKey> {
     let id = Uuid::now_v7();
     let token = generate_token();
     let prefix = display_prefix(&token);
@@ -77,7 +93,12 @@ pub async fn create(pool: &PgPool, account_id: Uuid, name: &str, access: KeyAcce
     )
     .execute(pool)
     .await?;
-    Ok(NewKey { id, token, prefix, access })
+    Ok(NewKey {
+        id,
+        token,
+        prefix,
+        access,
+    })
 }
 
 pub async fn find_by_token(pool: &PgPool, token: &str) -> sqlx::Result<Option<KeyContext>> {

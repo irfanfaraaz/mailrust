@@ -8,7 +8,11 @@ use crate::tokens::{self, TokenKind};
 
 /// Rewrites http(s) links to go through /c/<token> and adds the 1x1 open pixel.
 /// Returns the new HTML and the original link list (index = link number in the token).
-pub fn apply(html: &str, email_id: Uuid, t: &Tracking) -> Result<(String, Vec<String>), RenderError> {
+pub fn apply(
+    html: &str,
+    email_id: Uuid,
+    t: &Tracking,
+) -> Result<(String, Vec<String>), RenderError> {
     let links = RefCell::new(Vec::<String>::new());
     let saw_body = Cell::new(false);
     let pixel = format!(
@@ -24,7 +28,9 @@ pub fn apply(html: &str, email_id: Uuid, t: &Tracking) -> Result<(String, Vec<St
                 let target = href.trim().to_string();
                 let lower = target.to_ascii_lowercase();
                 let mut list = links.borrow_mut();
-                if (lower.starts_with("http://") || lower.starts_with("https://")) && list.len() < u16::MAX as usize {
+                if (lower.starts_with("http://") || lower.starts_with("https://"))
+                    && list.len() < u16::MAX as usize
+                {
                     let idx = list.len() as u16;
                     list.push(target);
                     let token = tokens::sign(t.secret, email_id, TokenKind::Click(idx));
@@ -44,7 +50,10 @@ pub fn apply(html: &str, email_id: Uuid, t: &Tracking) -> Result<(String, Vec<St
 
     let mut out = rewrite_str(
         html,
-        RewriteStrSettings { element_content_handlers: handlers, ..RewriteStrSettings::new() },
+        RewriteStrSettings {
+            element_content_handlers: handlers,
+            ..RewriteStrSettings::new()
+        },
     )
     .map_err(|e| RenderError::Html(e.to_string()))?;
     if t.opens && !saw_body.get() {

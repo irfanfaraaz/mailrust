@@ -1,4 +1,7 @@
-use hickory_resolver::{TokioAsyncResolver, proto::rr::{RData, RecordType}};
+use hickory_resolver::{
+    TokioAsyncResolver,
+    proto::rr::{RData, RecordType},
+};
 
 /// Returns the CNAME target of `host` without the trailing dot, if any.
 pub async fn cname_target(host: &str) -> Option<String> {
@@ -11,5 +14,7 @@ pub async fn cname_target(host: &str) -> Option<String> {
 }
 
 pub async fn cname_points_to(host: &str, target: &str) -> bool {
-    cname_target(host).await.is_some_and(|t| t.eq_ignore_ascii_case(target.trim_end_matches('.')))
+    cname_target(host)
+        .await
+        .is_some_and(|t| t.eq_ignore_ascii_case(target.trim_end_matches('.')))
 }

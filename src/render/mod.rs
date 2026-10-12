@@ -52,7 +52,8 @@ pub enum RenderError {
 }
 
 fn mailbox(s: &str) -> Result<Mailbox, RenderError> {
-    s.parse::<Mailbox>().map_err(|_| RenderError::Address(s.to_string()))
+    s.parse::<Mailbox>()
+        .map_err(|_| RenderError::Address(s.to_string()))
 }
 
 /// "Ann <ANN@Shop.com>" -> "ann@shop.com". Falls back to the trimmed, lowercased input.
@@ -112,8 +113,10 @@ pub fn render(input: &RenderInput) -> Result<Rendered, RenderError> {
             Body::Multi(m) => MultiPart::mixed().multipart(m),
         };
         for a in input.attachments {
-            let ct = ContentType::parse(&a.content_type).map_err(|e| RenderError::Build(e.to_string()))?;
-            mixed = mixed.singlepart(Attachment::new(a.filename.clone()).body(a.content.clone(), ct));
+            let ct = ContentType::parse(&a.content_type)
+                .map_err(|e| RenderError::Build(e.to_string()))?;
+            mixed =
+                mixed.singlepart(Attachment::new(a.filename.clone()).body(a.content.clone(), ct));
         }
         b.multipart(mixed)
     }
@@ -165,14 +168,21 @@ mod tests {
     fn plain_and_html_with_attachment_and_custom_header() {
         let to = vec!["Ann <ann@x.com>".to_string()];
         let headers = BTreeMap::from([("X-Order".to_string(), "42".to_string())]);
-        let att = vec![AttachmentData { filename: "r.pdf".into(), content_type: "application/pdf".into(), content: b"%PDF".to_vec() }];
+        let att = vec![AttachmentData {
+            filename: "r.pdf".into(),
+            content_type: "application/pdf".into(),
+            content: b"%PDF".to_vec(),
+        }];
         let r = render(&input(&to, &headers, &att, Some("<p>Hi</p>"), None)).unwrap();
         let s = text(&r);
         assert!(s.starts_with("X-Order: 42\r\n"));
         assert!(s.contains("Subject: Your receipt"));
         assert!(s.contains("multipart/alternative"));
         assert!(s.contains("Content-Disposition: attachment"));
-        assert!(s.contains("@shop.com>"), "message id uses the sender domain");
+        assert!(
+            s.contains("@shop.com>"),
+            "message id uses the sender domain"
+        );
         assert!(r.links.is_empty());
     }
 
@@ -180,7 +190,10 @@ mod tests {
     fn bad_address_is_an_error() {
         let to = vec!["not an address".to_string()];
         let h = BTreeMap::new();
-        assert!(matches!(render(&input(&to, &h, &[], None, None)), Err(RenderError::Address(_))));
+        assert!(matches!(
+            render(&input(&to, &h, &[], None, None)),
+            Err(RenderError::Address(_))
+        ));
     }
 
     #[test]
@@ -194,21 +207,38 @@ mod tests {
         let to = vec!["a@x.com".to_string()];
         let h = BTreeMap::new();
         let html = r##"<html><body><a href="https://shop.com/sale">Sale</a> <a href="mailto:x@y.com">Mail</a> <a href="#top">Top</a> <A HREF="http://shop.com/two">Two</A></body></html>"##;
-        let t = Tracking { base_url: "https://track.shop.com".into(), secret: S, opens: true, clicks: true };
+        let t = Tracking {
+            base_url: "https://track.shop.com".into(),
+            secret: S,
+            opens: true,
+            clicks: true,
+        };
         let r = render(&input(&to, &h, &[], Some(html), Some(t))).unwrap();
-        assert_eq!(r.links, vec!["https://shop.com/sale", "http://shop.com/two"]);
+        assert_eq!(
+            r.links,
+            vec!["https://shop.com/sale", "http://shop.com/two"]
+        );
         let s = text(&r);
         assert!(s.contains("track.shop.com/c/"));
         assert!(s.contains("track.shop.com/o/"));
         assert!(s.contains("mailto:x@y.com"));
-        assert!(!s.contains("https://shop.com/sale\""), "original link is replaced");
+        assert!(
+            !s.contains("https://shop.com/sale\""),
+            "original link is replaced"
+        );
     }
 
     #[test]
     fn pixel_is_added_even_without_a_body_tag_and_broken_html_survives() {
         let id = Uuid::now_v7();
-        let t = Tracking { base_url: "https://m.test".into(), secret: S, opens: true, clicks: true };
-        let (out, links) = tracking::apply("<p>Hello <a href='https://a.com'>there", id, &t).unwrap();
+        let t = Tracking {
+            base_url: "https://m.test".into(),
+            secret: S,
+            opens: true,
+            clicks: true,
+        };
+        let (out, links) =
+            tracking::apply("<p>Hello <a href='https://a.com'>there", id, &t).unwrap();
         assert!(out.contains("Hello"));
         assert!(out.contains("https://m.test/o/"));
         assert_eq!(links, vec!["https://a.com"]);
@@ -217,8 +247,14 @@ mod tests {
     #[test]
     fn opens_only_leaves_links_alone() {
         let id = Uuid::now_v7();
-        let t = Tracking { base_url: "https://m.test".into(), secret: S, opens: true, clicks: false };
-        let (out, links) = tracking::apply(r#"<body><a href="https://a.com">x</a></body>"#, id, &t).unwrap();
+        let t = Tracking {
+            base_url: "https://m.test".into(),
+            secret: S,
+            opens: true,
+            clicks: false,
+        };
+        let (out, links) =
+            tracking::apply(r#"<body><a href="https://a.com">x</a></body>"#, id, &t).unwrap();
         assert!(out.contains(r#"href="https://a.com""#));
         assert!(links.is_empty());
     }

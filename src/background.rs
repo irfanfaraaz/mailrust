@@ -6,7 +6,11 @@ use tokio_util::sync::CancellationToken;
 use crate::api::AppState;
 
 /// Starts every background loop. Later tasks add their loops here.
-pub fn spawn_all(tasks: &mut JoinSet<anyhow::Result<()>>, state: AppState, shutdown: CancellationToken) {
+pub fn spawn_all(
+    tasks: &mut JoinSet<anyhow::Result<()>>,
+    state: AppState,
+    shutdown: CancellationToken,
+) {
     tasks.spawn(crate::domains::verify_loop(state.clone(), shutdown.clone()));
     tasks.spawn(crate::worker::run(state.clone(), shutdown.clone()));
     tasks.spawn(crate::queue::reaper_loop(state.clone(), shutdown.clone()));
@@ -23,9 +27,10 @@ pub async fn maintenance_loop(state: AppState, shutdown: CancellationToken) -> a
         )
         .execute(&state.pool)
         .await;
-        let s = sqlx::query!("DELETE FROM sns_messages WHERE received_at < now() - interval '30 days'")
-            .execute(&state.pool)
-            .await;
+        let s =
+            sqlx::query!("DELETE FROM sns_messages WHERE received_at < now() - interval '30 days'")
+                .execute(&state.pool)
+                .await;
         if let Err(e) = a.and(s) {
             tracing::error!(error = ?e, "maintenance failed");
         }

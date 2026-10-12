@@ -110,19 +110,36 @@ pub async fn run() -> anyhow::Result<()> {
         }
         Command::Account(cmd) => account_cmd(&pool, &config, cmd).await?,
         Command::Key(cmd) => key_cmd(&pool, cmd).await?,
-        Command::Domain(DomainCmd::Add { account, name, tracking_subdomain }) => {
+        Command::Domain(DomainCmd::Add {
+            account,
+            name,
+            tracking_subdomain,
+        }) => {
             let sender = sender::from_config(&config).await?;
             let state = crate::api::AppState::new(pool.clone(), config.clone(), sender);
-            let acc = accounts::get(&pool, account).await?.ok_or_else(|| anyhow::anyhow!("no account {account}"))?;
-            let d = crate::domains::add(&state, &acc, crate::domains::AddDomain {
-                name, tracking_subdomain, open_tracking: false, click_tracking: false,
-            }).await?;
+            let acc = accounts::get(&pool, account)
+                .await?
+                .ok_or_else(|| anyhow::anyhow!("no account {account}"))?;
+            let d = crate::domains::add(
+                &state,
+                &acc,
+                crate::domains::AddDomain {
+                    name,
+                    tracking_subdomain,
+                    open_tracking: false,
+                    click_tracking: false,
+                },
+            )
+            .await?;
             println!("domain {} ({:?})\nadd these DNS records:", d.name, d.status);
             for r in d.dns_records.iter() {
-                println!("  {:<6} {:<45} {}   # {}", r.record_type, r.name, r.value, r.purpose);
+                println!(
+                    "  {:<6} {:<45} {}   # {}",
+                    r.record_type, r.name, r.value, r.purpose
+                );
             }
         }
-    
+
         Command::Serve { role } => {
             let sender = sender::from_config(&config).await?;
             let state = crate::api::AppState::new(pool, config, sender);
@@ -151,7 +168,10 @@ async fn account_cmd(pool: &sqlx::PgPool, config: &Config, cmd: AccountCmd) -> a
     match cmd {
         AccountCmd::Create { name } => {
             let name = name.trim();
-            anyhow::ensure!(!name.is_empty() && name.len() <= 100, "name must be 1-100 characters");
+            anyhow::ensure!(
+                !name.is_empty() && name.len() <= 100,
+                "name must be 1-100 characters"
+            );
             let sender = sender::from_config(config).await?;
             let account = accounts::create(pool, name).await?;
             println!("account {} created ({})", account.id, account.name);
@@ -176,16 +196,34 @@ async fn account_cmd(pool: &sqlx::PgPool, config: &Config, cmd: AccountCmd) -> a
         }
         AccountCmd::Pause { id, reason } => {
             let changed = accounts::pause(pool, id, &reason).await?;
-            println!("{}", if changed { "paused" } else { "not changed (missing or already paused)" });
+            println!(
+                "{}",
+                if changed {
+                    "paused"
+                } else {
+                    "not changed (missing or already paused)"
+                }
+            );
         }
         AccountCmd::Resume { id } => {
             let changed = accounts::resume(pool, id).await?;
-            println!("{}", if changed { "resumed" } else { "not changed (missing or not paused)" });
+            println!(
+                "{}",
+                if changed {
+                    "resumed"
+                } else {
+                    "not changed (missing or not paused)"
+                }
+            );
         }
         AccountCmd::SyncSes { id, all } => {
             let sender = sender::from_config(config).await?;
             let targets = match (id, all) {
-                (Some(id), false) => vec![accounts::get(pool, id).await?.ok_or_else(|| anyhow::anyhow!("no account {id}"))?],
+                (Some(id), false) => vec![
+                    accounts::get(pool, id)
+                        .await?
+                        .ok_or_else(|| anyhow::anyhow!("no account {id}"))?,
+                ],
                 (None, true) => accounts::list(pool).await?,
                 _ => anyhow::bail!("pass one account id, or --all"),
             };
@@ -202,10 +240,20 @@ async fn account_cmd(pool: &sqlx::PgPool, config: &Config, cmd: AccountCmd) -> a
 
 async fn key_cmd(pool: &sqlx::PgPool, cmd: KeyCmd) -> anyhow::Result<()> {
     match cmd {
-        KeyCmd::Create { account, name, access } => {
-            anyhow::ensure!(accounts::get(pool, account).await?.is_some(), "no account {account}");
+        KeyCmd::Create {
+            account,
+            name,
+            access,
+        } => {
+            anyhow::ensure!(
+                accounts::get(pool, account).await?.is_some(),
+                "no account {account}"
+            );
             let key = keys::create(pool, account, &name, access).await?;
-            println!("key id: {}\nkey:    {}\n(save it now, it is not shown again)", key.id, key.token);
+            println!(
+                "key id: {}\nkey:    {}\n(save it now, it is not shown again)",
+                key.id, key.token
+            );
         }
         KeyCmd::Revoke { id } => {
             let changed = keys::revoke(pool, None, id).await?;

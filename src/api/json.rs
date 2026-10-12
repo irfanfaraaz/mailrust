@@ -1,5 +1,8 @@
 // src/api/json.rs
-use axum::{extract::{FromRequest, rejection::JsonRejection}, http::StatusCode};
+use axum::{
+    extract::{FromRequest, rejection::JsonRejection},
+    http::StatusCode,
+};
 
 use crate::error::ApiError;
 

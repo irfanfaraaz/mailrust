@@ -3,7 +3,10 @@ use std::collections::HashMap;
 use axum::{
     Json, Router,
     body::Bytes,
-    extract::{Path, Query, State, rejection::{BytesRejection, QueryRejection}},
+    extract::{
+        Path, Query, State,
+        rejection::{BytesRejection, QueryRejection},
+    },
     http::{HeaderMap, StatusCode},
     routing::{get, post},
 };
@@ -15,7 +18,10 @@ use uuid::Uuid;
 use super::{AppState, auth::Auth};
 use crate::{
     domains::{self, DomainStatus},
-    emails::{self, EmailStatus, EmailSummary, EmailView, MAX_BATCH, SendEmailRequest, SendResponse, ValidEmail},
+    emails::{
+        self, EmailStatus, EmailSummary, EmailView, MAX_BATCH, SendEmailRequest, SendResponse,
+        ValidEmail,
+    },
     error::ApiError,
 };
 
@@ -48,24 +54,46 @@ pub struct ListQuery {
 }
 
 fn body_error(r: BytesRejection) -> ApiError {
-    if r.status() == StatusCode::PAYLOAD_TOO_LARGE { ApiError::TooLarge } else { ApiError::Validation(r.body_text()) }
+    if r.status() == StatusCode::PAYLOAD_TOO_LARGE {
+        ApiError::TooLarge
+    } else {
+        ApiError::Validation(r.body_text())
+    }
 }
 
-async fn verified_domain_id(state: &AppState, account_id: Uuid, domain: &str) -> Result<Uuid, ApiError> {
-    let d = domains::find_by_name(&state.pool, account_id, domain).await?.ok_or_else(|| {
-        ApiError::Unprocessable("domain_not_found", format!("add and verify {domain} before sending from it"))
-    })?;
+async fn verified_domain_id(
+    state: &AppState,
+    account_id: Uuid,
+    domain: &str,
+) -> Result<Uuid, ApiError> {
+    let d = domains::find_by_name(&state.pool, account_id, domain)
+        .await?
+        .ok_or_else(|| {
+            ApiError::Unprocessable(
+                "domain_not_found",
+                format!("add and verify {domain} before sending from it"),
+            )
+        })?;
     if d.status != DomainStatus::Verified {
-        return Err(ApiError::Unprocessable("domain_not_verified", format!("{domain} is not verified yet")));
+        return Err(ApiError::Unprocessable(
+            "domain_not_verified",
+            format!("{domain} is not verified yet"),
+        ));
     }
     Ok(d.id)
 }
 
 fn idempotency_key(headers: &HeaderMap) -> Result<Option<String>, ApiError> {
-    let Some(v) = headers.get("idempotency-key") else { return Ok(None) };
-    let s = v.to_str().map_err(|_| ApiError::Validation("Idempotency-Key must be printable ASCII".into()))?;
+    let Some(v) = headers.get("idempotency-key") else {
+        return Ok(None);
+    };
+    let s = v
+        .to_str()
+        .map_err(|_| ApiError::Validation("Idempotency-Key must be printable ASCII".into()))?;
     if s.is_empty() || s.len() > 256 {
-        return Err(ApiError::Validation("Idempotency-Key must be 1-256 characters".into()));
+        return Err(ApiError::Validation(
+            "Idempotency-Key must be 1-256 characters".into(),
+        ));
     }
     Ok(Some(s.to_string()))
 }
@@ -82,7 +110,8 @@ pub(crate) async fn send(
 ) -> Result<Json<SendResponse>, ApiError> {
     auth.require_active()?;
     let body = body.map_err(body_error)?;
-    let req: SendEmailRequest = serde_json::from_slice(&body).map_err(|e| ApiError::Validation(e.to_string()))?;
+    let req: SendEmailRequest =
+        serde_json::from_slice(&body).map_err(|e| ApiError::Validation(e.to_string()))?;
     let now = Utc::now();
     let email = emails::validate(req, now)?;
     let domain_id = verified_domain_id(&state, auth.account_id(), &email.from_domain).await?;
@@ -103,18 +132,29 @@ pub(crate) async fn send(
                 return if p.request_hash.as_deref() == Some(hash.as_slice()) {
                     Ok(Json(SendResponse { id: p.id }))
                 } else {
-                    Err(ApiError::Conflict("idempotency_conflict", "this Idempotency-Key was used with a different body".into()))
+                    Err(ApiError::Conflict(
+                        "idempotency_conflict",
+                        "this Idempotency-Key was used with a different body".into(),
+                    ))
                 };
             }
             // Older than the window: free the key for reuse.
-            sqlx::query!("UPDATE emails SET idempotency_key = NULL WHERE id = $1", p.id).execute(&mut *tx).await?;
+            sqlx::query!(
+                "UPDATE emails SET idempotency_key = NULL WHERE id = $1",
+                p.id
+            )
+            .execute(&mut *tx)
+            .await?;
         }
     }
     let idem = key.as_deref().map(|k| (k, hash.as_slice()));
     let id = match emails::insert(&mut tx, auth.account_id(), domain_id, &email, idem).await {
         Ok(id) => id,
         Err(e) if is_idempotency_race(&e) => {
-            return Err(ApiError::Conflict("idempotency_conflict", "a request with this Idempotency-Key is already being processed".into()));
+            return Err(ApiError::Conflict(
+                "idempotency_conflict",
+                "a request with this Idempotency-Key is already being processed".into(),
+            ));
         }
         Err(e) => return Err(e.into()),
     };
@@ -129,9 +169,12 @@ pub(crate) async fn batch(
 ) -> Result<Json<BatchResponse>, ApiError> {
     auth.require_active()?;
     let body = body.map_err(body_error)?;
-    let reqs: Vec<SendEmailRequest> = serde_json::from_slice(&body).map_err(|e| ApiError::Validation(e.to_string()))?;
+    let reqs: Vec<SendEmailRequest> =
+        serde_json::from_slice(&body).map_err(|e| ApiError::Validation(e.to_string()))?;
     if reqs.is_empty() || reqs.len() > MAX_BATCH {
-        return Err(ApiError::Validation(format!("a batch holds 1-{MAX_BATCH} emails")));
+        return Err(ApiError::Validation(format!(
+            "a batch holds 1-{MAX_BATCH} emails"
+        )));
     }
     let now = Utc::now();
     let mut valid: Vec<(ValidEmail, Uuid)> = Vec::with_capacity(reqs.len());
@@ -139,14 +182,18 @@ pub(crate) async fn batch(
     for (i, r) in reqs.into_iter().enumerate() {
         let prefix = |e: ApiError| match e {
             ApiError::Validation(m) => ApiError::Validation(format!("emails[{i}]: {m}")),
-            ApiError::Unprocessable(c, m) => ApiError::Unprocessable(c, format!("emails[{i}]: {m}")),
+            ApiError::Unprocessable(c, m) => {
+                ApiError::Unprocessable(c, format!("emails[{i}]: {m}"))
+            }
             other => other,
         };
         let e = emails::validate(r, now).map_err(prefix)?;
         let id = match domain_ids.get(&e.from_domain) {
             Some(id) => *id,
             None => {
-                let id = verified_domain_id(&state, auth.account_id(), &e.from_domain).await.map_err(prefix)?;
+                let id = verified_domain_id(&state, auth.account_id(), &e.from_domain)
+                    .await
+                    .map_err(prefix)?;
                 domain_ids.insert(e.from_domain.clone(), id);
                 id
             }
@@ -156,14 +203,23 @@ pub(crate) async fn batch(
     let mut tx = state.pool.begin().await?;
     let mut data = Vec::with_capacity(valid.len());
     for (e, domain_id) in &valid {
-        data.push(SendResponse { id: emails::insert(&mut tx, auth.account_id(), *domain_id, e, None).await? });
+        data.push(SendResponse {
+            id: emails::insert(&mut tx, auth.account_id(), *domain_id, e, None).await?,
+        });
     }
     tx.commit().await?;
     Ok(Json(BatchResponse { data }))
 }
 
-pub(crate) async fn get_one(State(state): State<AppState>, auth: Auth, Path(id): Path<Uuid>) -> Result<Json<EmailView>, ApiError> {
-    emails::view(&state.pool, auth.account_id(), id).await?.map(Json).ok_or(ApiError::NotFound)
+pub(crate) async fn get_one(
+    State(state): State<AppState>,
+    auth: Auth,
+    Path(id): Path<Uuid>,
+) -> Result<Json<EmailView>, ApiError> {
+    emails::view(&state.pool, auth.account_id(), id)
+        .await?
+        .map(Json)
+        .ok_or(ApiError::NotFound)
 }
 
 pub(crate) async fn list(
@@ -175,11 +231,19 @@ pub(crate) async fn list(
     let Query(q) = q.map_err(|e| ApiError::Validation(e.body_text()))?;
     let limit = q.limit.unwrap_or(50).clamp(1, 100);
     let data = emails::list(&state.pool, auth.account_id(), q.status, q.after, limit).await?;
-    let next_cursor = if data.len() as i64 == limit { data.last().map(|e| e.id) } else { None };
+    let next_cursor = if data.len() as i64 == limit {
+        data.last().map(|e| e.id)
+    } else {
+        None
+    };
     Ok(Json(EmailList { data, next_cursor }))
 }
 
-pub(crate) async fn cancel(State(state): State<AppState>, auth: Auth, Path(id): Path<Uuid>) -> Result<Json<SendResponse>, ApiError> {
+pub(crate) async fn cancel(
+    State(state): State<AppState>,
+    auth: Auth,
+    Path(id): Path<Uuid>,
+) -> Result<Json<SendResponse>, ApiError> {
     auth.require_full()?;
     let done = sqlx::query_scalar!(
         "UPDATE emails SET status = 'canceled', updated_at = now()
@@ -193,7 +257,10 @@ pub(crate) async fn cancel(State(state): State<AppState>, auth: Auth, Path(id): 
         Some(id) => Ok(Json(SendResponse { id })),
         None => match emails::view(&state.pool, auth.account_id(), id).await? {
             None => Err(ApiError::NotFound),
-            Some(_) => Err(ApiError::Conflict("not_cancelable", "only queued or scheduled emails can be canceled".into())),
+            Some(_) => Err(ApiError::Conflict(
+                "not_cancelable",
+                "only queued or scheduled emails can be canceled".into(),
+            )),
         },
     }
 }

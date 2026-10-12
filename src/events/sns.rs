@@ -71,9 +71,17 @@ pub fn string_to_sign(m: &SnsMessage) -> Result<String, SnsError> {
         "SubscriptionConfirmation" | "UnsubscribeConfirmation" => {
             push("Message", &m.message);
             push("MessageId", &m.message_id);
-            push("SubscribeURL", m.subscribe_url.as_deref().ok_or(SnsError::MissingField("SubscribeURL"))?);
+            push(
+                "SubscribeURL",
+                m.subscribe_url
+                    .as_deref()
+                    .ok_or(SnsError::MissingField("SubscribeURL"))?,
+            );
             push("Timestamp", &m.timestamp);
-            push("Token", m.token.as_deref().ok_or(SnsError::MissingField("Token"))?);
+            push(
+                "Token",
+                m.token.as_deref().ok_or(SnsError::MissingField("Token"))?,
+            );
             push("TopicArn", &m.topic_arn);
             push("Type", &m.kind);
         }
@@ -83,14 +91,23 @@ pub fn string_to_sign(m: &SnsMessage) -> Result<String, SnsError> {
 }
 
 fn is_sns_host(host: &str) -> bool {
-    let Some(rest) = host.strip_prefix("sns.") else { return false };
-    let region = rest.strip_suffix(".amazonaws.com").or_else(|| rest.strip_suffix(".amazonaws.com.cn"));
-    region.is_some_and(|r| !r.is_empty() && r.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-'))
+    let Some(rest) = host.strip_prefix("sns.") else {
+        return false;
+    };
+    let region = rest
+        .strip_suffix(".amazonaws.com")
+        .or_else(|| rest.strip_suffix(".amazonaws.com.cn"));
+    region.is_some_and(|r| {
+        !r.is_empty()
+            && r.chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+    })
 }
 
 pub fn check_cert_url(url: &str) -> Result<(), SnsError> {
     let u = url::Url::parse(url).map_err(|_| SnsError::BadCertUrl)?;
-    if u.scheme() == "https" && u.host_str().is_some_and(is_sns_host) && u.path().ends_with(".pem") {
+    if u.scheme() == "https" && u.host_str().is_some_and(is_sns_host) && u.path().ends_with(".pem")
+    {
         Ok(())
     } else {
         Err(SnsError::BadCertUrl)
@@ -98,18 +115,25 @@ pub fn check_cert_url(url: &str) -> Result<(), SnsError> {
 }
 
 pub fn is_sns_host_url(url: &str) -> bool {
-    url::Url::parse(url).is_ok_and(|u| u.scheme() == "https" && u.host_str().is_some_and(is_sns_host))
+    url::Url::parse(url)
+        .is_ok_and(|u| u.scheme() == "https" && u.host_str().is_some_and(is_sns_host))
 }
 
 pub fn public_key_from_pem(pem: &[u8]) -> Result<RsaPublicKey, SnsError> {
-    let (_, pem) = x509_parser::pem::parse_x509_pem(pem).map_err(|e| SnsError::CertParse(e.to_string()))?;
-    let cert = pem.parse_x509().map_err(|e| SnsError::CertParse(e.to_string()))?;
-    RsaPublicKey::from_public_key_der(cert.public_key().raw).map_err(|e| SnsError::CertParse(e.to_string()))
+    let (_, pem) =
+        x509_parser::pem::parse_x509_pem(pem).map_err(|e| SnsError::CertParse(e.to_string()))?;
+    let cert = pem
+        .parse_x509()
+        .map_err(|e| SnsError::CertParse(e.to_string()))?;
+    RsaPublicKey::from_public_key_der(cert.public_key().raw)
+        .map_err(|e| SnsError::CertParse(e.to_string()))
 }
 
 pub fn verify_with_key(m: &SnsMessage, key: &RsaPublicKey) -> Result<(), SnsError> {
     let data = string_to_sign(m)?;
-    let raw = STANDARD.decode(m.signature.as_bytes()).map_err(|_| SnsError::BadSignature)?;
+    let raw = STANDARD
+        .decode(m.signature.as_bytes())
+        .map_err(|_| SnsError::BadSignature)?;
     let sig = Signature::try_from(raw.as_slice()).map_err(|_| SnsError::BadSignature)?;
     let ok = match m.signature_version.as_str() {
         "1" => VerifyingKey::<sha1::Sha1>::new(key.clone()).verify(data.as_bytes(), &sig),
@@ -138,7 +162,10 @@ impl CertCache {
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .unwrap_or_default();
-        Self { client, keys: Mutex::new(HashMap::new()) }
+        Self {
+            client,
+            keys: Mutex::new(HashMap::new()),
+        }
     }
 
     pub fn client(&self) -> &reqwest::Client {
@@ -147,7 +174,10 @@ impl CertCache {
 
     /// Pre-loads a key (used by tests, which cannot fetch real AWS certificates).
     pub async fn insert(&self, url: &str, key: RsaPublicKey) {
-        self.keys.lock().await.insert(url.to_string(), Arc::new(key));
+        self.keys
+            .lock()
+            .await
+            .insert(url.to_string(), Arc::new(key));
     }
 
     pub async fn key_for(&self, url: &str) -> Result<Arc<RsaPublicKey>, SnsError> {
@@ -201,12 +231,17 @@ mod tests {
 
     #[test]
     fn cert_urls_must_be_aws() {
-        assert!(check_cert_url("https://sns.us-east-1.amazonaws.com/SimpleNotificationService-abc.pem").is_ok());
+        assert!(
+            check_cert_url("https://sns.us-east-1.amazonaws.com/SimpleNotificationService-abc.pem")
+                .is_ok()
+        );
         assert!(check_cert_url("http://sns.us-east-1.amazonaws.com/a.pem").is_err());
         assert!(check_cert_url("https://sns.us-east-1.amazonaws.com.evil.com/a.pem").is_err());
         assert!(check_cert_url("https://evil.com/sns.us-east-1.amazonaws.com/a.pem").is_err());
         assert!(check_cert_url("https://sns.us-east-1.amazonaws.com/a.txt").is_err());
-        assert!(!is_sns_host_url("https://example.com/?Action=ConfirmSubscription"));
+        assert!(!is_sns_host_url(
+            "https://example.com/?Action=ConfirmSubscription"
+        ));
     }
 
     #[test]
@@ -219,8 +254,12 @@ mod tests {
             m.signature_version = version.into();
             let data = string_to_sign(&m).unwrap();
             let sig = match version {
-                "1" => rsa::pkcs1v15::SigningKey::<sha1::Sha1>::new(private.clone()).sign(data.as_bytes()).to_bytes(),
-                _ => rsa::pkcs1v15::SigningKey::<sha2::Sha256>::new(private.clone()).sign(data.as_bytes()).to_bytes(),
+                "1" => rsa::pkcs1v15::SigningKey::<sha1::Sha1>::new(private.clone())
+                    .sign(data.as_bytes())
+                    .to_bytes(),
+                _ => rsa::pkcs1v15::SigningKey::<sha2::Sha256>::new(private.clone())
+                    .sign(data.as_bytes())
+                    .to_bytes(),
             };
             m.signature = STANDARD.encode(sig);
             assert!(verify_with_key(&m, &public).is_ok());

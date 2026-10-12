@@ -1,6 +1,6 @@
 // src/db.rs
-use std::time::Duration;
 use sqlx::{PgPool, postgres::PgPoolOptions};
+use std::time::Duration;
 
 pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
 

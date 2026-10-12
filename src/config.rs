@@ -53,7 +53,10 @@ impl Config {
                 None => Ok(default),
                 Some(v) => match v.parse::<u32>() {
                     Ok(n) if n > 0 => Ok(n),
-                    _ => Err(ConfigError::Invalid(k, format!("{v} is not a number above 0"))),
+                    _ => Err(ConfigError::Invalid(
+                        k,
+                        format!("{v} is not a number above 0"),
+                    )),
                 },
             }
         };
@@ -61,7 +64,12 @@ impl Config {
         let sender = match get("MAILRUST_SENDER").as_deref().unwrap_or("fake") {
             "fake" => SenderKind::Fake,
             "ses" => SenderKind::Ses,
-            other => return Err(ConfigError::Invalid("MAILRUST_SENDER", format!("{other} (use fake or ses)"))),
+            other => {
+                return Err(ConfigError::Invalid(
+                    "MAILRUST_SENDER",
+                    format!("{other} (use fake or ses)"),
+                ));
+            }
         };
         let ses = match sender {
             SenderKind::Ses => Some(SesConfig {
@@ -74,7 +82,10 @@ impl Config {
 
         let tracking_secret = req("TRACKING_SECRET")?.into_bytes();
         if tracking_secret.len() < 32 {
-            return Err(ConfigError::Invalid("TRACKING_SECRET", "must be at least 32 characters".into()));
+            return Err(ConfigError::Invalid(
+                "TRACKING_SECRET",
+                "must be at least 32 characters".into(),
+            ));
         }
 
         let public_url_raw = req("PUBLIC_URL")?;
@@ -143,20 +154,29 @@ mod tests {
     fn ses_sender_requires_region() {
         let mut env = base();
         env.insert("MAILRUST_SENDER".into(), "ses".into());
-        assert!(matches!(Config::from_map(&env), Err(ConfigError::Missing("AWS_REGION"))));
+        assert!(matches!(
+            Config::from_map(&env),
+            Err(ConfigError::Missing("AWS_REGION"))
+        ));
     }
 
     #[test]
     fn short_tracking_secret_is_rejected() {
         let mut env = base();
         env.insert("TRACKING_SECRET".into(), "short".into());
-        assert!(matches!(Config::from_map(&env), Err(ConfigError::Invalid("TRACKING_SECRET", _))));
+        assert!(matches!(
+            Config::from_map(&env),
+            Err(ConfigError::Invalid("TRACKING_SECRET", _))
+        ));
     }
 
     #[test]
     fn zero_rate_is_rejected() {
         let mut env = base();
         env.insert("SES_MAX_SEND_RATE".into(), "0".into());
-        assert!(matches!(Config::from_map(&env), Err(ConfigError::Invalid("SES_MAX_SEND_RATE", _))));
+        assert!(matches!(
+            Config::from_map(&env),
+            Err(ConfigError::Invalid("SES_MAX_SEND_RATE", _))
+        ));
     }
 }

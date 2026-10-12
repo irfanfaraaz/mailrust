@@ -27,7 +27,10 @@ pub struct Account {
 
 impl Account {
     pub fn tenant(&self) -> TenantRef {
-        TenantRef { account_id: self.id, tenant_name: self.ses_tenant_name.clone() }
+        TenantRef {
+            account_id: self.id,
+            tenant_name: self.ses_tenant_name.clone(),
+        }
     }
 }
 
@@ -97,10 +100,17 @@ pub async fn resume(pool: &PgPool, id: Uuid) -> sqlx::Result<bool> {
     Ok(r.rows_affected() == 1)
 }
 
-pub async fn provision(pool: &PgPool, sender: &dyn Sender, account: &Account) -> anyhow::Result<()> {
+pub async fn provision(
+    pool: &PgPool,
+    sender: &dyn Sender,
+    account: &Account,
+) -> anyhow::Result<()> {
     sender.provision_account(&account.tenant()).await?;
-    sqlx::query!("UPDATE accounts SET ses_synced_at = now() WHERE id = $1", account.id)
-        .execute(pool)
-        .await?;
+    sqlx::query!(
+        "UPDATE accounts SET ses_synced_at = now() WHERE id = $1",
+        account.id
+    )
+    .execute(pool)
+    .await?;
     Ok(())
 }

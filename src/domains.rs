@@ -98,11 +98,21 @@ pub async fn get_by_id(pool: &PgPool, id: Uuid) -> sqlx::Result<Option<Domain>> 
     .await
 }
 
-pub async fn get_for_account(pool: &PgPool, account_id: Uuid, id: Uuid) -> sqlx::Result<Option<Domain>> {
-    Ok(get_by_id(pool, id).await?.filter(|d| d.account_id == account_id))
+pub async fn get_for_account(
+    pool: &PgPool,
+    account_id: Uuid,
+    id: Uuid,
+) -> sqlx::Result<Option<Domain>> {
+    Ok(get_by_id(pool, id)
+        .await?
+        .filter(|d| d.account_id == account_id))
 }
 
-pub async fn find_by_name(pool: &PgPool, account_id: Uuid, name: &str) -> sqlx::Result<Option<Domain>> {
+pub async fn find_by_name(
+    pool: &PgPool,
+    account_id: Uuid,
+    name: &str,
+) -> sqlx::Result<Option<Domain>> {
     sqlx::query_as!(
         Domain,
         r#"SELECT id, account_id, name, status AS "status: DomainStatus",
@@ -129,7 +139,11 @@ pub async fn list(pool: &PgPool, account_id: Uuid) -> sqlx::Result<Vec<Domain>> 
     .await
 }
 
-pub async fn add(state: &AppState, account: &Account, input: AddDomain) -> Result<Domain, AddDomainError> {
+pub async fn add(
+    state: &AppState,
+    account: &Account,
+    input: AddDomain,
+) -> Result<Domain, AddDomainError> {
     let name = normalize_domain(&input.name).map_err(AddDomainError::Invalid)?;
     let tracking = match input.tracking_subdomain.as_deref() {
         None => None,
@@ -144,7 +158,10 @@ pub async fn add(state: &AppState, account: &Account, input: AddDomain) -> Resul
             Some(t)
         }
     };
-    if find_by_name(&state.pool, account.id, &name).await?.is_some() {
+    if find_by_name(&state.pool, account.id, &name)
+        .await?
+        .is_some()
+    {
         return Err(AddDomainError::Exists);
     }
 
@@ -187,7 +204,9 @@ pub async fn add(state: &AppState, account: &Account, input: AddDomain) -> Resul
         other => other?,
     };
 
-    let domain = get_by_id(&state.pool, id).await?.ok_or(sqlx::Error::RowNotFound)?;
+    let domain = get_by_id(&state.pool, id)
+        .await?
+        .ok_or(sqlx::Error::RowNotFound)?;
     // One check right away: the fake sender (and already-verified SES identities) verify instantly.
     match check(state, &domain).await {
         Ok(d) => Ok(d),
@@ -202,7 +221,11 @@ pub async fn check(state: &AppState, domain: &Domain) -> anyhow::Result<Domain> 
     let account = accounts::get(&state.pool, domain.account_id)
         .await?
         .ok_or_else(|| anyhow::anyhow!("domain {} has no account", domain.id))?;
-    let status = match state.sender.domain_state(&account.tenant(), &domain.name).await? {
+    let status = match state
+        .sender
+        .domain_state(&account.tenant(), &domain.name)
+        .await?
+    {
         DomainState::Verified => DomainStatus::Verified,
         DomainState::Failed => DomainStatus::Failed,
         DomainState::Pending if Utc::now() > domain.verify_until => DomainStatus::Failed,
@@ -220,7 +243,9 @@ pub async fn check(state: &AppState, domain: &Domain) -> anyhow::Result<Domain> 
     )
     .execute(&state.pool)
     .await?;
-    Ok(get_by_id(&state.pool, domain.id).await?.ok_or(sqlx::Error::RowNotFound)?)
+    Ok(get_by_id(&state.pool, domain.id)
+        .await?
+        .ok_or(sqlx::Error::RowNotFound)?)
 }
 
 pub async fn verify_loop(state: AppState, shutdown: CancellationToken) -> anyhow::Result<()> {

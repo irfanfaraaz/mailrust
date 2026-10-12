@@ -9,8 +9,14 @@ pub fn routes() -> Router<AppState> {
 }
 
 async fn health(State(state): State<AppState>) -> (StatusCode, Json<Value>) {
-    match sqlx::query_scalar!("SELECT 1 AS \"one!\"").fetch_one(&state.pool).await {
+    match sqlx::query_scalar!("SELECT 1 AS \"one!\"")
+        .fetch_one(&state.pool)
+        .await
+    {
         Ok(_) => (StatusCode::OK, Json(json!({ "status": "ok" }))),
-        Err(_) => (StatusCode::SERVICE_UNAVAILABLE, Json(json!({ "status": "database unavailable" }))),
+        Err(_) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({ "status": "database unavailable" })),
+        ),
     }
 }

@@ -57,8 +57,16 @@ pub enum SenderError {
 #[async_trait]
 pub trait Sender: Send + Sync {
     async fn provision_account(&self, tenant: &TenantRef) -> Result<(), SenderError>;
-    async fn create_domain(&self, tenant: &TenantRef, domain: &str) -> Result<Vec<DnsRecord>, SenderError>;
-    async fn domain_state(&self, tenant: &TenantRef, domain: &str) -> Result<DomainState, SenderError>;
+    async fn create_domain(
+        &self,
+        tenant: &TenantRef,
+        domain: &str,
+    ) -> Result<Vec<DnsRecord>, SenderError>;
+    async fn domain_state(
+        &self,
+        tenant: &TenantRef,
+        domain: &str,
+    ) -> Result<DomainState, SenderError>;
     async fn send(&self, email: &OutgoingEmail) -> Result<String, SenderError>;
 }
 

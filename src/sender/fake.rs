@@ -21,7 +21,11 @@ impl Sender for FakeSender {
         Ok(())
     }
 
-    async fn create_domain(&self, _tenant: &TenantRef, domain: &str) -> Result<Vec<DnsRecord>, SenderError> {
+    async fn create_domain(
+        &self,
+        _tenant: &TenantRef,
+        domain: &str,
+    ) -> Result<Vec<DnsRecord>, SenderError> {
         Ok(vec![DnsRecord {
             record_type: "TXT".into(),
             name: format!("_mailrust.{domain}"),
@@ -30,7 +34,11 @@ impl Sender for FakeSender {
         }])
     }
 
-    async fn domain_state(&self, _tenant: &TenantRef, _domain: &str) -> Result<DomainState, SenderError> {
+    async fn domain_state(
+        &self,
+        _tenant: &TenantRef,
+        _domain: &str,
+    ) -> Result<DomainState, SenderError> {
         Ok(DomainState::Verified)
     }
 
@@ -52,7 +60,10 @@ mod tests {
     use uuid::Uuid;
 
     fn tenant() -> TenantRef {
-        TenantRef { account_id: Uuid::now_v7(), tenant_name: "mailrust-test".into() }
+        TenantRef {
+            account_id: Uuid::now_v7(),
+            tenant_name: "mailrust-test".into(),
+        }
     }
 
     #[tokio::test]
@@ -76,7 +87,17 @@ mod tests {
     #[tokio::test]
     async fn domains_are_verified_at_once() {
         let sender = FakeSender::new(std::env::temp_dir());
-        assert_eq!(sender.domain_state(&tenant(), "shop.com").await.unwrap(), DomainState::Verified);
-        assert_eq!(sender.create_domain(&tenant(), "shop.com").await.unwrap().len(), 1);
+        assert_eq!(
+            sender.domain_state(&tenant(), "shop.com").await.unwrap(),
+            DomainState::Verified
+        );
+        assert_eq!(
+            sender
+                .create_domain(&tenant(), "shop.com")
+                .await
+                .unwrap()
+                .len(),
+            1
+        );
     }
 }

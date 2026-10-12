@@ -1,4 +1,8 @@
-use std::{collections::HashMap, num::NonZeroU32, sync::{Arc, Mutex}};
+use std::{
+    collections::HashMap,
+    num::NonZeroU32,
+    sync::{Arc, Mutex},
+};
 
 use governor::{DefaultDirectRateLimiter, Quota, RateLimiter};
 use uuid::Uuid;
@@ -58,6 +62,10 @@ mod tests {
         for _ in 0..10 {
             l.wait(id, 5, 1).await; // 5/s with a burst of 5: 10 sends need about 1 s
         }
-        assert!(start.elapsed().as_millis() >= 800, "took {:?}", start.elapsed());
+        assert!(
+            start.elapsed().as_millis() >= 800,
+            "took {:?}",
+            start.elapsed()
+        );
     }
 }

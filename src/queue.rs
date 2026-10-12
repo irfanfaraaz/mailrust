@@ -6,7 +6,11 @@ use sqlx::{PgPool, types::Json};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-use crate::{api::AppState, background, email_events::{self, EventKind, NewEvent}};
+use crate::{
+    api::AppState,
+    background,
+    email_events::{self, EventKind, NewEvent},
+};
 
 pub const BATCH: i64 = 50;
 pub const LEASE_SECS: i64 = 300;
@@ -64,13 +68,22 @@ pub fn retry_delay(attempts: i32) -> Option<Duration> {
 }
 
 pub async fn save_links(pool: &PgPool, id: Uuid, links: &[String]) -> sqlx::Result<()> {
-    sqlx::query!("UPDATE emails SET links = $2 WHERE id = $1", id, Json(links) as _)
-        .execute(pool)
-        .await?;
+    sqlx::query!(
+        "UPDATE emails SET links = $2 WHERE id = $1",
+        id,
+        Json(links) as _
+    )
+    .execute(pool)
+    .await?;
     Ok(())
 }
 
-pub async fn mark_sent(pool: &PgPool, email: &ClaimedEmail, provider_id: &str, recipients: &[String]) -> sqlx::Result<()> {
+pub async fn mark_sent(
+    pool: &PgPool,
+    email: &ClaimedEmail,
+    provider_id: &str,
+    recipients: &[String],
+) -> sqlx::Result<()> {
     let mut tx = pool.begin().await?;
     // An SES event may have arrived first (e.g. delivered). Keep that status, but always save the provider id.
     sqlx::query!(
@@ -83,14 +96,17 @@ pub async fn mark_sent(pool: &PgPool, email: &ClaimedEmail, provider_id: &str, r
     )
     .execute(&mut *tx)
     .await?;
-    email_events::record(&mut tx, NewEvent {
-        account_id: email.account_id,
-        email_id: email.id,
-        kind: EventKind::Sent,
-        recipient: None,
-        data: json!({ "recipients": recipients, "provider_message_id": provider_id }),
-        likely_bot: false,
-    })
+    email_events::record(
+        &mut tx,
+        NewEvent {
+            account_id: email.account_id,
+            email_id: email.id,
+            kind: EventKind::Sent,
+            recipient: None,
+            data: json!({ "recipients": recipients, "provider_message_id": provider_id }),
+            likely_bot: false,
+        },
+    )
     .await?;
     tx.commit().await
 }
@@ -119,19 +135,26 @@ pub async fn mark_failed(pool: &PgPool, email: &ClaimedEmail, error: &str) -> sq
     )
     .execute(&mut *tx)
     .await?;
-    email_events::record(&mut tx, NewEvent {
-        account_id: email.account_id,
-        email_id: email.id,
-        kind: EventKind::Failed,
-        recipient: None,
-        data: json!({ "error": error }),
-        likely_bot: false,
-    })
+    email_events::record(
+        &mut tx,
+        NewEvent {
+            account_id: email.account_id,
+            email_id: email.id,
+            kind: EventKind::Failed,
+            recipient: None,
+            data: json!({ "error": error }),
+            likely_bot: false,
+        },
+    )
     .await?;
     tx.commit().await
 }
 
-pub async fn mark_suppressed(pool: &PgPool, email: &ClaimedEmail, removed: &[String]) -> sqlx::Result<()> {
+pub async fn mark_suppressed(
+    pool: &PgPool,
+    email: &ClaimedEmail,
+    removed: &[String],
+) -> sqlx::Result<()> {
     let mut tx = pool.begin().await?;
     sqlx::query!(
         "UPDATE emails SET status = 'suppressed', lease_until = NULL, updated_at = now() WHERE id = $1 AND status = 'sending'",
@@ -139,14 +162,17 @@ pub async fn mark_suppressed(pool: &PgPool, email: &ClaimedEmail, removed: &[Str
     )
     .execute(&mut *tx)
     .await?;
-    email_events::record(&mut tx, NewEvent {
-        account_id: email.account_id,
-        email_id: email.id,
-        kind: EventKind::Suppressed,
-        recipient: None,
-        data: json!({ "recipients": removed }),
-        likely_bot: false,
-    })
+    email_events::record(
+        &mut tx,
+        NewEvent {
+            account_id: email.account_id,
+            email_id: email.id,
+            kind: EventKind::Suppressed,
+            recipient: None,
+            data: json!({ "recipients": removed }),
+            likely_bot: false,
+        },
+    )
     .await?;
     tx.commit().await
 }
@@ -209,7 +235,9 @@ mod tests {
 
     #[test]
     fn backoff_then_give_up() {
-        let secs: Vec<i64> = (1..=5).map(|a| retry_delay(a).unwrap().num_seconds()).collect();
+        let secs: Vec<i64> = (1..=5)
+            .map(|a| retry_delay(a).unwrap().num_seconds())
+            .collect();
         assert_eq!(secs, vec![30, 120, 600, 3600, 21600]);
         assert!(retry_delay(6).is_none());
         assert!(retry_delay(0).is_none());

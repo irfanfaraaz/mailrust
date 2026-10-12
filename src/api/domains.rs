@@ -49,7 +49,9 @@ pub(crate) async fn create(
     ApiJson(body): ApiJson<CreateDomainRequest>,
 ) -> Result<(StatusCode, Json<Domain>), ApiError> {
     auth.require_full()?;
-    let account = accounts::get(&state.pool, auth.account_id()).await?.ok_or(ApiError::Unauthorized)?;
+    let account = accounts::get(&state.pool, auth.account_id())
+        .await?
+        .ok_or(ApiError::Unauthorized)?;
     let input = AddDomain {
         name: body.name,
         tracking_subdomain: body.tracking_subdomain,
@@ -59,23 +61,39 @@ pub(crate) async fn create(
     match domains::add(&state, &account, input).await {
         Ok(d) => Ok((StatusCode::CREATED, Json(d))),
         Err(AddDomainError::Invalid(m)) => Err(ApiError::Validation(m)),
-        Err(AddDomainError::Exists) => Err(ApiError::Conflict("domain_exists", "this domain is already added".into())),
-        Err(AddDomainError::Sender(SenderError::Permanent(m))) => Err(ApiError::Unprocessable("sender_rejected", m)),
+        Err(AddDomainError::Exists) => Err(ApiError::Conflict(
+            "domain_exists",
+            "this domain is already added".into(),
+        )),
+        Err(AddDomainError::Sender(SenderError::Permanent(m))) => {
+            Err(ApiError::Unprocessable("sender_rejected", m))
+        }
         Err(AddDomainError::Sender(e)) => Err(ApiError::Internal(e.into())),
         Err(AddDomainError::Db(e)) => Err(e.into()),
     }
 }
 
-pub(crate) async fn list(State(state): State<AppState>, auth: Auth) -> Result<Json<DomainList>, ApiError> {
+pub(crate) async fn list(
+    State(state): State<AppState>,
+    auth: Auth,
+) -> Result<Json<DomainList>, ApiError> {
     auth.require_full()?;
-    Ok(Json(DomainList { data: domains::list(&state.pool, auth.account_id()).await? }))
+    Ok(Json(DomainList {
+        data: domains::list(&state.pool, auth.account_id()).await?,
+    }))
 }
 
 async fn owned(state: &AppState, auth: &Auth, id: Uuid) -> Result<Domain, ApiError> {
-    domains::get_for_account(&state.pool, auth.account_id(), id).await?.ok_or(ApiError::NotFound)
+    domains::get_for_account(&state.pool, auth.account_id(), id)
+        .await?
+        .ok_or(ApiError::NotFound)
 }
 
-pub(crate) async fn get_one(State(state): State<AppState>, auth: Auth, Path(id): Path<Uuid>) -> Result<Json<Domain>, ApiError> {
+pub(crate) async fn get_one(
+    State(state): State<AppState>,
+    auth: Auth,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Domain>, ApiError> {
     auth.require_full()?;
     Ok(Json(owned(&state, &auth, id).await?))
 }
@@ -99,15 +117,25 @@ pub(crate) async fn update(
     Ok(Json(owned(&state, &auth, id).await?))
 }
 
-pub(crate) async fn remove(State(state): State<AppState>, auth: Auth, Path(id): Path<Uuid>) -> Result<StatusCode, ApiError> {
+pub(crate) async fn remove(
+    State(state): State<AppState>,
+    auth: Auth,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, ApiError> {
     auth.require_full()?;
     let d = owned(&state, &auth, id).await?;
     // shortcut: the identity stays at the sender (SES); delete it there by hand if needed.
-    sqlx::query!("DELETE FROM domains WHERE id = $1", d.id).execute(&state.pool).await?;
+    sqlx::query!("DELETE FROM domains WHERE id = $1", d.id)
+        .execute(&state.pool)
+        .await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
-pub(crate) async fn verify(State(state): State<AppState>, auth: Auth, Path(id): Path<Uuid>) -> Result<Json<Domain>, ApiError> {
+pub(crate) async fn verify(
+    State(state): State<AppState>,
+    auth: Auth,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Domain>, ApiError> {
     auth.require_full()?;
     let d = owned(&state, &auth, id).await?;
     Ok(Json(domains::check(&state, &d).await?))

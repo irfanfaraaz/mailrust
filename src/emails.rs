@@ -14,11 +14,24 @@ pub const MAX_TOTAL_BYTES: usize = 40 * 1024 * 1024;
 pub const MAX_SCHEDULE_DAYS: i64 = 30;
 pub const MAX_BATCH: usize = 100;
 const RESERVED_HEADERS: [&str; 13] = [
-    "from", "to", "cc", "bcc", "subject", "reply-to", "date", "message-id", "mime-version",
-    "content-type", "content-transfer-encoding", "return-path", "sender",
+    "from",
+    "to",
+    "cc",
+    "bcc",
+    "subject",
+    "reply-to",
+    "date",
+    "message-id",
+    "mime-version",
+    "content-type",
+    "content-transfer-encoding",
+    "return-path",
+    "sender",
 ];
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, sqlx::Type, Serialize, Deserialize, utoipa::ToSchema,
+)]
 #[sqlx(type_name = "email_status", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum EmailStatus {
@@ -68,7 +81,11 @@ impl EmailStatus {
 }
 
 pub fn api_status(status: EmailStatus, send_at: DateTime<Utc>, now: DateTime<Utc>) -> &'static str {
-    if status == EmailStatus::Queued && send_at > now { "scheduled" } else { status.as_str() }
+    if status == EmailStatus::Queued && send_at > now {
+        "scheduled"
+    } else {
+        status.as_str()
+    }
 }
 
 fn one_or_many<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<String>, D::Error> {
@@ -142,27 +159,38 @@ fn check_list(field: &str, list: &[String], min: usize) -> Result<(), ApiError> 
         return Err(bad(format!("{field} needs at least {min} address")));
     }
     if list.len() > MAX_RECIPIENTS_PER_FIELD {
-        return Err(bad(format!("{field} has more than {MAX_RECIPIENTS_PER_FIELD} addresses")));
+        return Err(bad(format!(
+            "{field} has more than {MAX_RECIPIENTS_PER_FIELD} addresses"
+        )));
     }
     for a in list {
-        a.parse::<Mailbox>().map_err(|_| bad(format!("{field}: {a} is not a valid address")))?;
+        a.parse::<Mailbox>()
+            .map_err(|_| bad(format!("{field}: {a} is not a valid address")))?;
     }
     Ok(())
 }
 
 fn is_tag_part(s: &str) -> bool {
-    (1..=256).contains(&s.len()) && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+    (1..=256).contains(&s.len())
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
 }
 
 pub fn validate(req: SendEmailRequest, now: DateTime<Utc>) -> Result<ValidEmail, ApiError> {
-    let from_box = req.from.parse::<Mailbox>().map_err(|_| bad(format!("from: {} is not a valid address", req.from)))?;
+    let from_box = req
+        .from
+        .parse::<Mailbox>()
+        .map_err(|_| bad(format!("from: {} is not a valid address", req.from)))?;
     let from_domain = from_box.email.domain().to_ascii_lowercase();
     check_list("to", &req.to, 1)?;
     check_list("cc", &req.cc, 0)?;
     check_list("bcc", &req.bcc, 0)?;
     check_list("reply_to", &req.reply_to, 0)?;
 
-    if req.subject.trim().is_empty() || req.subject.chars().count() > 998 || req.subject.contains(['\r', '\n']) {
+    if req.subject.trim().is_empty()
+        || req.subject.chars().count() > 998
+        || req.subject.contains(['\r', '\n'])
+    {
         return Err(bad("subject must be 1-998 characters on one line"));
     }
     if req.html.is_none() && req.text.is_none() {
@@ -173,15 +201,20 @@ pub fn validate(req: SendEmailRequest, now: DateTime<Utc>) -> Result<ValidEmail,
         return Err(bad("at most 50 headers"));
     }
     for (k, v) in &req.headers {
-        let name_ok = (1..=100).contains(&k.len()) && k.chars().all(|c| c.is_ascii_alphanumeric() || c == '-');
+        let name_ok = (1..=100).contains(&k.len())
+            && k.chars().all(|c| c.is_ascii_alphanumeric() || c == '-');
         if !name_ok {
             return Err(bad(format!("header name {k} is not allowed")));
         }
         if RESERVED_HEADERS.contains(&k.to_ascii_lowercase().as_str()) {
-            return Err(bad(format!("header {k} is set by Mailrust; use the matching field instead")));
+            return Err(bad(format!(
+                "header {k} is set by Mailrust; use the matching field instead"
+            )));
         }
         if v.len() > 998 || !v.chars().all(|c| (' '..='~').contains(&c)) {
-            return Err(bad(format!("header {k} must be printable ASCII on one line")));
+            return Err(bad(format!(
+                "header {k} must be printable ASCII on one line"
+            )));
         }
     }
 
@@ -190,23 +223,35 @@ pub fn validate(req: SendEmailRequest, now: DateTime<Utc>) -> Result<ValidEmail,
     }
     for (k, v) in &req.tags {
         if !is_tag_part(k) || !is_tag_part(v) || k == crate::sender::EMAIL_ID_TAG {
-            return Err(bad(format!("tag {k} must use letters, digits, '_' or '-' (1-256 chars)")));
+            return Err(bad(format!(
+                "tag {k} must use letters, digits, '_' or '-' (1-256 chars)"
+            )));
         }
     }
 
-    let mut total = req.html.as_ref().map_or(0, String::len) + req.text.as_ref().map_or(0, String::len);
+    let mut total =
+        req.html.as_ref().map_or(0, String::len) + req.text.as_ref().map_or(0, String::len);
     let mut attachments = Vec::with_capacity(req.attachments.len());
     for a in req.attachments {
         if a.filename.is_empty() || a.filename.len() > 255 || a.filename.contains(['/', '\\']) {
-            return Err(bad("attachment filename must be 1-255 characters without slashes"));
+            return Err(bad(
+                "attachment filename must be 1-255 characters without slashes",
+            ));
         }
         let content = STANDARD
             .decode(a.content.as_bytes())
             .map_err(|_| bad(format!("attachment {} is not valid base64", a.filename)))?;
-        let content_type = a.content_type.unwrap_or_else(|| "application/octet-stream".into());
-        ContentType::parse(&content_type).map_err(|_| bad(format!("attachment {}: bad content_type", a.filename)))?;
+        let content_type = a
+            .content_type
+            .unwrap_or_else(|| "application/octet-stream".into());
+        ContentType::parse(&content_type)
+            .map_err(|_| bad(format!("attachment {}: bad content_type", a.filename)))?;
         total += content.len();
-        attachments.push(AttachmentData { filename: a.filename, content_type, content });
+        attachments.push(AttachmentData {
+            filename: a.filename,
+            content_type,
+            content,
+        });
     }
     if total > MAX_TOTAL_BYTES {
         return Err(ApiError::TooLarge);
@@ -215,7 +260,9 @@ pub fn validate(req: SendEmailRequest, now: DateTime<Utc>) -> Result<ValidEmail,
     let send_at = match req.scheduled_at {
         None => now,
         Some(t) if t > now + Duration::days(MAX_SCHEDULE_DAYS) => {
-            return Err(bad(format!("scheduled_at can be at most {MAX_SCHEDULE_DAYS} days ahead")));
+            return Err(bad(format!(
+                "scheduled_at can be at most {MAX_SCHEDULE_DAYS} days ahead"
+            )));
         }
         Some(t) => t.max(now),
     };
@@ -454,11 +501,17 @@ mod tests {
             json!({ "from": "a@b.com", "to": "a@x.com", "subject": "Hi", "text": "x", "scheduled_at": (now + Duration::days(31)).to_rfc3339() }),
         ];
         for c in cases {
-            assert!(matches!(validate(req(c.clone()), now), Err(ApiError::Validation(_))), "should reject {c}");
+            assert!(
+                matches!(validate(req(c.clone()), now), Err(ApiError::Validation(_))),
+                "should reject {c}"
+            );
         }
         let many: Vec<String> = (0..51).map(|i| format!("u{i}@x.com")).collect();
         let c = json!({ "from": "a@b.com", "to": many, "subject": "Hi", "text": "x" });
-        assert!(matches!(validate(req(c), now), Err(ApiError::Validation(_))));
+        assert!(matches!(
+            validate(req(c), now),
+            Err(ApiError::Validation(_))
+        ));
     }
 
     #[test]
@@ -467,7 +520,10 @@ mod tests {
         let mut v = base();
         v["scheduled_at"] = json!((now - Duration::hours(1)).to_rfc3339());
         assert_eq!(validate(req(v), now).unwrap().send_at, now);
-        assert_eq!(api_status(EmailStatus::Queued, now + Duration::hours(1), now), "scheduled");
+        assert_eq!(
+            api_status(EmailStatus::Queued, now + Duration::hours(1), now),
+            "scheduled"
+        );
         assert_eq!(api_status(EmailStatus::Queued, now, now), "queued");
     }
 
