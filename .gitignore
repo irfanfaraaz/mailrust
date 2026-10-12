@@ -1,0 +1,8 @@
+/target
+.env
+/outbox
+.impeccable/hook.cache.json
+.DS_Store
+docs/superpowers/
+docs/learning/
+.impeccable/
