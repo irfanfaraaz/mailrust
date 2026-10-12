@@ -87,6 +87,16 @@ pub async fn sync_loop(state: AppState, shutdown: CancellationToken) -> anyhow::
     Ok(())
 }
 
+/// The probe email did not hit the cap again (that would have set a new pause): the pause is over.
+pub async fn end_probe(pool: &PgPool) -> sqlx::Result<()> {
+    sqlx::query!(
+        "UPDATE sender_quota SET paused_until = NULL, pause_reason = NULL WHERE paused_until <= now()"
+    )
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 /// True while the daily-cap pause holds.
 pub async fn paused(pool: &PgPool) -> sqlx::Result<bool> {
     sqlx::query_scalar!(
@@ -101,6 +111,8 @@ pub async fn paused(pool: &PgPool) -> sqlx::Result<bool> {
 pub struct Gate {
     pub paused: bool,
     pub only_urgent: bool,
+    /// A daily-cap pause ran out but no sync has ended it: send one email to test SES first.
+    pub probing: bool,
     pub max_send_rate: Option<f64>,
 }
 
@@ -109,6 +121,7 @@ pub struct Gate {
 pub async fn gate(pool: &PgPool) -> sqlx::Result<Gate> {
     let row = sqlx::query!(
         r#"SELECT q.max_send_rate, COALESCE(q.paused_until > now(), false) AS "paused!",
+                  COALESCE(q.paused_until <= now(), false) AS "probing!",
                   COALESCE(q.max_24h_send > 0 AND q.synced_at > now() - make_interval(secs => $2) AND
                       q.sent_last_24h + (SELECT COALESCE(sum(cardinality(e.to_addresses) + cardinality(e.cc_addresses)
                                                              + cardinality(e.bcc_addresses)), 0)
@@ -124,6 +137,7 @@ pub async fn gate(pool: &PgPool) -> sqlx::Result<Gate> {
         .map(|r| Gate {
             paused: r.paused,
             only_urgent: r.only_urgent,
+            probing: r.probing,
             max_send_rate: r.max_send_rate,
         })
         .unwrap_or_default())

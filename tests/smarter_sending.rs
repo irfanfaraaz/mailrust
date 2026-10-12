@@ -260,3 +260,96 @@ async fn one_gate_read_gives_the_rate_too(pool: sqlx::PgPool) {
     quota::save(&pool, &q(2.0, 1000.0, 0.0)).await.unwrap();
     assert_eq!(quota::gate(&pool).await.unwrap().max_send_rate, Some(2.0));
 }
+
+async fn end_the_pause(pool: &sqlx::PgPool) {
+    sqlx::query("UPDATE sender_quota SET paused_until = now() - interval '1 second'")
+        .execute(pool)
+        .await
+        .unwrap();
+}
+
+#[sqlx::test]
+async fn a_cap_requeue_does_not_repeat_the_partial_suppression_event(pool: sqlx::PgPool) {
+    let s = common::RecordingSender::failing(|| {
+        SenderError::DailyQuota("Daily message quota exceeded".into())
+    });
+    let t = common::app_with_sender(pool.clone(), s).await;
+    common::verified_domain(&t, "shop.com").await;
+    let (st, _) = common::call(
+        &t.router,
+        common::req(
+            "POST",
+            "/suppressions",
+            Some(&t.key),
+            Some(serde_json::json!({ "address": "b@x.com" })),
+        ),
+    )
+    .await;
+    assert!(st.is_success());
+    let id = common::send_email(
+        &t,
+        serde_json::json!({ "from": "hi@shop.com", "to": ["a@x.com", "b@x.com"], "subject": "Hi", "text": "x" }),
+    )
+    .await;
+    let limiter = SendLimiter::new(10_000, 1);
+    worker::tick(&t.state, &limiter).await.unwrap();
+    end_the_pause(&pool).await;
+    worker::tick(&t.state, &limiter).await.unwrap();
+    let n: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM email_events WHERE email_id = $1 AND type = 'suppressed'",
+    )
+    .bind(id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(n, 1);
+}
+
+#[sqlx::test]
+async fn after_a_pause_one_email_probes_first(pool: sqlx::PgPool) {
+    let s = common::RecordingSender::ok();
+    let t = common::app_with_sender(pool.clone(), s.clone()).await;
+    common::verified_domain(&t, "shop.com").await;
+    for to in ["a@x.com", "b@x.com", "c@x.com"] {
+        common::send_email(
+            &t,
+            serde_json::json!({ "from": "hi@shop.com", "to": to, "subject": "Hi", "text": "x" }),
+        )
+        .await;
+    }
+    quota::pause(&pool, "cap").await.unwrap();
+    end_the_pause(&pool).await;
+    let limiter = SendLimiter::new(10_000, 1);
+    assert_eq!(worker::tick(&t.state, &limiter).await.unwrap(), 1);
+    // The probe went through, so the pause is over and the rest go together.
+    assert!(
+        quota::load(&pool)
+            .await
+            .unwrap()
+            .unwrap()
+            .paused_until
+            .is_none()
+    );
+    assert_eq!(worker::tick(&t.state, &limiter).await.unwrap(), 2);
+}
+
+#[sqlx::test]
+async fn a_probe_that_hits_the_cap_again_keeps_the_pause(pool: sqlx::PgPool) {
+    let s = common::RecordingSender::failing(|| {
+        SenderError::DailyQuota("Daily message quota exceeded".into())
+    });
+    let t = common::app_with_sender(pool.clone(), s).await;
+    common::verified_domain(&t, "shop.com").await;
+    common::send_email(
+        &t,
+        serde_json::json!({ "from": "hi@shop.com", "to": "a@x.com", "subject": "Hi", "text": "x" }),
+    )
+    .await;
+    quota::pause(&pool, "cap").await.unwrap();
+    end_the_pause(&pool).await;
+    worker::tick(&t.state, &SendLimiter::new(10_000, 1))
+        .await
+        .unwrap();
+    let row = quota::load(&pool).await.unwrap().unwrap();
+    assert!(row.paused_until.unwrap() > chrono::Utc::now());
+}

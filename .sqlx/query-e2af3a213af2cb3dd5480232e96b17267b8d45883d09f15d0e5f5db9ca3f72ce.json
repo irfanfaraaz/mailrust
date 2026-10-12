@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS (SELECT 1 FROM email_events WHERE email_id = $1 AND type = 'suppressed') AS \"already!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "already!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "e2af3a213af2cb3dd5480232e96b17267b8d45883d09f15d0e5f5db9ca3f72ce"
+}
