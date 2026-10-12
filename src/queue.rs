@@ -61,7 +61,7 @@ pub async fn claim(pool: &PgPool, limit: i64) -> sqlx::Result<Vec<ClaimedEmail>>
 }
 
 pub fn retry_delay(attempts: i32) -> Option<Duration> {
-    if attempts < 1 || attempts >= MAX_ATTEMPTS {
+    if !(1..MAX_ATTEMPTS).contains(&attempts) {
         return None;
     }
     Some(Duration::seconds(BACKOFF_SECS[(attempts - 1) as usize]))
