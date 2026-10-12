@@ -11,6 +11,8 @@ pub const SYNC_SECS: u64 = 300;
 pub const DAILY_CAP_PAUSE_SECS: i64 = 900;
 /// Non-urgent mail stops at this share of the 24-hour quota; the rest is kept for urgent mail.
 pub const RESERVE_AT: f64 = 0.9;
+/// Numbers older than this (3 missed syncs) are not trusted for the reserve: fail open, the real SES cap still pauses us.
+pub const STALE_SECS: i64 = 900;
 
 #[derive(Debug, Clone, Default)]
 pub struct QuotaRow {
@@ -31,7 +33,9 @@ pub async fn load(pool: &PgPool) -> sqlx::Result<Option<QuotaRow>> {
     .await
 }
 
-/// Saves fresh numbers. If they show room, a daily-cap pause ends early.
+/// Saves fresh numbers. If they show room below the reserve line, a daily-cap pause ends early.
+/// (Not just below the cap: SES's count lags, so a near-full answer would end the pause and hit the cap again.)
+/// A max of 0 or less means SES reports no limit.
 pub async fn save(pool: &PgPool, q: &SendQuota) -> sqlx::Result<()> {
     sqlx::query!(
         "INSERT INTO sender_quota (id, max_send_rate, max_24h_send, sent_last_24h, synced_at)
@@ -39,11 +43,14 @@ pub async fn save(pool: &PgPool, q: &SendQuota) -> sqlx::Result<()> {
          ON CONFLICT (id) DO UPDATE SET
              max_send_rate = EXCLUDED.max_send_rate, max_24h_send = EXCLUDED.max_24h_send,
              sent_last_24h = EXCLUDED.sent_last_24h, synced_at = EXCLUDED.synced_at,
-             paused_until = CASE WHEN EXCLUDED.sent_last_24h < EXCLUDED.max_24h_send THEN NULL ELSE sender_quota.paused_until END,
-             pause_reason = CASE WHEN EXCLUDED.sent_last_24h < EXCLUDED.max_24h_send THEN NULL ELSE sender_quota.pause_reason END",
+             paused_until = CASE WHEN EXCLUDED.max_24h_send <= 0 OR EXCLUDED.sent_last_24h < $4 * EXCLUDED.max_24h_send
+                                 THEN NULL ELSE sender_quota.paused_until END,
+             pause_reason = CASE WHEN EXCLUDED.max_24h_send <= 0 OR EXCLUDED.sent_last_24h < $4 * EXCLUDED.max_24h_send
+                                 THEN NULL ELSE sender_quota.pause_reason END",
         q.max_send_rate,
         q.max_24h_send,
-        q.sent_last_24h
+        q.sent_last_24h,
+        RESERVE_AT
     )
     .execute(pool)
     .await?;
@@ -80,6 +87,15 @@ pub async fn sync_loop(state: AppState, shutdown: CancellationToken) -> anyhow::
     Ok(())
 }
 
+/// True while the daily-cap pause holds.
+pub async fn paused(pool: &PgPool) -> sqlx::Result<bool> {
+    sqlx::query_scalar!(
+        r#"SELECT EXISTS (SELECT 1 FROM sender_quota WHERE paused_until > now()) AS "paused!""#
+    )
+    .fetch_one(pool)
+    .await
+}
+
 /// What `queue::claim` may take this round.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Gate {
@@ -92,13 +108,14 @@ pub struct Gate {
 pub async fn gate(pool: &PgPool) -> sqlx::Result<Gate> {
     let row = sqlx::query!(
         r#"SELECT COALESCE(q.paused_until > now(), false) AS "paused!",
-                  COALESCE(q.max_24h_send IS NOT NULL AND q.synced_at IS NOT NULL AND
+                  COALESCE(q.max_24h_send > 0 AND q.synced_at > now() - make_interval(secs => $2) AND
                       q.sent_last_24h + (SELECT COALESCE(sum(cardinality(e.to_addresses) + cardinality(e.cc_addresses)
                                                              + cardinality(e.bcc_addresses)), 0)
                                          FROM emails e WHERE e.sent_at > q.synced_at)::float8
                       >= $1 * q.max_24h_send, false) AS "only_urgent!"
            FROM sender_quota q"#,
-        RESERVE_AT
+        RESERVE_AT,
+        STALE_SECS as f64
     )
     .fetch_optional(pool)
     .await?;

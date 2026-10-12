@@ -187,6 +187,11 @@ async fn process(
         tracing::warn!(email_id = %email.id, "lease lost while waiting to send; skipped");
         return Ok(());
     }
+    // Another email in this batch may have hit the daily cap while this one waited: do not knock on SES again.
+    if crate::quota::paused(pool).await? {
+        queue::requeue_paused(pool, email.id).await?;
+        return Ok(());
+    }
     let out = OutgoingEmail {
         email_id: email.id,
         tenant: account.tenant(),

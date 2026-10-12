@@ -20,10 +20,10 @@ fn quota(rate: u32, divisor: u32) -> Quota {
     Quota::per_second(NonZeroU32::new(per_proc).unwrap_or(NonZeroU32::MIN))
 }
 
-/// The SES rate, capped by our own ceiling. A bad answer (NaN) is ignored; never below 1.
+/// The SES rate, capped by our own ceiling. A bad answer (NaN, 0, -1 for "no limit") is ignored; never below 1.
 pub fn effective_rate(ceiling: u32, ses: Option<f64>) -> u32 {
     match ses {
-        Some(r) if r.is_finite() => ceiling.min(r.floor().max(1.0) as u32),
+        Some(r) if r.is_finite() && r > 0.0 => ceiling.min(r.floor().max(1.0) as u32),
         _ => ceiling,
     }
 }
@@ -92,7 +92,8 @@ mod tests {
         assert_eq!(effective_rate(14, Some(2.0)), 2);
         assert_eq!(effective_rate(14, Some(500.0)), 14);
         assert_eq!(effective_rate(14, Some(0.5)), 1);
-        assert_eq!(effective_rate(14, Some(0.0)), 1);
+        assert_eq!(effective_rate(14, Some(0.0)), 14);
+        assert_eq!(effective_rate(14, Some(-1.0)), 14);
         assert_eq!(effective_rate(14, Some(f64::NAN)), 14);
     }
 

@@ -121,6 +121,8 @@ pub struct RecordingSender {
     pub sent: std::sync::Mutex<Vec<OutgoingEmail>>,
     pub fail_with: Option<fn() -> SenderError>,
     pub quota: std::sync::Mutex<Option<Result<SendQuota, String>>>,
+    /// Every call to `send`, failed ones too.
+    pub calls: std::sync::atomic::AtomicUsize,
 }
 
 impl RecordingSender {
@@ -129,6 +131,7 @@ impl RecordingSender {
             sent: Default::default(),
             fail_with: None,
             quota: Default::default(),
+            calls: Default::default(),
         })
     }
     pub fn failing(f: fn() -> SenderError) -> Arc<Self> {
@@ -136,6 +139,7 @@ impl RecordingSender {
             sent: Default::default(),
             fail_with: Some(f),
             quota: Default::default(),
+            calls: Default::default(),
         })
     }
     pub fn sent(&self) -> Vec<OutgoingEmail> {
@@ -155,6 +159,7 @@ impl Sender for RecordingSender {
         Ok(DomainState::Verified)
     }
     async fn send(&self, email: &OutgoingEmail) -> Result<String, SenderError> {
+        self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         if let Some(f) = self.fail_with {
             return Err(f());
         }

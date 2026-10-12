@@ -99,6 +99,16 @@ async fn sync_ends_a_pause_only_when_there_is_room(pool: sqlx::PgPool) {
             .paused_until
             .is_some()
     );
+    // 190 of 200 is still inside the urgent reserve: SES's count lags, so a near-full answer must not end the pause.
+    quota::save(&pool, &q(14.0, 200.0, 190.0)).await.unwrap();
+    assert!(
+        quota::load(&pool)
+            .await
+            .unwrap()
+            .unwrap()
+            .paused_until
+            .is_some()
+    );
     quota::save(&pool, &q(14.0, 200.0, 150.0)).await.unwrap();
     assert!(
         quota::load(&pool)
@@ -178,4 +188,68 @@ async fn the_worker_paces_itself_by_the_synced_rate(pool: sqlx::PgPool) {
     quota::save(&pool, &q(500.0, 1000.0, 0.0)).await.unwrap();
     worker::tick(&t.state, &limiter).await.unwrap();
     assert_eq!(limiter.global_rate(), 14);
+}
+
+#[sqlx::test]
+async fn stale_quota_numbers_do_not_hold_back_normal_mail(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    common::seed_emails(&pool, t.account.id, "bulk", "queued", 1, 0.0).await;
+    quota::save(&pool, &q(14.0, 1000.0, 950.0)).await.unwrap();
+    sqlx::query("UPDATE sender_quota SET synced_at = now() - interval '1 hour'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(queue::claim(&pool, 10).await.unwrap().len(), 1);
+}
+
+#[sqlx::test]
+async fn non_positive_ses_numbers_are_ignored(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    common::seed_emails(&pool, t.account.id, "bulk", "queued", 1, 0.0).await;
+    quota::pause(&pool, "cap").await.unwrap();
+    quota::save(&pool, &q(-1.0, -1.0, 5.0)).await.unwrap(); // -1: no limit
+    assert!(
+        quota::load(&pool)
+            .await
+            .unwrap()
+            .unwrap()
+            .paused_until
+            .is_none()
+    );
+    assert_eq!(queue::claim(&pool, 10).await.unwrap().len(), 1);
+}
+
+#[sqlx::test]
+async fn emails_already_claimed_wait_once_the_pause_starts(pool: sqlx::PgPool) {
+    let s = common::RecordingSender::failing(|| {
+        SenderError::DailyQuota("Daily message quota exceeded".into())
+    });
+    let mut t = common::app_with_sender(pool.clone(), s.clone()).await;
+    let mut cfg = (*t.state.config).clone();
+    cfg.worker_concurrency = 1; // one at a time, so the second email sees the pause
+    t.state.config = std::sync::Arc::new(cfg);
+    common::verified_domain(&t, "shop.com").await;
+    let mut ids = vec![];
+    for to in ["a@x.com", "b@x.com"] {
+        ids.push(
+            common::send_email(
+                &t,
+                serde_json::json!({ "from": "hi@shop.com", "to": to, "subject": "Hi", "text": "x" }),
+            )
+            .await,
+        );
+    }
+    worker::tick(&t.state, &SendLimiter::new(10_000, 1))
+        .await
+        .unwrap();
+    assert_eq!(s.calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+    for id in ids {
+        assert_eq!(common::status_of(&pool, id).await, "queued");
+        let attempts: i32 = sqlx::query_scalar("SELECT attempts FROM emails WHERE id = $1")
+            .bind(id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(attempts, 0);
+    }
 }
