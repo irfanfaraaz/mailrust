@@ -20,6 +20,7 @@ pub fn routes() -> Router<AppState> {
         .route("/campaigns", get(list).post(create))
         .route("/campaigns/{id}", get(get_one).patch(update).delete(remove))
         .route("/campaigns/{id}/preview", post(preview))
+        .route("/campaigns/{id}/test", post(send_test))
 }
 
 /// Create and edit. Absent fields stay as they are; `preview_text: ""` clears it.
@@ -293,4 +294,27 @@ pub(crate) async fn preview(
         checks: r.checks,
         warnings: r.warnings,
     }))
+}
+
+#[derive(Deserialize, utoipa::ToSchema)]
+pub struct TestSendRequest {
+    /// 1-5 addresses of members of this account.
+    pub to: Vec<String>,
+}
+
+#[derive(Serialize, utoipa::ToSchema)]
+pub struct TestSendResult {
+    pub queued: usize,
+}
+
+pub(crate) async fn send_test(
+    State(state): State<AppState>,
+    auth: Auth,
+    Path(id): Path<Uuid>,
+    ApiJson(body): ApiJson<TestSendRequest>,
+) -> Result<(StatusCode, Json<TestSendResult>), ApiError> {
+    auth.require_full()?;
+    let c = load(&state, &auth, id).await?;
+    let queued = campaigns::test_send::send(&state, &c, &body.to).await?;
+    Ok((StatusCode::ACCEPTED, Json(TestSendResult { queued })))
 }

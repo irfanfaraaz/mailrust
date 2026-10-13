@@ -692,3 +692,144 @@ async fn the_reader_count_follows_the_tags(pool: sqlx::PgPool) {
         "skip wins over include"
     );
 }
+
+async fn member(t: &common::TestApp, email: &str) {
+    common::session_for(
+        &t.state.pool,
+        t.account.id,
+        email,
+        mailrust::users::MemberRole::Member,
+    )
+    .await;
+}
+
+#[sqlx::test]
+async fn a_test_goes_to_members_with_their_own_merge_data(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    ready(&t).await;
+    member(&t, "ann@shop.com").await;
+    member(&t, "bob@shop.com").await;
+    contact(&t, "ann@shop.com", Some("Ann"), &[]).await;
+    let (_, c) = api(
+        &t,
+        "POST",
+        "/campaigns",
+        Some(json!({"subject": "Hello", "blocks": greeting(Some("there"))})),
+    )
+    .await;
+    let id = c["id"].as_str().unwrap();
+    let (s, b) = api(
+        &t,
+        "POST",
+        &format!("/campaigns/{id}/test"),
+        Some(json!({"to": ["Ann@Shop.com", "bob@shop.com"]})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::ACCEPTED, "{b}");
+    assert_eq!(b["queued"], 2);
+    let rows: Vec<(String, String, Option<String>, String, String)> = sqlx::query_as(
+        "SELECT to_addresses[1], subject, html, priority::text, from_address FROM emails WHERE tags->>'campaign_test' = $1 ORDER BY to_addresses[1]",
+    )
+    .bind(id)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(rows.len(), 2);
+    assert_eq!(
+        (rows[0].0.as_str(), rows[0].1.as_str(), rows[0].3.as_str()),
+        ("ann@shop.com", "[Test] Hello", "normal")
+    );
+    assert!(
+        rows[0].2.as_deref().unwrap().contains("Hi Ann"),
+        "the member's own contact row"
+    );
+    assert!(
+        rows[1].2.as_deref().unwrap().contains("Hi there"),
+        "no contact row: fallback"
+    );
+    assert!(
+        rows[0]
+            .2
+            .as_deref()
+            .unwrap()
+            .contains("This is a test email")
+    );
+    assert!(rows[0].4.contains("Shop Weekly") && rows[0].4.contains("<news@news.shop.com>"));
+    let campaign_rows: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM emails WHERE campaign_id IS NOT NULL")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(campaign_rows, 0, "tests never count in the report");
+}
+
+#[sqlx::test]
+async fn test_sends_are_limited(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    ready(&t).await;
+    member(&t, "ann@shop.com").await;
+    let (_, c) = api(&t, "POST", "/campaigns", Some(json!({"subject": "Hello"}))).await;
+    let uri = format!("/campaigns/{}/test", c["id"].as_str().unwrap());
+    let (s, _) = api(&t, "POST", &uri, Some(json!({"to": []}))).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let six: Vec<String> = (0..6).map(|i| format!("m{i}@shop.com")).collect();
+    let (s, _) = api(&t, "POST", &uri, Some(json!({"to": six}))).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, b) = api(&t, "POST", &uri, Some(json!({"to": ["stranger@x.com"]}))).await;
+    assert_eq!(
+        (s, b["error"]["code"].as_str()),
+        (StatusCode::UNPROCESSABLE_ENTITY, Some("not_a_member"))
+    );
+    for _ in 0..20 {
+        let (s, _) = api(&t, "POST", &uri, Some(json!({"to": ["ann@shop.com"]}))).await;
+        assert_eq!(s, StatusCode::ACCEPTED);
+    }
+    // `api` would retry a 429 forever; wait out the 10/s key limit, then take the answer as it is.
+    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    let (s, _) = common::call(
+        &t.router,
+        common::req(
+            "POST",
+            &uri,
+            Some(&t.key),
+            Some(json!({"to": ["ann@shop.com"]})),
+        ),
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::TOO_MANY_REQUESTS,
+        "21st test email this hour"
+    );
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM emails WHERE tags ? 'campaign_test'")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(n, 20, "the refused request queued nothing");
+}
+
+#[sqlx::test]
+async fn a_test_needs_a_from_address_a_subject_and_valid_blocks(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    member(&t, "ann@shop.com").await;
+    let (_, c) = api(&t, "POST", "/campaigns", Some(json!({"subject": "Hello"}))).await;
+    let uri = format!("/campaigns/{}/test", c["id"].as_str().unwrap());
+    let (s, b) = api(&t, "POST", &uri, Some(json!({"to": ["ann@shop.com"]}))).await;
+    assert_eq!(
+        (s, b["error"]["code"].as_str()),
+        (StatusCode::UNPROCESSABLE_ENTITY, Some("from_address"))
+    );
+    ready(&t).await;
+    api(
+        &t,
+        "PATCH",
+        &format!("/campaigns/{}", c["id"].as_str().unwrap()),
+        Some(json!({"blocks": greeting(None)})),
+    )
+    .await;
+    let (s, b) = api(&t, "POST", &uri, Some(json!({"to": ["ann@shop.com"]}))).await;
+    assert_eq!(
+        (s, b["error"]["code"].as_str()),
+        (StatusCode::UNPROCESSABLE_ENTITY, Some("merge_tag_fallback"))
+    );
+}

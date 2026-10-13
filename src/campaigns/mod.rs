@@ -7,6 +7,7 @@ use uuid::Uuid;
 
 pub mod checks;
 pub mod plan;
+pub mod test_send;
 
 pub const EMPTY_DOC: &str = r#"{"type":"doc","content":[]}"#;
 
