@@ -23,7 +23,7 @@ pub fn spawn_all(
 }
 
 /// Hourly cleanup: attachments of finished emails after 7 days, SNS dedupe ids after 30 days,
-/// and dead login data (see `cleanup_auth`).
+/// dead login data (see `cleanup_auth`) and stale audience data (see `cleanup_audience`).
 pub async fn maintenance_loop(state: AppState, shutdown: CancellationToken) -> anyhow::Result<()> {
     every(Duration::from_secs(3600), &shutdown, || async {
         let a = sqlx::query!(
@@ -42,6 +42,9 @@ pub async fn maintenance_loop(state: AppState, shutdown: CancellationToken) -> a
         }
         if let Err(e) = cleanup_auth(&state.pool).await {
             tracing::error!(error = ?e, "auth cleanup failed");
+        }
+        if let Err(e) = cleanup_audience(&state.pool).await {
+            tracing::error!(error = ?e, "audience cleanup failed");
         }
     })
     .await;
@@ -65,6 +68,30 @@ pub async fn cleanup_auth(pool: &sqlx::PgPool) -> sqlx::Result<()> {
     )
     .execute(pool)
     .await?;
+    Ok(())
+}
+
+/// Pending signups nobody confirmed in 30 days, dead confirm links, join limits past their 1 h window.
+/// A pending contact who had unsubscribed before goes back to unsubscribed instead of being deleted,
+/// so a later import or API add can never re-subscribe them.
+pub async fn cleanup_audience(pool: &sqlx::PgPool) -> sqlx::Result<()> {
+    sqlx::query!(
+        "UPDATE contacts SET status = 'unsubscribed', updated_at = now()
+         WHERE status = 'pending' AND unsubscribed_at IS NOT NULL AND updated_at < now() - interval '30 days'"
+    )
+    .execute(pool)
+    .await?;
+    sqlx::query!(
+        "DELETE FROM contacts WHERE status = 'pending' AND unsubscribed_at IS NULL AND updated_at < now() - interval '30 days'"
+    )
+    .execute(pool)
+    .await?;
+    sqlx::query!("DELETE FROM contact_confirmations WHERE expires_at < now() - interval '1 day'")
+        .execute(pool)
+        .await?;
+    sqlx::query!("DELETE FROM join_requests WHERE created_at < now() - interval '1 hour'")
+        .execute(pool)
+        .await?;
     Ok(())
 }
 

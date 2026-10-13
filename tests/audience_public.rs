@@ -355,3 +355,45 @@ async fn an_expired_confirm_link_is_refused(pool: sqlx::PgPool) {
     assert_eq!(s, StatusCode::UNAUTHORIZED);
     assert_eq!(contact_status(&pool, "late@x.com").await.as_deref(), Some("pending"));
 }
+
+#[sqlx::test]
+async fn cleanup_forgets_old_pending_but_remembers_who_left(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    let a = t.account.id;
+    sqlx::query(
+        "INSERT INTO contacts (id, account_id, email, status, source, unsubscribed_at, updated_at) VALUES
+           (gen_random_uuid(), $1, 'old@x.com',   'pending',    'form', NULL,  now() - interval '31 days'),
+           (gen_random_uuid(), $1, 'back@x.com',  'pending',    'form', now() - interval '40 days', now() - interval '31 days'),
+           (gen_random_uuid(), $1, 'fresh@x.com', 'pending',    'form', NULL,  now() - interval '29 days'),
+           (gen_random_uuid(), $1, 'sub@x.com',   'subscribed', 'api',  NULL,  now() - interval '90 days')",
+    )
+    .bind(a)
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO contact_confirmations (token_hash, contact_id, expires_at)
+         SELECT '\\x01', id, now() - interval '2 days' FROM contacts WHERE email = 'fresh@x.com'",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query("INSERT INTO join_requests (ip, email, created_at) VALUES ('1.1.1.1', 'a@x.com', now() - interval '2 hours'), ('1.1.1.1', 'b@x.com', now())")
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    mailrust::background::cleanup_audience(&pool).await.unwrap();
+
+    let rows: Vec<(String, String)> = sqlx::query_as("SELECT email, status::text FROM contacts ORDER BY email")
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        rows,
+        [("back@x.com".into(), "unsubscribed".into()), ("fresh@x.com".into(), "pending".into()), ("sub@x.com".into(), "subscribed".into())]
+    );
+    let conf: i64 = sqlx::query_scalar("SELECT count(*) FROM contact_confirmations").fetch_one(&pool).await.unwrap();
+    let reqs: i64 = sqlx::query_scalar("SELECT count(*) FROM join_requests").fetch_one(&pool).await.unwrap();
+    assert_eq!((conf, reqs), (0, 1));
+}
