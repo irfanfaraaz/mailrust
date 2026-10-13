@@ -283,3 +283,18 @@ pub fn web_req(method: &str, uri: &str, ip: &str, body: Option<Value>) -> Reques
     r.headers_mut().insert("x-mailrust-client-ip", ip.parse().unwrap());
     r
 }
+
+/// Polls `f` every 20 ms for up to 5 s (for work done after the response, like the join email).
+pub async fn eventually<F, Fut>(mut f: F)
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = bool>,
+{
+    for _ in 0..250 {
+        if f().await {
+            return;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+    panic!("condition not met within 5 s");
+}

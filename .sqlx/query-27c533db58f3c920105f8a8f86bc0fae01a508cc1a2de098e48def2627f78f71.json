@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO contact_confirmations (token_hash, contact_id, expires_at) VALUES ($1, $2, now() + make_interval(days => $3))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Uuid",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "27c533db58f3c920105f8a8f86bc0fae01a508cc1a2de098e48def2627f78f71"
+}

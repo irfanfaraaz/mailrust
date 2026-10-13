@@ -6,8 +6,17 @@ use uuid::Uuid;
 
 use crate::{
     accounts::AccountStatus,
+    api::AppState,
+    auth_tokens,
+    contacts::ContactStatus,
     domains::{self, DomainStatus},
+    keys::hash_token,
+    system_mail,
 };
+
+pub const CONFIRM_DAYS: i32 = 7;
+pub const CONFIRM_EVERY_MINUTES: i32 = 10;
+pub const JOIN_PER_IP_PER_HOUR: i64 = 5;
 
 #[derive(Debug, Clone)]
 pub struct Newsletter {
@@ -115,6 +124,68 @@ pub fn normalize_from(raw: &str) -> Result<Option<String>, String> {
 
 pub fn from_domain(from: &str) -> &str {
     from.rsplit_once('@').map_or("", |(_, d)| d)
+}
+
+
+/// Runs after `POST /public/join` has answered: new or unsubscribed → `pending` + confirm email;
+/// pending → a new email unless one went out in the last 10 minutes; subscribed → nothing.
+pub async fn process_join(state: &AppState, n: &Newsletter, email: &str, first_name: Option<String>) -> anyhow::Result<()> {
+    let Some(from) = n.newsletter_from.as_deref() else {
+        return Ok(());
+    };
+    let mut tx = state.pool.begin().await?;
+    sqlx::query!(
+        "INSERT INTO contacts (id, account_id, email, first_name, status, source) VALUES ($1, $2, $3, $4, 'pending', 'form')
+         ON CONFLICT (account_id, email) DO NOTHING",
+        Uuid::now_v7(),
+        n.account_id,
+        email,
+        first_name
+    )
+    .execute(&mut *tx)
+    .await?;
+    let c = sqlx::query!(
+        r#"SELECT id, status AS "status: ContactStatus",
+                  EXISTS (SELECT 1 FROM contact_confirmations cc WHERE cc.contact_id = contacts.id
+                          AND cc.created_at > now() - make_interval(mins => $3)) AS "recent!"
+           FROM contacts WHERE account_id = $1 AND email = $2 FOR UPDATE"#,
+        n.account_id,
+        email,
+        CONFIRM_EVERY_MINUTES
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+    if c.status == ContactStatus::Subscribed || c.recent {
+        return Ok(());
+    }
+    sqlx::query!(
+        "UPDATE contacts SET status = 'pending', first_name = COALESCE($2, first_name), updated_at = now() WHERE id = $1",
+        c.id,
+        first_name
+    )
+    .execute(&mut *tx)
+    .await?;
+    let token = auth_tokens::generate(auth_tokens::CONFIRM_PREFIX);
+    sqlx::query!(
+        "INSERT INTO contact_confirmations (token_hash, contact_id, expires_at) VALUES ($1, $2, now() + make_interval(days => $3))",
+        hash_token(&token),
+        c.id,
+        CONFIRM_DAYS
+    )
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+
+    let name = n.display_name();
+    let link = format!("{}/confirm/{token}", state.config.web_base());
+    let text = format!(
+        "Please confirm that you want to get {name}:\n\n{link}\n\nThe link works for {CONFIRM_DAYS} days.\nIf you did not ask for this, ignore this email; you will not be added.\n"
+    );
+    let from = Mailbox::new(Some(name.to_string()), from.parse()?).to_string();
+    let subject = format!("Confirm your subscription to {name}");
+    system_mail::queue_from(state, n.account_id, &from, email, &subject, text).await?;
+    tracing::info!(contact_id = %c.id, account_id = %n.account_id, "confirm email queued");
+    Ok(())
 }
 
 #[cfg(test)]

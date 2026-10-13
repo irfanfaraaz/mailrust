@@ -152,3 +152,25 @@ async fn a_paused_system_account_is_a_setup_problem(pool: sqlx::PgPool) {
             .is_none()
     );
 }
+
+#[sqlx::test]
+async fn queue_from_sends_through_the_account_itself(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    common::verified_domain(&t, "news.shop.com").await;
+    let id = mailrust::system_mail::queue_from(&t.state, t.account.id, "Shop Weekly <hi@news.shop.com>", "r@x.com", "Confirm", "link".into())
+        .await
+        .unwrap()
+        .expect("queued");
+    let (account_id, priority, html, system): (uuid::Uuid, String, Option<String>, bool) = sqlx::query_as(
+        "SELECT account_id, priority::text, html, tags ? 'mailrust_system' FROM emails WHERE id = $1",
+    )
+    .bind(id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!((account_id, priority.as_str(), html, system), (t.account.id, "urgent", None, true));
+    let none = mailrust::system_mail::queue_from(&t.state, t.account.id, "hi@unverified.com", "r@x.com", "s", "t".into())
+        .await
+        .unwrap();
+    assert!(none.is_none());
+}

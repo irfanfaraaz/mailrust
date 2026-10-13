@@ -5,6 +5,7 @@ use rand::RngCore;
 pub const SESSION_PREFIX: &str = "mr_sess_";
 pub const LOGIN_PREFIX: &str = "mr_login_";
 pub const INVITE_PREFIX: &str = "mr_inv_";
+pub const CONFIRM_PREFIX: &str = "mr_conf_";
 
 /// 32 random bytes, base64url without padding (43 chars), after the prefix.
 pub fn generate(prefix: &str) -> String {
