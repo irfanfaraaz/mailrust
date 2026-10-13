@@ -573,3 +573,270 @@ async fn campaign_rows_stay_out_of_the_email_log(pool: PgPool) {
     let (s, _) = api(&t, "GET", &format!("/emails/{one}"), None).await;
     assert_eq!(s, StatusCode::OK, "still readable by id");
 }
+
+async fn post(t: &common::TestApp, id: Uuid, action: &str) -> (StatusCode, Value) {
+    api(t, "POST", &format!("/campaigns/{id}/{action}"), None).await
+}
+
+/// Marks `n` queued emails of the campaign sent (a worker part-way through a wave).
+async fn send_some(pool: &PgPool, id: Uuid, n: i64) {
+    sqlx::query("UPDATE emails SET status = 'sent', sent_at = now() WHERE id IN (SELECT id FROM emails WHERE campaign_id = $1 AND status = 'queued' LIMIT $2)")
+        .bind(id).bind(n).execute(pool).await.unwrap();
+}
+
+async fn once_each(pool: &PgPool, id: Uuid) -> (i64, i64) {
+    sqlx::query_as("SELECT count(*), count(DISTINCT contact_id) FROM emails WHERE campaign_id = $1")
+        .bind(id)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+#[sqlx::test]
+async fn pause_takes_back_queued_emails_and_resume_finishes_the_wave_first(pool: PgPool) {
+    let t = common::app(pool.clone()).await;
+    ready(&t).await;
+    readers(&pool, t.account.id, 600).await; // waves 100, 200, 300
+    let id = new_campaign(&t, json!({"subject": "Hello"})).await;
+    send_now(&t, id).await;
+    send::tick(&t.state, Utc::now()).await.unwrap();
+    send_some(&pool, id, 40).await;
+
+    let (s, c) = post(&t, id, "pause").await;
+    assert_eq!((s, c["status"].as_str()), (StatusCode::OK, Some("paused")));
+    assert_eq!(queued(&pool, id).await, 0);
+    assert_eq!(once_each(&pool, id).await, (40, 40));
+    let linked: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM campaign_recipients WHERE campaign_id = $1 AND email_id IS NOT NULL",
+    )
+    .bind(id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(linked, 40);
+    let (s, b) = post(&t, id, "pause").await;
+    assert_eq!(
+        (s, b["error"]["code"].as_str()),
+        (StatusCode::CONFLICT, Some("campaign_not_sending"))
+    );
+
+    let (s, c) = post(&t, id, "resume").await;
+    assert_eq!((s, c["status"].as_str()), (StatusCode::OK, Some("sending")));
+    let mut now = Utc::now();
+    send::tick(&t.state, now).await.unwrap();
+    assert_eq!(
+        queued(&pool, id).await,
+        60,
+        "the rest of wave 1, not wave 2"
+    );
+    for expected in [200, 300] {
+        mark_sent(&pool, id).await;
+        send::tick(&t.state, now).await.unwrap();
+        now += Duration::minutes(10) + Duration::seconds(1);
+        send::tick(&t.state, now).await.unwrap();
+        assert_eq!(queued(&pool, id).await, expected);
+    }
+    mark_sent(&pool, id).await;
+    send::tick(&t.state, now).await.unwrap();
+    assert_eq!(status(&pool, id).await, "sent");
+    assert_eq!(once_each(&pool, id).await, (600, 600));
+}
+
+#[sqlx::test]
+async fn auto_pause_mid_wave_takes_back_queued_emails(pool: PgPool) {
+    let rec = common::RecordingSender::ok();
+    let t = common::app_with_sender(pool.clone(), rec.clone()).await;
+    ready(&t).await;
+    readers(&pool, t.account.id, 10).await;
+    let id = new_campaign(&t, json!({"subject": "Hello"})).await;
+    send_now(&t, id).await;
+    send::tick(&t.state, Utc::now()).await.unwrap();
+    // A worker claimed three before the pause: they come back to `queued` after it (requeue_paused).
+    let claimed: Vec<Uuid> = sqlx::query_scalar("UPDATE emails SET status = 'sending', lease_until = now() + interval '5 minutes', attempts = 1
+                                                  WHERE id IN (SELECT id FROM emails WHERE campaign_id = $1 LIMIT 3) RETURNING id")
+        .bind(id).fetch_all(&pool).await.unwrap();
+    mailrust::accounts::pause(&pool, t.account.id, "bounce rate 5% is over 2%")
+        .await
+        .unwrap();
+    send::tick(&t.state, Utc::now()).await.unwrap();
+    let (st, reason): (String, String) =
+        sqlx::query_as("SELECT status::text, paused_reason FROM campaigns WHERE id = $1")
+            .bind(id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(st, "paused");
+    assert!(reason.contains("bounce rate"));
+    assert_eq!(
+        once_each(&pool, id).await.0,
+        3,
+        "only the claimed three are left"
+    );
+
+    // The claimed three come back to the queue; the worker takes them back instead of sending.
+    sqlx::query("UPDATE emails SET status = 'queued', lease_until = NULL WHERE id = ANY($1)")
+        .bind(&claimed)
+        .execute(&pool)
+        .await
+        .unwrap();
+    mailrust::accounts::resume(&pool, t.account.id)
+        .await
+        .unwrap();
+    drain(&t).await;
+    assert!(
+        rec.sent().is_empty(),
+        "nothing goes out while the issue is paused"
+    );
+    assert_eq!(once_each(&pool, id).await.0, 0);
+
+    let (s, _) = post(&t, id, "resume").await;
+    assert_eq!(s, StatusCode::OK);
+    send::tick(&t.state, Utc::now()).await.unwrap();
+    drain(&t).await;
+    assert_eq!(rec.sent().len(), 10);
+    assert_eq!(once_each(&pool, id).await, (10, 10));
+}
+
+#[sqlx::test]
+async fn a_restart_mid_send_sends_each_reader_once(pool: PgPool) {
+    let rec = common::RecordingSender::ok();
+    let t = common::app_with_sender(pool.clone(), rec.clone()).await;
+    ready(&t).await;
+    readers(&pool, t.account.id, 700).await; // waves 100, 200, 400
+    let id = new_campaign(&t, json!({"subject": "Hello"})).await;
+    send_now(&t, id).await;
+    let mut now = Utc::now();
+    send::tick(&t.state, now).await.unwrap();
+    drain(&t).await;
+    send::tick(&t.state, now).await.unwrap();
+    now += Duration::minutes(11);
+    send::tick(&t.state, now).await.unwrap(); // wave 2 queued, then the engine "restarts"
+
+    let again = mailrust::api::AppState::new(
+        pool.clone(),
+        common::test_config(common::temp_outbox()),
+        rec.clone(),
+    );
+    let limiter = mailrust::limiter::SendLimiter::new(10_000, 1);
+    for _ in 0..3 {
+        send::tick(&again, now).await.unwrap();
+        while worker::tick(&again, &limiter).await.unwrap() > 0 {}
+        send::tick(&again, now).await.unwrap();
+        now += Duration::minutes(11);
+    }
+    assert_eq!(status(&pool, id).await, "sent");
+    let mut to: Vec<String> = rec.sent().into_iter().flat_map(|e| e.recipients).collect();
+    to.sort();
+    let n = to.len();
+    to.dedup();
+    assert_eq!((n, to.len()), (700, 700), "everyone once");
+}
+
+#[sqlx::test]
+async fn cancel_stops_for_good(pool: PgPool) {
+    let t = common::app(pool.clone()).await;
+    ready(&t).await;
+    readers(&pool, t.account.id, 5).await;
+    let draft = new_campaign(&t, json!({"subject": "Draft"})).await;
+    let (s, b) = post(&t, draft, "cancel").await;
+    assert_eq!(
+        (s, b["error"]["code"].as_str()),
+        (StatusCode::CONFLICT, Some("campaign_not_cancellable"))
+    );
+
+    let id = new_campaign(&t, json!({"subject": "Hello"})).await;
+    send_now(&t, id).await;
+    send::tick(&t.state, Utc::now()).await.unwrap();
+    let (s, c) = post(&t, id, "cancel").await;
+    assert_eq!(
+        (s, c["status"].as_str()),
+        (StatusCode::OK, Some("cancelled"))
+    );
+    assert_eq!(queued(&pool, id).await, 0);
+    send::tick(&t.state, Utc::now() + Duration::hours(1))
+        .await
+        .unwrap();
+    assert_eq!(once_each(&pool, id).await.0, 0);
+    let (s, _) = post(&t, id, "resume").await;
+    assert_eq!(s, StatusCode::CONFLICT);
+}
+
+#[sqlx::test]
+async fn resume_waits_for_the_other_issue_and_reruns_the_checks(pool: PgPool) {
+    let t = common::app(pool.clone()).await;
+    ready(&t).await;
+    readers(&pool, t.account.id, 3).await;
+    let a = new_campaign(&t, json!({"subject": "A"})).await;
+    send_now(&t, a).await;
+    post(&t, a, "pause").await;
+    let b = new_campaign(&t, json!({"subject": "B"})).await;
+    assert_eq!(
+        send_now(&t, b).await["status"],
+        "sending",
+        "a paused issue does not block another"
+    );
+    let (s, e) = post(&t, a, "resume").await;
+    assert_eq!(
+        (s, e["error"]["code"].as_str()),
+        (StatusCode::CONFLICT, Some("another_sending"))
+    );
+    post(&t, b, "cancel").await;
+    api(
+        &t,
+        "PATCH",
+        "/newsletter",
+        Some(json!({"postal_address": ""})),
+    )
+    .await;
+    let (s, e) = post(&t, a, "resume").await;
+    assert_eq!(
+        (s, e["error"]["code"].as_str()),
+        (StatusCode::UNPROCESSABLE_ENTITY, Some("postal_address"))
+    );
+}
+
+#[sqlx::test]
+async fn resuming_an_issue_that_never_started_starts_it(pool: PgPool) {
+    let t = common::app(pool.clone()).await;
+    ready(&t).await;
+    readers(&pool, t.account.id, 3).await;
+    let id = new_campaign(&t, json!({"subject": "Later"})).await;
+    let at = Utc::now() + Duration::hours(1);
+    api(
+        &t,
+        "POST",
+        &format!("/campaigns/{id}/send"),
+        Some(json!({"send_at": at})),
+    )
+    .await;
+    api(
+        &t,
+        "PATCH",
+        "/newsletter",
+        Some(json!({"postal_address": ""})),
+    )
+    .await;
+    send::tick(&t.state, at + Duration::seconds(1))
+        .await
+        .unwrap();
+    assert_eq!(status(&pool, id).await, "paused");
+    api(
+        &t,
+        "PATCH",
+        "/newsletter",
+        Some(json!({"postal_address": "1 Main St"})),
+    )
+    .await;
+    let (s, c) = post(&t, id, "resume").await;
+    assert_eq!(
+        (s, c["status"].as_str(), c["archive_slug"].as_str()),
+        (StatusCode::OK, Some("sending"), Some("later"))
+    );
+    let n: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM campaign_recipients WHERE campaign_id = $1")
+            .bind(id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(n, 3);
+}

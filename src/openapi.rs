@@ -353,6 +353,18 @@ fn test_campaign() {}
                (status = 409, body = ErrorBody), (status = 422, body = ErrorBody, description = "Named by the first failed check")))]
 fn send_campaign() {}
 
+#[utoipa::path(post, path = "/campaigns/{id}/pause", tag = "campaigns", params(("id" = uuid::Uuid, Path)),
+    responses((status = 200, body = Campaign), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+fn pause_campaign() {}
+
+#[utoipa::path(post, path = "/campaigns/{id}/resume", tag = "campaigns", params(("id" = uuid::Uuid, Path)),
+    responses((status = 200, body = Campaign), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody), (status = 422, body = ErrorBody)))]
+fn resume_campaign() {}
+
+#[utoipa::path(post, path = "/campaigns/{id}/cancel", tag = "campaigns", params(("id" = uuid::Uuid, Path)),
+    responses((status = 200, body = Campaign), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+fn cancel_campaign() {}
+
 #[derive(OpenApi)]
 #[openapi(
     info(title = "Mailrust API", version = "0.1.0", description = "Send transactional email through your own Amazon SES. Auth: `Authorization: Bearer mr_live_…` (API key), or `Bearer mr_sess_…` (dashboard session) plus `X-Mailrust-Account: <account id>`."),
@@ -365,7 +377,8 @@ fn send_campaign() {}
           public_newsletter, public_unsubscribe_info, public_unsubscribe, public_resubscribe,
           public_join, public_confirm, public_confirm_info, upload_import, list_imports, get_import,
           upload_image, public_image,
-          list_campaigns, create_campaign, get_campaign, update_campaign, delete_campaign, preview_campaign, test_campaign, send_campaign),
+          list_campaigns, create_campaign, get_campaign, update_campaign, delete_campaign, preview_campaign, test_campaign, send_campaign,
+          pause_campaign, resume_campaign, cancel_campaign),
     components(schemas(SendEmailRequest, AttachmentInput, SendResponse, BatchResponse, EmailView, EmailSummary, EmailList,
         EventView, EmailStatus, Priority, Domain, DomainStatus, DnsRecord, DomainList, CreateDomainRequest, UpdateDomainRequest,
         KeySummary, KeyAccess, CreateKeyRequest, CreatedKey, KeyList, CreateWebhookRequest, WebhookView, WebhookList,

@@ -22,6 +22,9 @@ pub fn routes() -> Router<AppState> {
         .route("/campaigns/{id}/preview", post(preview))
         .route("/campaigns/{id}/test", post(send_test))
         .route("/campaigns/{id}/send", post(send))
+        .route("/campaigns/{id}/pause", post(pause))
+        .route("/campaigns/{id}/resume", post(resume))
+        .route("/campaigns/{id}/cancel", post(cancel))
 }
 
 /// Create and edit. Absent fields stay as they are; `preview_text: ""` clears it.
@@ -335,5 +338,38 @@ pub(crate) async fn send(
     auth.require_full()?;
     let c = load(&state, &auth, id).await?;
     campaigns::send::request(&state, &c, body.send_at, Utc::now()).await?;
+    Ok(Json(load(&state, &auth, id).await?))
+}
+
+pub(crate) async fn pause(
+    State(state): State<AppState>,
+    auth: Auth,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Campaign>, ApiError> {
+    auth.require_full()?;
+    let c = load(&state, &auth, id).await?;
+    campaigns::send::pause(&state, &c, "paused by a team member").await?;
+    Ok(Json(load(&state, &auth, id).await?))
+}
+
+pub(crate) async fn resume(
+    State(state): State<AppState>,
+    auth: Auth,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Campaign>, ApiError> {
+    auth.require_full()?;
+    let c = load(&state, &auth, id).await?;
+    campaigns::send::resume(&state, &c, Utc::now()).await?;
+    Ok(Json(load(&state, &auth, id).await?))
+}
+
+pub(crate) async fn cancel(
+    State(state): State<AppState>,
+    auth: Auth,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Campaign>, ApiError> {
+    auth.require_full()?;
+    let c = load(&state, &auth, id).await?;
+    campaigns::send::cancel(&state, &c, Utc::now()).await?;
     Ok(Json(load(&state, &auth, id).await?))
 }

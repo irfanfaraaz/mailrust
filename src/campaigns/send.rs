@@ -244,8 +244,142 @@ pub async fn pause_in_tx(conn: &mut PgConnection, id: Uuid, reason: &str) -> sql
     Ok(())
 }
 
+pub async fn pause(state: &AppState, c: &Campaign, reason: &str) -> Result<(), ApiError> {
+    let mut tx = state.pool.begin().await?;
+    let status = sqlx::query_scalar!(
+        r#"SELECT status AS "s: CampaignStatus" FROM campaigns WHERE id = $1 FOR UPDATE"#,
+        c.id
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+    if status != CampaignStatus::Sending {
+        return Err(ApiError::Conflict(
+            "campaign_not_sending",
+            "only a sending issue can be paused".into(),
+        ));
+    }
+    pause_in_tx(&mut tx, c.id, reason).await?;
+    tx.commit().await?;
+    tracing::info!(campaign_id = %c.id, "campaign paused");
+    Ok(())
+}
+
+/// Checks again, then `sending` with the next wave due now. An issue that never started gets the full start.
+pub async fn resume(state: &AppState, c: &Campaign, now: DateTime<Utc>) -> Result<(), ApiError> {
+    if c.status != CampaignStatus::Paused {
+        return Err(ApiError::Conflict(
+            "campaign_not_paused",
+            "only a paused issue can be resumed".into(),
+        ));
+    }
+    let report = checks::run(state, c).await?;
+    if !report.passed() {
+        return Err(report.failure());
+    }
+    let another = || {
+        ApiError::Conflict(
+            "another_sending",
+            "another issue of this account is sending; resume this one when it ends".into(),
+        )
+    };
+    let mut tx = state.pool.begin().await?;
+    let Some(locked) = lock_skip(&mut tx, c.id).await? else {
+        return Err(ApiError::Conflict(
+            "campaign_busy",
+            "this issue is being changed; try again".into(),
+        ));
+    };
+    if locked.status != CampaignStatus::Paused {
+        return Err(ApiError::Conflict(
+            "campaign_not_paused",
+            "only a paused issue can be resumed".into(),
+        ));
+    }
+    if locked.started_at.is_none() {
+        if !start(&mut tx, &locked, now).await? {
+            return Err(another());
+        }
+    } else {
+        let r = sqlx::query!(
+            "UPDATE campaigns SET status = 'sending', paused_reason = NULL, next_wave_at = $2, updated_at = now() WHERE id = $1",
+            c.id,
+            now
+        )
+        .execute(&mut *tx)
+        .await;
+        match r {
+            Err(sqlx::Error::Database(d)) if d.is_unique_violation() => return Err(another()),
+            r => {
+                r?;
+            }
+        }
+    }
+    tx.commit().await?;
+    tracing::info!(campaign_id = %c.id, "campaign resumed");
+    Ok(())
+}
+
+pub async fn cancel(state: &AppState, c: &Campaign, now: DateTime<Utc>) -> Result<(), ApiError> {
+    let mut tx = state.pool.begin().await?;
+    let status = sqlx::query_scalar!(
+        r#"SELECT status AS "s: CampaignStatus" FROM campaigns WHERE id = $1 FOR UPDATE"#,
+        c.id
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+    if !matches!(
+        status,
+        CampaignStatus::Scheduled | CampaignStatus::Sending | CampaignStatus::Paused
+    ) {
+        return Err(ApiError::Conflict(
+            "campaign_not_cancellable",
+            "only a scheduled, sending or paused issue can be cancelled; delete a draft instead"
+                .into(),
+        ));
+    }
+    take_back(&mut tx, c.id).await?;
+    sqlx::query!(
+        "UPDATE campaigns SET status = 'cancelled', finished_at = $2, next_wave_at = NULL, updated_at = now() WHERE id = $1",
+        c.id,
+        now
+    )
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    tracing::info!(campaign_id = %c.id, "campaign cancelled");
+    Ok(())
+}
+
+/// An account that is paused (auto-pause or by hand) stops its issue: no new waves, queued emails back.
+async fn pause_for_paused_accounts(state: &AppState) -> anyhow::Result<()> {
+    let rows = sqlx::query!(
+        r#"SELECT c.id, COALESCE(a.paused_reason, 'no reason given') AS "reason!"
+           FROM campaigns c JOIN accounts a ON a.id = c.account_id
+           WHERE c.status = 'sending' AND a.status = 'paused'"#
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    for r in rows {
+        let mut tx = state.pool.begin().await?;
+        if let Some(c) = lock_skip(&mut tx, r.id).await?
+            && c.status == CampaignStatus::Sending
+        {
+            pause_in_tx(
+                &mut tx,
+                r.id,
+                &format!("the account is paused: {}", r.reason),
+            )
+            .await?;
+            tx.commit().await?;
+            tracing::warn!(campaign_id = %r.id, "campaign paused with its account");
+        }
+    }
+    Ok(())
+}
+
 /// One round of the campaign loop. `now` is the test hook: tests move it instead of sleeping.
 pub async fn tick(state: &AppState, now: DateTime<Utc>) -> anyhow::Result<()> {
+    pause_for_paused_accounts(state).await?;
     start_due(state, now, None).await?;
     let sending = sqlx::query_scalar!(
         "SELECT id FROM campaigns WHERE status = 'sending' ORDER BY next_wave_at NULLS FIRST LIMIT 100"
