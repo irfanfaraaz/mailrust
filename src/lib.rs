@@ -14,6 +14,7 @@ pub mod email_events;
 pub mod emails;
 pub mod error;
 pub mod events;
+pub mod images;
 pub mod imports;
 pub mod keys;
 pub mod limiter;

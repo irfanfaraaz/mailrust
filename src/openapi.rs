@@ -14,6 +14,7 @@ use crate::{
         contacts::{ContactList, CreateContactRequest, UpdateContactRequest},
         domains::{CreateDomainRequest, DomainList, UpdateDomainRequest},
         emails::{BatchResponse, EmailList},
+        images::{ImageUpload, ImageUploaded},
         imports::{ImportList, ImportUpload},
         keys::{CreateKeyRequest, CreatedKey, KeyList},
         login::{LoginRequest, SessionResponse, TokenRequest},
@@ -300,6 +301,17 @@ fn list_imports() {}
     responses((status = 200, body = ImportView), (status = 404, body = ErrorBody)))]
 fn get_import() {}
 
+#[utoipa::path(post, path = "/images", tag = "campaigns",
+    request_body(content = ImageUpload, content_type = "multipart/form-data"),
+    responses((status = 201, body = ImageUploaded), (status = 400, body = ErrorBody), (status = 413, body = ErrorBody),
+               (status = 415, body = ErrorBody), (status = 422, body = ErrorBody)))]
+fn upload_image() {}
+
+#[utoipa::path(get, path = "/public/img/{id}", tag = "public", security(),
+    params(("id" = uuid::Uuid, Path), ("X-Mailrust-Web" = String, Header)),
+    responses((status = 200, content_type = "image/*", body = String, description = "The image bytes"), (status = 404, body = ErrorBody)))]
+fn public_image() {}
+
 #[derive(OpenApi)]
 #[openapi(
     info(title = "Mailrust API", version = "0.1.0", description = "Send transactional email through your own Amazon SES. Auth: `Authorization: Bearer mr_live_…` (API key), or `Bearer mr_sess_…` (dashboard session) plus `X-Mailrust-Account: <account id>`."),
@@ -310,7 +322,8 @@ fn get_import() {}
           list_contacts, export_contacts, create_contact, get_contact, update_contact, delete_contact,
           list_tags, create_tag, rename_tag, delete_tag, get_newsletter, update_newsletter,
           public_newsletter, public_unsubscribe_info, public_unsubscribe, public_resubscribe,
-          public_join, public_confirm, public_confirm_info, upload_import, list_imports, get_import),
+          public_join, public_confirm, public_confirm_info, upload_import, list_imports, get_import,
+          upload_image, public_image),
     components(schemas(SendEmailRequest, AttachmentInput, SendResponse, BatchResponse, EmailView, EmailSummary, EmailList,
         EventView, EmailStatus, Priority, Domain, DomainStatus, DnsRecord, DomainList, CreateDomainRequest, UpdateDomainRequest,
         KeySummary, KeyAccess, CreateKeyRequest, CreatedKey, KeyList, CreateWebhookRequest, WebhookView, WebhookList,
@@ -319,7 +332,7 @@ fn get_import() {}
         ContactView, ContactList, ContactStatus, ContactSource, TagRef, CreateContactRequest, UpdateContactRequest,
         TagView, TagList, TagRequest, NewsletterSettings, UpdateNewsletterRequest,
         PublicNewsletter, UnsubscribeView, PublicJoinRequest, ConfirmView, ConfirmInfo,
-        ImportView, ImportList, ImportStatus, ImportRowError, ImportUpload)),
+        ImportView, ImportList, ImportStatus, ImportRowError, ImportUpload, ImageUpload, ImageUploaded)),
     modifiers(&BearerAuth),
     security(("bearer" = []))
 )]

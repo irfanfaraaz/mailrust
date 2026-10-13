@@ -18,6 +18,7 @@ pub mod contacts;
 pub mod domains;
 pub mod emails;
 pub mod health;
+pub mod images;
 pub mod imports;
 pub mod json;
 pub mod keys;
@@ -50,12 +51,15 @@ pub struct AppState {
     pub key_limiter: Arc<KeyLimiter>,
     pub ip_limiter: Arc<IpLimiter>,
     pub sns_certs: Arc<crate::events::sns::CertCache>,
+    pub images: Arc<dyn crate::images::ImageStore>,
 }
 
 impl AppState {
     pub fn new(pool: PgPool, config: Config, sender: Arc<dyn Sender>) -> Self {
         let per_second = NonZeroU32::new(REQUESTS_PER_SECOND_PER_KEY).unwrap_or(NonZeroU32::MIN);
         let per_ip = NonZeroU32::new(PUBLIC_REQUESTS_PER_SECOND_PER_IP).unwrap_or(NonZeroU32::MIN);
+        let images: Arc<dyn crate::images::ImageStore> =
+            Arc::new(crate::images::PgImageStore::new(pool.clone()));
         Self {
             pool,
             config: Arc::new(config),
@@ -63,6 +67,7 @@ impl AppState {
             key_limiter: Arc::new(RateLimiter::keyed(Quota::per_second(per_second))),
             ip_limiter: Arc::new(RateLimiter::keyed(Quota::per_second(per_ip))),
             sns_certs: Arc::new(crate::events::sns::CertCache::new()),
+            images,
         }
     }
 }
@@ -71,6 +76,7 @@ pub fn router(state: AppState) -> Router {
     Router::new()
         .merge(health::routes())
         .merge(contacts::routes())
+        .merge(images::routes())
         .merge(imports::routes())
         .merge(newsletter::routes())
         .merge(public::routes())

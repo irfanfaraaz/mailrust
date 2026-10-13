@@ -66,6 +66,22 @@ impl FromRequestParts<AppState> for WebCaller {
     }
 }
 
+/// Extractor: only the Next.js app (404 otherwise), with no per-IP limit. For image bytes:
+/// mail providers fetch images through a few proxy IPs, which a per-IP limit would starve.
+pub struct WebOnly;
+
+impl FromRequestParts<AppState> for WebOnly {
+    type Rejection = ApiError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, ApiError> {
+        if from_web(parts, state) {
+            Ok(WebOnly)
+        } else {
+            Err(ApiError::NotFound)
+        }
+    }
+}
+
 #[derive(Serialize, utoipa::ToSchema)]
 pub struct PublicNewsletter {
     pub name: String,

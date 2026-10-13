@@ -23,6 +23,8 @@ pub enum ApiError {
     Conflict(&'static str, String),
     #[error("the request is too large")]
     TooLarge,
+    #[error("{0}")]
+    UnsupportedMedia(String),
     #[error("{1}")]
     Unprocessable(&'static str, String),
     #[error("too many requests, slow down")]
@@ -48,6 +50,9 @@ impl ApiError {
             ApiError::NotFound => (StatusCode::NOT_FOUND, "not_found"),
             ApiError::Conflict(code, _) => (StatusCode::CONFLICT, code),
             ApiError::TooLarge => (StatusCode::PAYLOAD_TOO_LARGE, "payload_too_large"),
+            ApiError::UnsupportedMedia(_) => {
+                (StatusCode::UNSUPPORTED_MEDIA_TYPE, "unsupported_media_type")
+            }
             ApiError::Unprocessable(code, _) => (StatusCode::UNPROCESSABLE_ENTITY, code),
             ApiError::RateLimited => (StatusCode::TOO_MANY_REQUESTS, "rate_limited"),
             ApiError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "internal_error"),

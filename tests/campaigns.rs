@@ -1,5 +1,6 @@
 mod common;
 
+use axum::http::StatusCode;
 use mailrust::campaigns::{self, CampaignStatus};
 use serde_json::json;
 
@@ -97,5 +98,116 @@ async fn lock_skip_skips_a_row_another_transaction_holds(pool: sqlx::PgPool) {
             .await
             .unwrap()
             .is_none()
+    );
+}
+
+async fn upload(
+    t: &common::TestApp,
+    bytes: &[u8],
+    declared: &str,
+) -> (StatusCode, serde_json::Value) {
+    common::call(
+        &t.router,
+        common::multipart_file("/images", &t.key, bytes, declared),
+    )
+    .await
+}
+
+#[sqlx::test]
+async fn an_uploaded_image_is_served_with_safe_headers(pool: sqlx::PgPool) {
+    let mut t = common::app(pool).await;
+    common::with_web_secret(&mut t);
+    // The declared type is ignored: the bytes decide.
+    let (s, b) = upload(&t, &common::png_1x1(), "image/svg+xml").await;
+    assert_eq!(s, StatusCode::CREATED, "{b}");
+    let id = b["id"].as_str().unwrap().to_string();
+    assert_eq!(b["url"], format!("http://localhost:3000/img/{id}"));
+    assert_eq!(
+        (b["width"].as_u64(), b["height"].as_u64()),
+        (Some(1), Some(1))
+    );
+
+    let (s, h, _) = common::call_raw(
+        &t.router,
+        common::web_req("GET", &format!("/public/img/{id}"), "10.0.0.1", None),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(h["content-type"], "image/png");
+    assert_eq!(h["x-content-type-options"], "nosniff");
+    assert_eq!(h["cache-control"], "public, max-age=31536000, immutable");
+
+    let (s, _, _) = common::call_raw(
+        &t.router,
+        common::req("GET", &format!("/public/img/{id}"), None, None),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "web secret required");
+    let (s, _, _) = common::call_raw(
+        &t.router,
+        common::web_req(
+            "GET",
+            &format!("/public/img/{}", uuid::Uuid::now_v7()),
+            "10.0.0.1",
+            None,
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+}
+
+#[sqlx::test]
+async fn svg_unknown_and_huge_uploads_are_refused(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    let (s, b) = upload(
+        &t,
+        b"<svg xmlns=\"http://www.w3.org/2000/svg\"><script>x</script></svg>",
+        "image/png",
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNSUPPORTED_MEDIA_TYPE);
+    assert_eq!(b["error"]["code"], "unsupported_media_type");
+    let (s, _) = upload(&t, b"%PDF-1.7", "image/png").await;
+    assert_eq!(s, StatusCode::UNSUPPORTED_MEDIA_TYPE);
+    let mut big = common::png_1x1();
+    big.resize(mailrust::images::MAX_IMAGE_BYTES + 1, 0);
+    let (s, _) = upload(&t, &big, "image/png").await;
+    assert_eq!(s, StatusCode::PAYLOAD_TOO_LARGE);
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM images")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(n, 0, "nothing stored");
+}
+
+#[sqlx::test]
+async fn a_sending_key_cannot_upload(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    let key = mailrust::keys::create(
+        &pool,
+        t.account.id,
+        "send",
+        mailrust::keys::KeyAccess::Sending,
+    )
+    .await
+    .unwrap()
+    .token;
+    let (s, _) = common::call(
+        &t.router,
+        common::multipart_file("/images", &key, &common::png_1x1(), "image/png"),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+}
+
+#[sqlx::test]
+async fn the_store_knows_the_owner(pool: sqlx::PgPool) {
+    let t = common::app(pool).await;
+    let (_, b) = upload(&t, &common::png_1x1(), "image/png").await;
+    let id: uuid::Uuid = b["id"].as_str().unwrap().parse().unwrap();
+    assert_eq!(t.state.images.owner(id).await.unwrap(), Some(t.account.id));
+    assert_eq!(
+        t.state.images.owner(uuid::Uuid::now_v7()).await.unwrap(),
+        None
     );
 }
