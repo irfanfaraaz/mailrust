@@ -30,7 +30,11 @@ use crate::{
         team::{InviteRequest, RoleRequest},
         webhooks::{CreateWebhookRequest, WebhookList},
     },
-    campaigns::{Campaign, CampaignStatus, checks::Check},
+    campaigns::{
+        Campaign, CampaignStatus,
+        checks::Check,
+        report::{CampaignReport, LinkStat, ProviderStat, ReportRates, ReportTotals, WaveStat},
+    },
     contacts::{ContactSource, ContactStatus, ContactView, TagRef},
     domains::{Domain, DomainStatus},
     emails::{
@@ -353,6 +357,10 @@ fn test_campaign() {}
                (status = 409, body = ErrorBody), (status = 422, body = ErrorBody, description = "Named by the first failed check")))]
 fn send_campaign() {}
 
+#[utoipa::path(get, path = "/campaigns/{id}/report", tag = "campaigns", params(("id" = uuid::Uuid, Path)),
+    responses((status = 200, body = CampaignReport), (status = 404, body = ErrorBody)))]
+fn campaign_report() {}
+
 #[utoipa::path(post, path = "/campaigns/{id}/pause", tag = "campaigns", params(("id" = uuid::Uuid, Path)),
     responses((status = 200, body = Campaign), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
 fn pause_campaign() {}
@@ -378,7 +386,7 @@ fn cancel_campaign() {}
           public_join, public_confirm, public_confirm_info, upload_import, list_imports, get_import,
           upload_image, public_image,
           list_campaigns, create_campaign, get_campaign, update_campaign, delete_campaign, preview_campaign, test_campaign, send_campaign,
-          pause_campaign, resume_campaign, cancel_campaign),
+          campaign_report, pause_campaign, resume_campaign, cancel_campaign),
     components(schemas(SendEmailRequest, AttachmentInput, SendResponse, BatchResponse, EmailView, EmailSummary, EmailList,
         EventView, EmailStatus, Priority, Domain, DomainStatus, DnsRecord, DomainList, CreateDomainRequest, UpdateDomainRequest,
         KeySummary, KeyAccess, CreateKeyRequest, CreatedKey, KeyList, CreateWebhookRequest, WebhookView, WebhookList,
@@ -389,6 +397,7 @@ fn cancel_campaign() {}
         PublicNewsletter, UnsubscribeView, PublicJoinRequest, ConfirmView, ConfirmInfo,
         ImportView, ImportList, ImportStatus, ImportRowError, ImportUpload, ImageUpload, ImageUploaded,
         Campaign, CampaignStatus, CampaignRequest, CampaignSummary, CampaignList, CampaignPreview, Check,
+        CampaignReport, ReportTotals, ReportRates, LinkStat, ProviderStat, WaveStat,
         TestSendRequest, TestSendResult, SendRequest)),
     modifiers(&BearerAuth),
     security(("bearer" = []))

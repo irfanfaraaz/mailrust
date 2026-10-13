@@ -3,6 +3,7 @@ mod common;
 use axum::http::StatusCode;
 use chrono::{Duration, Utc};
 use mailrust::campaigns::send;
+use mailrust::email_events::{self, EventKind, NewEvent};
 use mailrust::{limiter::SendLimiter, tokens, worker};
 use serde_json::{Value, json};
 use sqlx::PgPool;
@@ -839,4 +840,193 @@ async fn resuming_an_issue_that_never_started_starts_it(pool: PgPool) {
             .await
             .unwrap();
     assert_eq!(n, 3);
+}
+
+async fn event(
+    pool: &PgPool,
+    account: Uuid,
+    email_id: Uuid,
+    kind: EventKind,
+    data: Value,
+    bot: bool,
+) {
+    let mut conn = pool.acquire().await.unwrap();
+    email_events::record(
+        &mut conn,
+        NewEvent {
+            account_id: account,
+            email_id,
+            kind,
+            recipient: None,
+            data,
+            likely_bot: bot,
+        },
+    )
+    .await
+    .unwrap();
+}
+
+async fn email_to(pool: &PgPool, campaign: Uuid, to: &str) -> Uuid {
+    sqlx::query_scalar("SELECT id FROM emails WHERE campaign_id = $1 AND to_addresses[1] = $2")
+        .bind(campaign)
+        .bind(to)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+#[sqlx::test]
+async fn the_report_counts_unique_people_per_link_and_provider(pool: PgPool) {
+    let mut t = common::app(pool.clone()).await;
+    common::with_web_secret(&mut t);
+    ready(&t).await;
+    for e in ["a@gmail.com", "b@gmail.com", "c@hotmail.com", "d@shop.com"] {
+        api(&t, "POST", "/contacts", Some(json!({"email": e}))).await;
+    }
+    let id = new_campaign(&t, json!({"subject": "Hello"})).await;
+    send_now(&t, id).await;
+    send::tick(&t.state, Utc::now()).await.unwrap();
+    mark_sent(&pool, id).await;
+    let acc = t.account.id;
+    let (a, b, c, d) = (
+        email_to(&pool, id, "a@gmail.com").await,
+        email_to(&pool, id, "b@gmail.com").await,
+        email_to(&pool, id, "c@hotmail.com").await,
+        email_to(&pool, id, "d@shop.com").await,
+    );
+    for e in [a, b, c] {
+        event(&pool, acc, e, EventKind::Delivered, json!({}), false).await;
+    }
+    event(&pool, acc, a, EventKind::Opened, json!({}), false).await;
+    event(&pool, acc, a, EventKind::Opened, json!({}), false).await;
+    event(&pool, acc, b, EventKind::Opened, json!({}), true).await; // a bot: left out
+    event(
+        &pool,
+        acc,
+        a,
+        EventKind::Clicked,
+        json!({"link": "https://shop.com/x"}),
+        false,
+    )
+    .await;
+    event(
+        &pool,
+        acc,
+        a,
+        EventKind::Clicked,
+        json!({"link": "https://shop.com/x"}),
+        false,
+    )
+    .await;
+    event(
+        &pool,
+        acc,
+        c,
+        EventKind::Clicked,
+        json!({"link": "https://shop.com/y"}),
+        false,
+    )
+    .await;
+    event(
+        &pool,
+        acc,
+        b,
+        EventKind::Clicked,
+        json!({"link": "https://shop.com/y"}),
+        true,
+    )
+    .await; // a scanner
+    event(&pool, acc, d, EventKind::Bounced, json!({}), false).await;
+    sqlx::query("UPDATE emails SET status = 'bounced' WHERE id = $1")
+        .bind(d)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    // b unsubscribes from this issue's link, twice; it counts once.
+    let b_contact: Uuid = sqlx::query_scalar("SELECT id FROM contacts WHERE email = 'b@gmail.com'")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let token = tokens::sign_campaign_unsubscribe(&t.state.config.tracking_secret, b_contact, id);
+    for _ in 0..2 {
+        let (s, _) = common::call(
+            &t.router,
+            common::web_req(
+                "POST",
+                "/public/unsubscribe",
+                "10.0.0.9",
+                Some(json!({"token": token})),
+            ),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK);
+    }
+    // An old-form link changes the contact but names no issue.
+    let c_contact: Uuid =
+        sqlx::query_scalar("SELECT id FROM contacts WHERE email = 'c@hotmail.com'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let old = tokens::sign_unsubscribe(&t.state.config.tracking_secret, c_contact);
+    common::call(
+        &t.router,
+        common::web_req(
+            "POST",
+            "/public/unsubscribe",
+            "10.0.0.9",
+            Some(json!({"token": old})),
+        ),
+    )
+    .await;
+
+    let (s, r) = api(&t, "GET", &format!("/campaigns/{id}/report"), None).await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    let tot = &r["totals"];
+    assert_eq!(tot["recipients"], 4);
+    assert_eq!(tot["sent"], 4);
+    assert_eq!(tot["delivered"], 3);
+    assert_eq!(tot["bounced"], 1);
+    assert_eq!(tot["opened"], 1);
+    assert_eq!(tot["clicked"], 2);
+    assert_eq!(tot["unsubscribed"], 1);
+    assert_eq!(r["rates"]["open_rate"], 0.25);
+    assert_eq!(r["rates"]["click_rate"], 0.5);
+    assert_eq!(
+        r["links"],
+        json!([
+            {"url": "https://shop.com/x", "clicks": 2, "unique_clicks": 1},
+            {"url": "https://shop.com/y", "clicks": 1, "unique_clicks": 1}
+        ])
+    );
+    let gmail = r["providers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["provider"] == "Gmail")
+        .unwrap()
+        .clone();
+    assert_eq!(
+        (
+            gmail["sent"].as_i64(),
+            gmail["opened"].as_i64(),
+            gmail["clicked"].as_i64()
+        ),
+        (Some(2), Some(1), Some(1))
+    );
+    let other = r["providers"].as_array().unwrap().last().unwrap().clone();
+    assert_eq!(
+        (other["provider"].as_str(), other["bounced"].as_i64()),
+        (Some("Other"), Some(1))
+    );
+    assert_eq!(r["waves"], json!([{"wave": 1, "readers": 4, "done": 4}]));
+}
+
+#[sqlx::test]
+async fn another_accounts_report_is_not_found(pool: PgPool) {
+    let t = common::app(pool.clone()).await;
+    let id = new_campaign(&t, json!({"subject": "Mine"})).await;
+    let u = common::app(pool).await;
+    let (s, _) = api(&u, "GET", &format!("/campaigns/{id}/report"), None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
 }

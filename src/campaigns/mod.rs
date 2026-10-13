@@ -8,6 +8,7 @@ use uuid::Uuid;
 pub mod checks;
 pub mod mail;
 pub mod plan;
+pub mod report;
 pub mod send;
 pub mod test_send;
 

@@ -22,6 +22,7 @@ pub fn routes() -> Router<AppState> {
         .route("/campaigns/{id}/preview", post(preview))
         .route("/campaigns/{id}/test", post(send_test))
         .route("/campaigns/{id}/send", post(send))
+        .route("/campaigns/{id}/report", get(report))
         .route("/campaigns/{id}/pause", post(pause))
         .route("/campaigns/{id}/resume", post(resume))
         .route("/campaigns/{id}/cancel", post(cancel))
@@ -339,6 +340,18 @@ pub(crate) async fn send(
     let c = load(&state, &auth, id).await?;
     campaigns::send::request(&state, &c, body.send_at, Utc::now()).await?;
     Ok(Json(load(&state, &auth, id).await?))
+}
+
+pub(crate) async fn report(
+    State(state): State<AppState>,
+    auth: Auth,
+    Path(id): Path<Uuid>,
+) -> Result<Json<crate::campaigns::report::CampaignReport>, ApiError> {
+    auth.require_full()?;
+    load(&state, &auth, id).await?;
+    Ok(Json(
+        crate::campaigns::report::build(&state.pool, id).await?,
+    ))
 }
 
 pub(crate) async fn pause(

@@ -32,6 +32,7 @@ async fn openapi_lists_every_public_route(pool: sqlx::PgPool) {
         "/campaigns/{id}/test",
         "/campaigns/{id}/send",
         "/campaigns/{id}/pause",
+        "/campaigns/{id}/report",
         "/campaigns/{id}/resume",
         "/campaigns/{id}/cancel",
     ] {

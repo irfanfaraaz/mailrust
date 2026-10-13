@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT r.wave, count(*) AS \"readers!\",\n                  count(*) FILTER (WHERE e.status IS NOT NULL AND e.status NOT IN ('queued', 'sending', 'unknown')) AS \"done!\"\n           FROM campaign_recipients r LEFT JOIN emails e ON e.id = r.email_id\n           WHERE r.campaign_id = $1 GROUP BY r.wave ORDER BY r.wave",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "wave",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "readers!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "done!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "c97c42dda57c4dbf472b222400ea850eb5513173b69aae3b2e8d4f4522168c15"
+}

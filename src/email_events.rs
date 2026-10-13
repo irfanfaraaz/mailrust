@@ -14,6 +14,7 @@ pub enum EventKind {
     Clicked,
     Failed,
     Suppressed,
+    Unsubscribed,
 }
 
 impl EventKind {
@@ -29,6 +30,7 @@ impl EventKind {
             EventKind::Clicked => "clicked",
             EventKind::Failed => "failed",
             EventKind::Suppressed => "suppressed",
+            EventKind::Unsubscribed => "unsubscribed",
         }
     }
 
@@ -43,7 +45,7 @@ impl EventKind {
             EventKind::Clicked => "email.clicked",
             EventKind::Failed => "email.failed",
             EventKind::Suppressed => "email.suppressed",
-            EventKind::SoftBounced => return None,
+            EventKind::SoftBounced | EventKind::Unsubscribed => return None,
         })
     }
 }
