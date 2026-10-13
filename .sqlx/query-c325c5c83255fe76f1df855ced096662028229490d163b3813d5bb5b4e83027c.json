@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT archive_slug AS \"s!\" FROM campaigns\n           WHERE account_id = $1 AND archive_slug IS NOT NULL AND (archive_slug = $2 OR archive_slug LIKE $2 || '-%')",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "s!",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "c325c5c83255fe76f1df855ced096662028229490d163b3813d5bb5b4e83027c"
+}

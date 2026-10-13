@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT c.id FROM campaigns c\n         WHERE c.status = 'scheduled' AND c.send_at <= $1 AND ($2::uuid IS NULL OR c.id = $2)\n           AND NOT EXISTS (SELECT 1 FROM campaigns o WHERE o.account_id = c.account_id AND o.status = 'sending')\n         ORDER BY c.send_at LIMIT 20",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "6a60192b9f1f7e2c62b55e8746b43739b784e59ad49e7aa49c71562ec67084d7"
+}

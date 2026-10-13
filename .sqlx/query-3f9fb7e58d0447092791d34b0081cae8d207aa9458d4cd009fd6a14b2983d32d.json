@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE campaigns SET status = 'sent', finished_at = $2, next_wave_at = NULL, updated_at = now() WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3f9fb7e58d0447092791d34b0081cae8d207aa9458d4cd009fd6a14b2983d32d"
+}

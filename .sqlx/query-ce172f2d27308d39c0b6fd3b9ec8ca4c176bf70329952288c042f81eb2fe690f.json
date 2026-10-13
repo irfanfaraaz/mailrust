@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE campaigns SET status = 'sending', started_at = $2, send_at = COALESCE(send_at, $2), wave = 0,\n                next_wave_at = $2, paused_reason = NULL, updated_at = now()\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ce172f2d27308d39c0b6fd3b9ec8ca4c176bf70329952288c042f81eb2fe690f"
+}

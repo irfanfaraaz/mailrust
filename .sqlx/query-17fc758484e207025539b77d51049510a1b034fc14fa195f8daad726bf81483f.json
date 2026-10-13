@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO emails (id, account_id, domain_id, from_address, to_addresses, subject, priority, campaign_id, contact_id)\n         SELECT x.id, $1, $2, $3, ARRAY[x.email], $4, 'bulk', $5, x.contact_id\n         FROM unnest($6::uuid[], $7::uuid[], $8::text[]) AS x(id, contact_id, email)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Uuid",
+        "UuidArray",
+        "UuidArray",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "17fc758484e207025539b77d51049510a1b034fc14fa195f8daad726bf81483f"
+}

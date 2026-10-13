@@ -21,6 +21,7 @@ pub fn routes() -> Router<AppState> {
         .route("/campaigns/{id}", get(get_one).patch(update).delete(remove))
         .route("/campaigns/{id}/preview", post(preview))
         .route("/campaigns/{id}/test", post(send_test))
+        .route("/campaigns/{id}/send", post(send))
 }
 
 /// Create and edit. Absent fields stay as they are; `preview_text: ""` clears it.
@@ -317,4 +318,22 @@ pub(crate) async fn send_test(
     let c = load(&state, &auth, id).await?;
     let queued = campaigns::test_send::send(&state, &c, &body.to).await?;
     Ok((StatusCode::ACCEPTED, Json(TestSendResult { queued })))
+}
+
+#[derive(Deserialize, utoipa::ToSchema)]
+pub struct SendRequest {
+    /// When to start; absent or past = now. At most 30 days ahead.
+    pub send_at: Option<DateTime<Utc>>,
+}
+
+pub(crate) async fn send(
+    State(state): State<AppState>,
+    auth: Auth,
+    Path(id): Path<Uuid>,
+    ApiJson(body): ApiJson<SendRequest>,
+) -> Result<Json<Campaign>, ApiError> {
+    auth.require_full()?;
+    let c = load(&state, &auth, id).await?;
+    campaigns::send::request(&state, &c, body.send_at, Utc::now()).await?;
+    Ok(Json(load(&state, &auth, id).await?))
 }

@@ -12,8 +12,8 @@ use crate::{
     api::{
         AppState,
         campaigns::{
-            CampaignList, CampaignPreview, CampaignRequest, CampaignSummary, TestSendRequest,
-            TestSendResult,
+            CampaignList, CampaignPreview, CampaignRequest, CampaignSummary, SendRequest,
+            TestSendRequest, TestSendResult,
         },
         contacts::{ContactList, CreateContactRequest, UpdateContactRequest},
         domains::{CreateDomainRequest, DomainList, UpdateDomainRequest},
@@ -348,6 +348,11 @@ fn preview_campaign() {}
                (status = 422, body = ErrorBody), (status = 429, body = ErrorBody)))]
 fn test_campaign() {}
 
+#[utoipa::path(post, path = "/campaigns/{id}/send", tag = "campaigns", params(("id" = uuid::Uuid, Path)), request_body = SendRequest,
+    responses((status = 200, body = Campaign), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody),
+               (status = 409, body = ErrorBody), (status = 422, body = ErrorBody, description = "Named by the first failed check")))]
+fn send_campaign() {}
+
 #[derive(OpenApi)]
 #[openapi(
     info(title = "Mailrust API", version = "0.1.0", description = "Send transactional email through your own Amazon SES. Auth: `Authorization: Bearer mr_live_…` (API key), or `Bearer mr_sess_…` (dashboard session) plus `X-Mailrust-Account: <account id>`."),
@@ -360,7 +365,7 @@ fn test_campaign() {}
           public_newsletter, public_unsubscribe_info, public_unsubscribe, public_resubscribe,
           public_join, public_confirm, public_confirm_info, upload_import, list_imports, get_import,
           upload_image, public_image,
-          list_campaigns, create_campaign, get_campaign, update_campaign, delete_campaign, preview_campaign, test_campaign),
+          list_campaigns, create_campaign, get_campaign, update_campaign, delete_campaign, preview_campaign, test_campaign, send_campaign),
     components(schemas(SendEmailRequest, AttachmentInput, SendResponse, BatchResponse, EmailView, EmailSummary, EmailList,
         EventView, EmailStatus, Priority, Domain, DomainStatus, DnsRecord, DomainList, CreateDomainRequest, UpdateDomainRequest,
         KeySummary, KeyAccess, CreateKeyRequest, CreatedKey, KeyList, CreateWebhookRequest, WebhookView, WebhookList,
@@ -371,7 +376,7 @@ fn test_campaign() {}
         PublicNewsletter, UnsubscribeView, PublicJoinRequest, ConfirmView, ConfirmInfo,
         ImportView, ImportList, ImportStatus, ImportRowError, ImportUpload, ImageUpload, ImageUploaded,
         Campaign, CampaignStatus, CampaignRequest, CampaignSummary, CampaignList, CampaignPreview, Check,
-        TestSendRequest, TestSendResult)),
+        TestSendRequest, TestSendResult, SendRequest)),
     modifiers(&BearerAuth),
     security(("bearer" = []))
 )]
