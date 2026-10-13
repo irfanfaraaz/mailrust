@@ -1,12 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { engine, type Schemas } from "@/lib/engine";
-
-// shortcut: inlines Task 10's getMe("/") (web/lib/account.ts); switch to it when Task 10 lands.
-function getMe(nextPath: string) {
-  return engine<Schemas["MeResponse"]>("/me", { nextPath });
-}
+import { getMe } from "@/lib/account";
 
 export default function Home() {
   // Cookies and the engine call are request data: read them inside Suspense (cacheComponents).

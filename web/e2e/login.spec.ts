@@ -25,7 +25,7 @@ test("a used link shows a clear error", async ({ page }) => {
 test("logging out ends the session", async ({ page }) => {
   await loginAs(page, SEED.ownerEmail);
   await page.getByRole("button", { name: "Account menu" }).click();
-  await page.getByRole("menuitem", { name: "Log out" }).click();
+  await page.getByRole("menuitem", { name: "Log out", exact: true }).click();
   await expect(page).toHaveURL(/\/login/);
   await page.goto(`/a/${SEED.accountId}/overview`);
   await expect(page).toHaveURL(/\/login\?next=/);

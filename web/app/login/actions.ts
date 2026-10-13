@@ -49,3 +49,9 @@ export async function logout() {
   await clearSession();
   redirect("/login");
 }
+
+export async function logoutAll() {
+  await engine("/auth/logout-all", { method: "POST" }).catch(() => undefined);
+  await clearSession();
+  redirect("/login");
+}
