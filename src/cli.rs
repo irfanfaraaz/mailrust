@@ -41,6 +41,8 @@ enum Command {
     /// Manage dashboard users
     #[command(subcommand)]
     User(UserCmd),
+    /// Print the OpenAPI document (JSON)
+    Openapi,
     /// Run the API and/or the background workers
     Serve {
         #[arg(long, value_enum, default_value_t = Role::All)]
@@ -114,6 +116,14 @@ enum KeyCmd {
 
 pub async fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
+    if let Command::Openapi = cli.command {
+        use utoipa::OpenApi;
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&crate::openapi::ApiDoc::openapi())?
+        );
+        return Ok(());
+    }
     let config = Config::from_env()?;
     telemetry::init(config.log_json);
     let pool = db::connect(&config.database_url).await?;
@@ -194,6 +204,7 @@ pub async fn run() -> anyhow::Result<()> {
             shutdown.cancel();
             while tasks.join_next().await.is_some() {}
         }
+        Command::Openapi => unreachable!("handled before connecting to the database"),
     }
     Ok(())
 }
@@ -295,4 +306,17 @@ async fn key_cmd(pool: &sqlx::PgPool, cmd: KeyCmd) -> anyhow::Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use clap::Parser;
+
+    use super::{Cli, Command};
+
+    #[test]
+    fn openapi_is_a_command() {
+        let cli = Cli::try_parse_from(["mailrust", "openapi"]).unwrap();
+        assert!(matches!(cli.command, Command::Openapi));
+    }
 }

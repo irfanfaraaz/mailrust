@@ -27,8 +27,8 @@ use crate::{
     },
     keys::{KeyAccess, KeySummary},
     safety::SuppressionReason,
-    stats::{Counts, Overview},
     sender::DnsRecord,
+    stats::{Counts, Overview},
     team::{InviteView, MemberView, TeamView},
     users::{MemberRole, MyAccount, User},
     webhooks::WebhookView,
@@ -212,4 +212,25 @@ pub struct ApiDoc;
 
 pub fn routes() -> Router<AppState> {
     Router::new().route("/openapi.json", get(|| async { Json(ApiDoc::openapi()) }))
+}
+
+#[cfg(test)]
+mod tests {
+    use utoipa::OpenApi;
+
+    #[test]
+    fn the_document_lists_the_dashboard_routes() {
+        let doc = serde_json::to_value(super::ApiDoc::openapi()).unwrap();
+        for p in [
+            "/auth/login",
+            "/auth/verify",
+            "/me",
+            "/team",
+            "/team/invites",
+            "/invites/accept",
+            "/stats/overview",
+        ] {
+            assert!(doc["paths"][p].is_object(), "missing {p}");
+        }
+    }
 }
