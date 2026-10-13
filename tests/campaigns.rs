@@ -833,3 +833,97 @@ async fn a_test_needs_a_from_address_a_subject_and_valid_blocks(pool: sqlx::PgPo
         (StatusCode::UNPROCESSABLE_ENTITY, Some("merge_tag_fallback"))
     );
 }
+
+/// A sent issue with `subject`, without going through the send path (the archive only reads rows).
+async fn sent_issue(t: &common::TestApp, subject: &str, slug: &str, hidden: bool) -> uuid::Uuid {
+    let (_, c) = api(
+        t,
+        "POST",
+        "/campaigns",
+        Some(json!({"subject": subject, "blocks": greeting(Some("reader"))})),
+    )
+    .await;
+    let id: uuid::Uuid = c["id"].as_str().unwrap().parse().unwrap();
+    sqlx::query("UPDATE campaigns SET status = 'sent', archive_slug = $2, archive_hidden = $3, started_at = now(), finished_at = now() WHERE id = $1")
+        .bind(id)
+        .bind(slug)
+        .bind(hidden)
+        .execute(&t.state.pool)
+        .await
+        .unwrap();
+    id
+}
+
+#[sqlx::test]
+async fn the_archive_lists_and_shows_sent_issues_only(pool: sqlx::PgPool) {
+    let mut t = common::app(pool.clone()).await;
+    common::with_web_secret(&mut t);
+    api(
+        &t,
+        "PATCH",
+        "/newsletter",
+        Some(json!({"public_slug": "weekly", "newsletter_name": "Shop Weekly"})),
+    )
+    .await;
+    sent_issue(&t, "First <issue>", "first-issue", false).await;
+    sent_issue(&t, "Secret", "secret", true).await;
+    let (_, draft) = api(&t, "POST", "/campaigns", Some(json!({"subject": "Draft"}))).await;
+    sqlx::query("UPDATE campaigns SET archive_slug = 'draft' WHERE id = $1")
+        .bind(uuid::Uuid::parse_str(draft["id"].as_str().unwrap()).unwrap())
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let (s, idx) = common::call(
+        &t.router,
+        common::web_req("GET", "/public/archive/weekly", "10.0.0.3", None),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{idx}");
+    assert_eq!(idx["newsletter_name"], "Shop Weekly");
+    assert_eq!(idx["signup_open"], false);
+    let issues = idx["issues"].as_array().unwrap();
+    assert_eq!(issues.len(), 1);
+    assert_eq!(
+        (issues[0]["title"].as_str(), issues[0]["slug"].as_str()),
+        (Some("First <issue>"), Some("first-issue"))
+    );
+
+    let (s, h, page) = common::call_raw(
+        &t.router,
+        common::web_req(
+            "GET",
+            "/public/archive/weekly/first-issue",
+            "10.0.0.3",
+            None,
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(h["content-type"], "text/html; charset=utf-8");
+    assert_eq!(
+        h["content-security-policy"],
+        mailrust::render::campaign::ARCHIVE_CSP
+    );
+    assert_eq!(h["x-content-type-options"], "nosniff");
+    assert!(page.contains("First &lt;issue&gt;"));
+    assert!(page.contains("Hi reader"), "merge tags show their fallback");
+    assert!(!page.contains("/o/") && !page.contains("Unsubscribe"));
+
+    for path in [
+        "/public/archive/weekly/secret",
+        "/public/archive/weekly/draft",
+        "/public/archive/weekly/nope",
+        "/public/archive/nobody/first-issue",
+    ] {
+        let (s, _, _) =
+            common::call_raw(&t.router, common::web_req("GET", path, "10.0.0.3", None)).await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "{path}");
+    }
+    let (s, _) = common::call(
+        &t.router,
+        common::req("GET", "/public/archive/weekly", None, None),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "web secret required");
+}

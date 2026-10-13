@@ -4,10 +4,13 @@ use std::net::IpAddr;
 use axum::{
     Json, Router,
     extract::{FromRequestParts, Path, State},
-    http::{StatusCode, request::Parts},
+    http::{StatusCode, header, request::Parts},
+    response::{IntoResponse, Response},
     routing::{get, post},
 };
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use sqlx::types::Json as SqlJson;
 use uuid::Uuid;
 
 use super::{
@@ -20,6 +23,7 @@ use crate::{
     error::ApiError,
     keys::hash_token,
     newsletter::{self, JOIN_PER_IP_PER_HOUR},
+    render::{blocks, campaign},
     tokens, users,
 };
 
@@ -30,6 +34,8 @@ pub fn routes() -> Router<AppState> {
         .route("/public/unsubscribe/{token}", get(unsubscribe_info))
         .route("/public/unsubscribe", post(unsubscribe))
         .route("/public/resubscribe", post(resubscribe))
+        .route("/public/archive/{slug}", get(archive_index))
+        .route("/public/archive/{slug}/{issue}", get(archive_issue))
         .route("/public/join", post(join))
         .route("/public/confirm", post(confirm))
 }
@@ -364,4 +370,95 @@ pub(crate) async fn confirm(
         .await?
         .ok_or(ApiError::BadToken)?;
     Ok(Json(ConfirmView { newsletter_name }))
+}
+
+#[derive(Serialize, utoipa::ToSchema)]
+pub struct ArchiveIssue {
+    pub title: String,
+    pub slug: String,
+    pub sent_at: DateTime<Utc>,
+}
+
+#[derive(Serialize, utoipa::ToSchema)]
+pub struct ArchiveIndex {
+    pub newsletter_name: String,
+    /// Show a Subscribe link to `/join/<slug>`.
+    pub signup_open: bool,
+    pub issues: Vec<ArchiveIssue>,
+}
+
+async fn newsletter_for(state: &AppState, slug: &str) -> Result<newsletter::Newsletter, ApiError> {
+    let slug = newsletter::normalize_slug(slug)
+        .ok()
+        .flatten()
+        .ok_or(ApiError::NotFound)?;
+    newsletter::by_slug(&state.pool, &slug)
+        .await?
+        .ok_or(ApiError::NotFound)
+}
+
+pub(crate) async fn archive_index(
+    State(state): State<AppState>,
+    _: WebCaller,
+    Path(slug): Path<String>,
+) -> Result<Json<ArchiveIndex>, ApiError> {
+    let n = newsletter_for(&state, &slug).await?;
+    let issues = sqlx::query_as!(
+        ArchiveIssue,
+        r#"SELECT subject AS title, archive_slug AS "slug!", COALESCE(finished_at, started_at, updated_at) AS "sent_at!"
+           FROM campaigns
+           WHERE account_id = $1 AND status = 'sent' AND NOT archive_hidden AND archive_slug IS NOT NULL
+           ORDER BY finished_at DESC NULLS LAST LIMIT 500"#,
+        n.account_id
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    Ok(Json(ArchiveIndex {
+        newsletter_name: n.display_name().to_string(),
+        signup_open: n.closed_reason(&state.pool).await?.is_none(),
+        issues,
+    }))
+}
+
+/// The whole page, built by the engine (no raw HTML anywhere), under a CSP with no scripts.
+pub(crate) async fn archive_issue(
+    State(state): State<AppState>,
+    _: WebCaller,
+    Path((slug, issue)): Path<(String, String)>,
+) -> Result<Response, ApiError> {
+    let n = newsletter_for(&state, &slug).await?;
+    let r = sqlx::query!(
+        r#"SELECT subject, preview_text, blocks AS "blocks: SqlJson<serde_json::Value>",
+                  COALESCE(finished_at, started_at, updated_at) AS "sent_at!"
+           FROM campaigns
+           WHERE account_id = $1 AND archive_slug = $2 AND status = 'sent' AND NOT archive_hidden"#,
+        n.account_id,
+        issue
+    )
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or(ApiError::NotFound)?;
+    let doc = blocks::parse(&r.blocks.0).map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
+    let page = campaign::archive_page(
+        &campaign::Issue {
+            subject: &r.subject,
+            preview_text: r.preview_text.as_deref(),
+            newsletter_name: n.display_name(),
+            postal_address: "",
+            doc: &doc,
+        },
+        r.sent_at,
+        n.public_slug.as_deref().unwrap_or_default(),
+        n.closed_reason(&state.pool).await?.is_none(),
+    );
+    Ok((
+        [
+            (header::CONTENT_TYPE, "text/html; charset=utf-8"),
+            (header::CONTENT_SECURITY_POLICY, campaign::ARCHIVE_CSP),
+            (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
+            (header::REFERRER_POLICY, "no-referrer"),
+        ],
+        page,
+    )
+        .into_response())
 }

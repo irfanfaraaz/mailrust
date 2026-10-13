@@ -24,7 +24,10 @@ use crate::{
         login::{LoginRequest, SessionResponse, TokenRequest},
         me::MeResponse,
         newsletter::UpdateNewsletterRequest,
-        public::{ConfirmInfo, ConfirmView, PublicJoinRequest, PublicNewsletter, UnsubscribeView},
+        public::{
+            ArchiveIndex, ArchiveIssue, ConfirmInfo, ConfirmView, PublicJoinRequest,
+            PublicNewsletter, UnsubscribeView,
+        },
         suppressions::{AddSuppressionRequest, SuppressionList, SuppressionView},
         tags::{TagList, TagRequest, TagView},
         team::{InviteRequest, RoleRequest},
@@ -297,6 +300,17 @@ fn public_confirm() {}
     responses((status = 200, body = ConfirmInfo)))]
 fn public_confirm_info() {}
 
+#[utoipa::path(get, path = "/public/archive/{slug}", tag = "public", security(),
+    params(("slug" = String, Path), ("X-Mailrust-Web" = String, Header)),
+    responses((status = 200, body = ArchiveIndex), (status = 404, body = ErrorBody), (status = 429, body = ErrorBody)))]
+fn public_archive() {}
+
+#[utoipa::path(get, path = "/public/archive/{slug}/{issue}", tag = "public", security(),
+    params(("slug" = String, Path), ("issue" = String, Path), ("X-Mailrust-Web" = String, Header)),
+    responses((status = 200, content_type = "text/html", body = String, description = "The archive page, served with a strict CSP"),
+               (status = 404, body = ErrorBody)))]
+fn public_archive_issue() {}
+
 #[utoipa::path(post, path = "/contacts/imports", tag = "audience",
     request_body(content = ImportUpload, content_type = "multipart/form-data"),
     responses((status = 201, body = ImportView), (status = 400, body = ErrorBody), (status = 413, body = ErrorBody),
@@ -383,7 +397,7 @@ fn cancel_campaign() {}
           list_contacts, export_contacts, create_contact, get_contact, update_contact, delete_contact,
           list_tags, create_tag, rename_tag, delete_tag, get_newsletter, update_newsletter,
           public_newsletter, public_unsubscribe_info, public_unsubscribe, public_resubscribe,
-          public_join, public_confirm, public_confirm_info, upload_import, list_imports, get_import,
+          public_join, public_confirm, public_confirm_info, public_archive, public_archive_issue, upload_import, list_imports, get_import,
           upload_image, public_image,
           list_campaigns, create_campaign, get_campaign, update_campaign, delete_campaign, preview_campaign, test_campaign, send_campaign,
           campaign_report, pause_campaign, resume_campaign, cancel_campaign),
@@ -394,7 +408,7 @@ fn cancel_campaign() {}
         MeResponse, MyAccount, User, MemberRole, TeamView, MemberView, InviteView, InviteRequest, RoleRequest, Overview, Counts, ErrorBody, ErrorDetail,
         ContactView, ContactList, ContactStatus, ContactSource, TagRef, CreateContactRequest, UpdateContactRequest,
         TagView, TagList, TagRequest, NewsletterSettings, UpdateNewsletterRequest,
-        PublicNewsletter, UnsubscribeView, PublicJoinRequest, ConfirmView, ConfirmInfo,
+        PublicNewsletter, UnsubscribeView, PublicJoinRequest, ConfirmView, ConfirmInfo, ArchiveIndex, ArchiveIssue,
         ImportView, ImportList, ImportStatus, ImportRowError, ImportUpload, ImageUpload, ImageUploaded,
         Campaign, CampaignStatus, CampaignRequest, CampaignSummary, CampaignList, CampaignPreview, Check,
         CampaignReport, ReportTotals, ReportRates, LinkStat, ProviderStat, WaveStat,
