@@ -1,0 +1,44 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO account_members (account_id, user_id, role) VALUES ($1, $2, $3)\n           ON CONFLICT (account_id, user_id) DO UPDATE\n             SET role = CASE WHEN account_members.role = 'owner' THEN 'owner'::member_role ELSE EXCLUDED.role END\n           RETURNING role AS \"role: MemberRole\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "role: MemberRole",
+        "type_info": {
+          "Custom": {
+            "name": "member_role",
+            "kind": {
+              "Enum": [
+                "member",
+                "owner"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        {
+          "Custom": {
+            "name": "member_role",
+            "kind": {
+              "Enum": [
+                "member",
+                "owner"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "12d041257ce465f0d3c4a54c77fc08c78c1478ecb797eb89790a2af536188fd3"
+}

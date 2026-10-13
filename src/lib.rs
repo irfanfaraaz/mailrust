@@ -1,6 +1,7 @@
 // src/lib.rs
 pub mod accounts;
 pub mod api;
+pub mod auth_tokens;
 pub mod background;
 pub mod cli;
 pub mod config;
@@ -22,5 +23,6 @@ pub mod sender;
 pub mod telemetry;
 pub mod tokens;
 pub mod tracking;
+pub mod users;
 pub mod webhooks;
 pub mod worker;

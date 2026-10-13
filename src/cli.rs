@@ -38,6 +38,9 @@ enum Command {
     /// Manage sending domains
     #[command(subcommand)]
     Domain(DomainCmd),
+    /// Manage dashboard users
+    #[command(subcommand)]
+    User(UserCmd),
     /// Run the API and/or the background workers
     Serve {
         #[arg(long, value_enum, default_value_t = Role::All)]
@@ -82,6 +85,18 @@ enum DomainCmd {
 }
 
 #[derive(Subcommand)]
+enum UserCmd {
+    /// Give someone dashboard access to an account (no email is sent). Safe to run again.
+    Invite {
+        email: String,
+        #[arg(long)]
+        account: Uuid,
+        #[arg(long, value_enum, default_value_t = crate::users::MemberRole::Member)]
+        role: crate::users::MemberRole,
+    },
+}
+
+#[derive(Subcommand)]
 enum KeyCmd {
     /// Create a key. It is printed once and never shown again.
     Create {
@@ -110,6 +125,21 @@ pub async fn run() -> anyhow::Result<()> {
         }
         Command::Account(cmd) => account_cmd(&pool, &config, cmd).await?,
         Command::Key(cmd) => key_cmd(&pool, cmd).await?,
+        Command::User(UserCmd::Invite {
+            email,
+            account,
+            role,
+        }) => {
+            accounts::get(&pool, account)
+                .await?
+                .ok_or_else(|| anyhow::anyhow!("no account {account}"))?;
+            let (user, role) = crate::users::invite_direct(&pool, &email, account, role).await?;
+            // Task 2 swaps the literal for config.web_url.
+            println!(
+                "{} is {:?} of {account}. Log in at <WEB_URL>/login",
+                user.email, role
+            );
+        }
         Command::Domain(DomainCmd::Add {
             account,
             name,

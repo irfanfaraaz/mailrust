@@ -7,15 +7,21 @@ async fn migrations_create_every_table(pool: sqlx::PgPool) {
     .await
     .unwrap();
     for t in [
+        "account_members",
         "accounts",
         "api_keys",
         "attachments",
         "domains",
         "email_events",
         "emails",
+        "invites",
+        "login_requests",
+        "login_tokens",
         "sender_quota",
+        "sessions",
         "sns_messages",
         "suppressions",
+        "users",
         "webhook_deliveries",
         "webhooks",
     ] {
