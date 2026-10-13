@@ -1,0 +1,140 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO campaigns (id, account_id, created_by) VALUES ($1, $2, $3)\n           RETURNING id, account_id, subject, preview_text, blocks AS \"blocks: Json<serde_json::Value>\",\n                     include_tags, exclude_tags, status AS \"status: CampaignStatus\", send_at, started_at,\n                     finished_at, paused_reason, archive_slug, archive_hidden, wave, next_wave_at, created_at, updated_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "account_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "subject",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "preview_text",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "blocks: Json<serde_json::Value>",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 5,
+        "name": "include_tags",
+        "type_info": "UuidArray"
+      },
+      {
+        "ordinal": 6,
+        "name": "exclude_tags",
+        "type_info": "UuidArray"
+      },
+      {
+        "ordinal": 7,
+        "name": "status: CampaignStatus",
+        "type_info": {
+          "Custom": {
+            "name": "campaign_status",
+            "kind": {
+              "Enum": [
+                "draft",
+                "scheduled",
+                "sending",
+                "paused",
+                "sent",
+                "cancelled"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "send_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 9,
+        "name": "started_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 10,
+        "name": "finished_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 11,
+        "name": "paused_reason",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 12,
+        "name": "archive_slug",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 13,
+        "name": "archive_hidden",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 14,
+        "name": "wave",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 15,
+        "name": "next_wave_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 16,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 17,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "0733f1814cdc274df9d713e04e64b1e6203d595768cddd89c5348984d3142ff1"
+}

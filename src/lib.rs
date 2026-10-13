@@ -3,6 +3,7 @@ pub mod accounts;
 pub mod api;
 pub mod auth_tokens;
 pub mod background;
+pub mod campaigns;
 pub mod cli;
 pub mod config;
 pub mod contacts;
