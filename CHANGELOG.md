@@ -6,8 +6,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-13
+
+The dashboard and the subscriber side of the newsletter.
+
 ### Added
 
+- Contacts with status `pending`, `subscribed` or `unsubscribed`, first and last name, and free JSON fields. One audience per account, plus tags.
+- Public signup form at `/join/<slug>` with double opt-in, plus an embed snippet. The form gives the same answer for every address and has per-IP and per-address limits.
+- One-link unsubscribe at `/u/<token>`, including RFC 8058 one-click POST. Unsubscribe changes the contact status only, not the suppression list.
+- Background CSV import (up to 100,000 rows or 20 MB) that resumes after a crash, and CSV export that defuses spreadsheet formulas.
+- Endpoints for contacts, tags, imports, newsletter settings and `/public/*`, all in OpenAPI.
+- Dashboard pages for contacts, import, tags and the signup form.
 - Dashboard (`web/`) with magic-link login, teams and invites (owner/member), and the door 1 pages.
 - `GET /stats/overview`, `/emails` filters (`priority`, `since`, `until`, `q`) and `/suppressions?q=`.
 - CLI `user invite` and `openapi`.
@@ -50,5 +60,6 @@ First release: the sending API and the engine behind it.
 - The database clock stamps `send_at` for send-now emails.
 - No repeat "suppressed" events for the same email.
 
-[Unreleased]: https://github.com/irfanfaraaz/mailrust/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/irfanfaraaz/mailrust/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/irfanfaraaz/mailrust/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/irfanfaraaz/mailrust/releases/tag/v0.1.0
