@@ -6,6 +6,7 @@ use lettre::{
 };
 use uuid::Uuid;
 
+pub mod blocks;
 pub mod tracking;
 
 #[derive(Debug, Clone)]
