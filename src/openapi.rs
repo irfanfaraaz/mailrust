@@ -18,6 +18,7 @@ use crate::{
         login::{LoginRequest, SessionResponse, TokenRequest},
         me::MeResponse,
         suppressions::{AddSuppressionRequest, SuppressionList, SuppressionView},
+        tags::{TagList, TagRequest, TagView},
         team::{InviteRequest, RoleRequest},
         webhooks::{CreateWebhookRequest, WebhookList},
     },
@@ -219,6 +220,21 @@ fn update_contact() {}
     responses((status = 204), (status = 404, body = ErrorBody)))]
 fn delete_contact() {}
 
+#[utoipa::path(get, path = "/tags", tag = "audience", responses((status = 200, body = TagList)))]
+fn list_tags() {}
+
+#[utoipa::path(post, path = "/tags", tag = "audience", request_body = TagRequest,
+    responses((status = 201, body = TagView), (status = 400, body = ErrorBody), (status = 409, body = ErrorBody)))]
+fn create_tag() {}
+
+#[utoipa::path(patch, path = "/tags/{id}", tag = "audience", params(("id" = uuid::Uuid, Path)), request_body = TagRequest,
+    responses((status = 200, body = TagView), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+fn rename_tag() {}
+
+#[utoipa::path(delete, path = "/tags/{id}", tag = "audience", params(("id" = uuid::Uuid, Path)),
+    responses((status = 204), (status = 404, body = ErrorBody)))]
+fn delete_tag() {}
+
 #[derive(OpenApi)]
 #[openapi(
     info(title = "Mailrust API", version = "0.1.0", description = "Send transactional email through your own Amazon SES. Auth: `Authorization: Bearer mr_live_…` (API key), or `Bearer mr_sess_…` (dashboard session) plus `X-Mailrust-Account: <account id>`."),
@@ -226,13 +242,15 @@ fn delete_contact() {}
           delete_domain, verify_domain, create_key, list_keys, delete_key, create_webhook, list_webhooks, delete_webhook,
           list_suppressions, add_suppression, delete_suppression, health, auth_login, auth_verify, me, auth_logout, auth_logout_all,
           team_list, team_invite, team_cancel_invite, team_set_role, team_remove, invites_accept, stats_overview,
-          list_contacts, create_contact, get_contact, update_contact, delete_contact),
+          list_contacts, create_contact, get_contact, update_contact, delete_contact,
+          list_tags, create_tag, rename_tag, delete_tag),
     components(schemas(SendEmailRequest, AttachmentInput, SendResponse, BatchResponse, EmailView, EmailSummary, EmailList,
         EventView, EmailStatus, Priority, Domain, DomainStatus, DnsRecord, DomainList, CreateDomainRequest, UpdateDomainRequest,
         KeySummary, KeyAccess, CreateKeyRequest, CreatedKey, KeyList, CreateWebhookRequest, WebhookView, WebhookList,
         SuppressionView, SuppressionList, AddSuppressionRequest, SuppressionReason, AccountStatus, LoginRequest, TokenRequest, SessionResponse,
         MeResponse, MyAccount, User, MemberRole, TeamView, MemberView, InviteView, InviteRequest, RoleRequest, Overview, Counts, ErrorBody, ErrorDetail,
-        ContactView, ContactList, ContactStatus, ContactSource, TagRef, CreateContactRequest, UpdateContactRequest)),
+        ContactView, ContactList, ContactStatus, ContactSource, TagRef, CreateContactRequest, UpdateContactRequest,
+        TagView, TagList, TagRequest)),
     modifiers(&BearerAuth),
     security(("bearer" = []))
 )]
@@ -265,7 +283,7 @@ mod tests {
     #[test]
     fn the_document_lists_the_audience_routes() {
         let doc = serde_json::to_value(super::ApiDoc::openapi()).unwrap();
-        for p in ["/contacts", "/contacts/{id}"] {
+        for p in ["/contacts", "/contacts/{id}", "/tags", "/tags/{id}"] {
             assert!(doc["paths"][p].is_object(), "missing {p}");
         }
     }

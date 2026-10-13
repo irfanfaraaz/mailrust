@@ -21,6 +21,7 @@ pub mod me;
 pub mod ses;
 pub mod stats;
 pub mod suppressions;
+pub mod tags;
 pub mod team;
 pub mod webhooks;
 
@@ -65,6 +66,7 @@ pub fn router(state: AppState) -> Router {
         .merge(me::routes())
         .merge(stats::routes())
         .merge(suppressions::routes())
+        .merge(tags::routes())
         .merge(team::routes())
         .merge(crate::tracking::routes())
         .merge(crate::openapi::routes())

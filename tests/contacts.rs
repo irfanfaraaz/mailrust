@@ -225,3 +225,58 @@ async fn delete_erases_tag_links_and_confirmations(pool: sqlx::PgPool) {
     let n: i64 = sqlx::query_scalar("SELECT count(*) FROM tags").fetch_one(&pool).await.unwrap();
     assert_eq!(n, 1, "the tag itself stays");
 }
+
+#[sqlx::test]
+async fn tags_create_rename_count_and_delete(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    let call = |m: &'static str, uri: String, body: Option<Value>| {
+        let r = common::req(m, &uri, Some(&t.key), body);
+        let router = t.router.clone();
+        async move { common::call(&router, r).await }
+    };
+    let (s, vip) = call("POST", "/tags".into(), Some(json!({"name": "  VIP "}))).await;
+    assert_eq!(s, StatusCode::CREATED, "{vip}");
+    assert_eq!(vip["name"], "VIP");
+    let (s, b) = call("POST", "/tags".into(), Some(json!({"name": "vip"}))).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    assert_eq!(b["error"]["code"], "tag_exists");
+    let (s, _) = call("POST", "/tags".into(), Some(json!({"name": " "}))).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+
+    add(&t, json!({"email": "a@x.com", "tags": ["vip"]})).await;
+    let (_, list) = call("GET", "/tags".into(), None).await;
+    assert_eq!(list["data"][0]["contacts"], 1);
+
+    let (_, news) = call("POST", "/tags".into(), Some(json!({"name": "News"}))).await;
+    let vip_uri = format!("/tags/{}", vip["id"].as_str().unwrap());
+    let (s, b) = call("PATCH", vip_uri.clone(), Some(json!({"name": "news"}))).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{b}");
+    let (s, b) = call("PATCH", vip_uri.clone(), Some(json!({"name": "Members"}))).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(b["name"], "Members");
+    let (s, b) = call("PATCH", vip_uri.clone(), Some(json!({"name": "members"}))).await;
+    assert_eq!(s, StatusCode::OK, "renaming a tag to its own name in another case is fine: {b}");
+
+    let (s, _) = call("DELETE", vip_uri.clone(), None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM contact_tags").fetch_one(&pool).await.unwrap();
+    assert_eq!(n, 0);
+    // The test key has used its 10 requests a second; a second key of the same account asks again.
+    let key2 = mailrust::keys::create(&pool, t.account.id, "k2", mailrust::keys::KeyAccess::Full).await.unwrap().token;
+    let (s, _) = common::call(&t.router, common::req("DELETE", &vip_uri, Some(&key2), None)).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    assert!(news["id"].is_string());
+}
+
+#[sqlx::test]
+async fn another_accounts_tag_is_not_found(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    let other = mailrust::accounts::create(&pool, "Other").await.unwrap();
+    let key = mailrust::keys::create(&pool, other.id, "k", mailrust::keys::KeyAccess::Full).await.unwrap().token;
+    let (_, tag) = common::call(&t.router, common::req("POST", "/tags", Some(&t.key), Some(json!({"name": "A"})))).await;
+    let uri = format!("/tags/{}", tag["id"].as_str().unwrap());
+    let (s, _) = common::call(&t.router, common::req("PATCH", &uri, Some(&key), Some(json!({"name": "B"})))).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (s, _) = common::call(&t.router, common::req("DELETE", &uri, Some(&key), None)).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+}
