@@ -19,6 +19,7 @@ pub mod login;
 pub mod me;
 pub mod ses;
 pub mod suppressions;
+pub mod team;
 pub mod webhooks;
 
 // shortcut: in-memory, per process; keys never expire from the map. Fine for one API process.
@@ -60,6 +61,7 @@ pub fn router(state: AppState) -> Router {
         .merge(login::routes())
         .merge(me::routes())
         .merge(suppressions::routes())
+        .merge(team::routes())
         .merge(crate::tracking::routes())
         .merge(crate::openapi::routes())
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))

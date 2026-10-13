@@ -17,6 +17,7 @@ use crate::{
         login::{LoginRequest, SessionResponse, TokenRequest},
         me::MeResponse,
         suppressions::{AddSuppressionRequest, SuppressionList, SuppressionView},
+        team::{InviteRequest, RoleRequest},
         webhooks::{CreateWebhookRequest, WebhookList},
     },
     domains::{Domain, DomainStatus},
@@ -27,6 +28,7 @@ use crate::{
     keys::{KeyAccess, KeySummary},
     safety::SuppressionReason,
     sender::DnsRecord,
+    team::{InviteView, MemberView, TeamView},
     users::{MemberRole, MyAccount, User},
     webhooks::WebhookView,
 };
@@ -160,17 +162,42 @@ fn auth_logout() {}
 #[utoipa::path(post, path = "/auth/logout-all", tag = "dashboard", responses((status = 204), (status = 401, body = ErrorBody)))]
 fn auth_logout_all() {}
 
+#[utoipa::path(get, path = "/team", tag = "dashboard",
+    responses((status = 200, body = TeamView), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody)))]
+fn team_list() {}
+
+#[utoipa::path(post, path = "/team/invites", tag = "dashboard", request_body = InviteRequest,
+    responses((status = 201, body = InviteView), (status = 400, body = ErrorBody), (status = 403, body = ErrorBody), (status = 409, body = ErrorBody)))]
+fn team_invite() {}
+
+#[utoipa::path(delete, path = "/team/invites/{id}", tag = "dashboard", params(("id" = uuid::Uuid, Path)),
+    responses((status = 204), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody)))]
+fn team_cancel_invite() {}
+
+#[utoipa::path(patch, path = "/team/members/{user_id}", tag = "dashboard", params(("user_id" = uuid::Uuid, Path)), request_body = RoleRequest,
+    responses((status = 200, body = MemberView), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+fn team_set_role() {}
+
+#[utoipa::path(delete, path = "/team/members/{user_id}", tag = "dashboard", params(("user_id" = uuid::Uuid, Path)),
+    responses((status = 204), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+fn team_remove() {}
+
+#[utoipa::path(post, path = "/invites/accept", tag = "dashboard", security(), request_body = TokenRequest,
+    responses((status = 200, body = SessionResponse), (status = 401, body = ErrorBody)))]
+fn invites_accept() {}
+
 #[derive(OpenApi)]
 #[openapi(
     info(title = "Mailrust API", version = "0.1.0", description = "Send transactional email through your own Amazon SES. Auth: `Authorization: Bearer mr_live_…` (API key), or `Bearer mr_sess_…` (dashboard session) plus `X-Mailrust-Account: <account id>`."),
     paths(send_email, send_batch, list_emails, get_email, cancel_email, create_domain, list_domains, get_domain, update_domain,
           delete_domain, verify_domain, create_key, list_keys, delete_key, create_webhook, list_webhooks, delete_webhook,
-          list_suppressions, add_suppression, delete_suppression, health, auth_login, auth_verify, me, auth_logout, auth_logout_all),
+          list_suppressions, add_suppression, delete_suppression, health, auth_login, auth_verify, me, auth_logout, auth_logout_all,
+          team_list, team_invite, team_cancel_invite, team_set_role, team_remove, invites_accept),
     components(schemas(SendEmailRequest, AttachmentInput, SendResponse, BatchResponse, EmailView, EmailSummary, EmailList,
         EventView, EmailStatus, Priority, Domain, DomainStatus, DnsRecord, DomainList, CreateDomainRequest, UpdateDomainRequest,
         KeySummary, KeyAccess, CreateKeyRequest, CreatedKey, KeyList, CreateWebhookRequest, WebhookView, WebhookList,
         SuppressionView, SuppressionList, AddSuppressionRequest, SuppressionReason, AccountStatus, LoginRequest, TokenRequest, SessionResponse,
-        MeResponse, MyAccount, User, MemberRole, ErrorBody, ErrorDetail)),
+        MeResponse, MyAccount, User, MemberRole, TeamView, MemberView, InviteView, InviteRequest, RoleRequest, ErrorBody, ErrorDetail)),
     modifiers(&BearerAuth),
     security(("bearer" = []))
 )]

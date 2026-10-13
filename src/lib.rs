@@ -22,6 +22,7 @@ pub mod safety;
 pub mod sender;
 pub mod sessions;
 pub mod system_mail;
+pub mod team;
 pub mod telemetry;
 pub mod tokens;
 pub mod tracking;
