@@ -134,10 +134,11 @@ pub async fn run() -> anyhow::Result<()> {
                 .await?
                 .ok_or_else(|| anyhow::anyhow!("no account {account}"))?;
             let (user, role) = crate::users::invite_direct(&pool, &email, account, role).await?;
-            // Task 2 swaps the literal for config.web_url.
             println!(
-                "{} is {:?} of {account}. Log in at <WEB_URL>/login",
-                user.email, role
+                "{} is {:?} of {account}. Log in at {}/login",
+                user.email,
+                role,
+                config.web_base()
             );
         }
         Command::Domain(DomainCmd::Add {
@@ -173,6 +174,9 @@ pub async fn run() -> anyhow::Result<()> {
         Command::Serve { role } => {
             let sender = sender::from_config(&config).await?;
             let state = crate::api::AppState::new(pool, config, sender);
+            if let Some(problem) = crate::system_mail::setup_problem(&state).await? {
+                tracing::warn!(%problem, "dashboard login emails will not be sent until this is fixed");
+            }
             let shutdown = tokio_util::sync::CancellationToken::new();
             let mut tasks = tokio::task::JoinSet::new();
             if role != Role::Worker {

@@ -207,3 +207,20 @@ pub async fn seed_emails(
     .bind(account_id).bind(priority).bind(status).bind(n).bind(hours_ago * 3600.0)
     .fetch_all(pool).await.unwrap()
 }
+
+/// Makes `t.account` the system sender with `from`, its domain verified.
+pub async fn with_system_sender(t: &mut TestApp, from: &str) {
+    let domain = from
+        .rsplit('@')
+        .next()
+        .unwrap()
+        .trim_end_matches('>')
+        .to_string();
+    verified_domain(t, &domain).await;
+    let mut config = (*t.state.config).clone();
+    config.system_account_id = Some(t.account.id);
+    config.system_from = Some(from.to_string());
+    config.web_url = "http://app.test".parse().unwrap();
+    t.state.config = std::sync::Arc::new(config);
+    t.router = api::router(t.state.clone());
+}

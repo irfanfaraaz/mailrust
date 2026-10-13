@@ -20,6 +20,7 @@ pub mod quota;
 pub mod render;
 pub mod safety;
 pub mod sender;
+pub mod system_mail;
 pub mod telemetry;
 pub mod tokens;
 pub mod tracking;
