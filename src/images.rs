@@ -41,8 +41,8 @@ pub enum ImageError {
 pub trait ImageStore: Send + Sync {
     async fn put(&self, account_id: Uuid, img: NewImage) -> Result<Uuid, StoreError>;
     async fn get(&self, id: Uuid) -> Result<Option<StoredImage>, StoreError>;
-    /// The owning account, without loading the bytes (block checks).
-    async fn owner(&self, id: Uuid) -> Result<Option<Uuid>, StoreError>;
+    /// Which of these ids belong to this account, without loading the bytes (block checks).
+    async fn owned(&self, account_id: Uuid, ids: &[Uuid]) -> Result<Vec<Uuid>, StoreError>;
 }
 
 /// The image type from its first bytes. SVG and everything else: None.
@@ -118,12 +118,14 @@ impl ImageStore for PgImageStore {
         .await?)
     }
 
-    async fn owner(&self, id: Uuid) -> Result<Option<Uuid>, StoreError> {
-        Ok(
-            sqlx::query_scalar!("SELECT account_id FROM images WHERE id = $1", id)
-                .fetch_optional(&self.pool)
-                .await?,
+    async fn owned(&self, account_id: Uuid, ids: &[Uuid]) -> Result<Vec<Uuid>, StoreError> {
+        Ok(sqlx::query_scalar!(
+            "SELECT id FROM images WHERE id = ANY($1) AND account_id = $2",
+            ids,
+            account_id
         )
+        .fetch_all(&self.pool)
+        .await?)
     }
 }
 

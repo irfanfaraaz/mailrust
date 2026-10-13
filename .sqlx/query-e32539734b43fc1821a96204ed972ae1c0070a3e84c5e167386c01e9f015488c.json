@@ -1,16 +1,17 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT account_id FROM images WHERE id = $1",
+  "query": "SELECT id FROM images WHERE id = ANY($1) AND account_id = $2",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "account_id",
+        "name": "id",
         "type_info": "Uuid"
       }
     ],
     "parameters": {
       "Left": [
+        "UuidArray",
         "Uuid"
       ]
     },
@@ -18,5 +19,5 @@
       false
     ]
   },
-  "hash": "dc061f70ff238133a8ee223eefa26d76b407963f6634e79104ef23760ee0af23"
+  "hash": "e32539734b43fc1821a96204ed972ae1c0070a3e84c5e167386c01e9f015488c"
 }

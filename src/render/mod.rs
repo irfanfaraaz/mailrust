@@ -80,7 +80,7 @@ pub fn render(input: &RenderInput) -> Result<Rendered, RenderError> {
             let (h, l) = tracking::apply(h, input.email_id, t)?;
             (Some(h), l)
         }
-        (h, _) => (h.map(str::to_string), Vec::new()),
+        (h, _) => (h.map(tracking::strip_skip).transpose()?, Vec::new()),
     };
 
     let mut b = Message::builder()
@@ -274,5 +274,23 @@ mod tests {
         assert_eq!(links, vec!["https://shop.com/a"]);
         assert!(out.contains(r#"href="https://app.test/u/tok""#));
         assert!(!out.contains("data-mr-skip"));
+    }
+
+    #[test]
+    fn the_skip_marker_is_stripped_with_tracking_off_or_opens_only() {
+        let to = vec!["a@x.com".to_string()];
+        let h = BTreeMap::new();
+        let html = r#"<body><a data-mr-skip href="https://app.test/u/tok">Unsubscribe</a></body>"#;
+        let opens = Tracking {
+            base_url: "https://m.test".into(),
+            secret: S,
+            opens: true,
+            clicks: false,
+        };
+        for t in [None, Some(opens)] {
+            let s = text(&render(&input(&to, &h, &[], Some(html), t)).unwrap());
+            assert!(s.contains("https://app.test/u/tok"));
+            assert!(!s.contains("data-mr-skip"));
+        }
     }
 }

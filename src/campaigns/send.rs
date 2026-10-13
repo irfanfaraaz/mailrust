@@ -85,16 +85,17 @@ async fn start_one(state: &AppState, id: Uuid, now: DateTime<Utc>) -> anyhow::Re
     }
     let report = checks::run(state, &c).await?;
     if !report.passed() {
+        // Back to draft (not paused): a draft can be fixed, deleted or sent again. The reason stays for the editor.
         let reason = format!("checks failed at start: {}", report.failed_messages());
         sqlx::query!(
-            "UPDATE campaigns SET status = 'paused', paused_reason = $2, updated_at = now() WHERE id = $1",
+            "UPDATE campaigns SET status = 'draft', send_at = NULL, paused_reason = $2, updated_at = now() WHERE id = $1",
             id,
             reason
         )
         .execute(&mut *tx)
         .await?;
         tx.commit().await?;
-        tracing::warn!(campaign_id = %id, "scheduled campaign failed its checks at start");
+        tracing::warn!(campaign_id = %id, "scheduled campaign failed its checks at start; back to draft");
         return Ok(());
     }
     if start(&mut tx, &c, now).await? {
@@ -360,27 +361,39 @@ async fn pause_for_paused_accounts(state: &AppState) -> anyhow::Result<()> {
     .fetch_all(&state.pool)
     .await?;
     for r in rows {
-        let mut tx = state.pool.begin().await?;
-        if let Some(c) = lock_skip(&mut tx, r.id).await?
-            && c.status == CampaignStatus::Sending
-        {
-            pause_in_tx(
-                &mut tx,
-                r.id,
-                &format!("the account is paused: {}", r.reason),
-            )
-            .await?;
-            tx.commit().await?;
-            tracing::warn!(campaign_id = %r.id, "campaign paused with its account");
+        if let Err(e) = pause_one(state, r.id, &r.reason).await {
+            tracing::error!(campaign_id = %r.id, error = ?e, "pausing a campaign with its account failed");
         }
+    }
+    Ok(())
+}
+
+async fn pause_one(state: &AppState, id: Uuid, account_reason: &str) -> sqlx::Result<()> {
+    let mut tx = state.pool.begin().await?;
+    if let Some(c) = lock_skip(&mut tx, id).await?
+        && c.status == CampaignStatus::Sending
+    {
+        pause_in_tx(
+            &mut tx,
+            id,
+            &format!("the account is paused: {account_reason}"),
+        )
+        .await?;
+        tx.commit().await?;
+        tracing::warn!(campaign_id = %id, "campaign paused with its account");
     }
     Ok(())
 }
 
 /// One round of the campaign loop. `now` is the test hook: tests move it instead of sleeping.
 pub async fn tick(state: &AppState, now: DateTime<Utc>) -> anyhow::Result<()> {
-    pause_for_paused_accounts(state).await?;
-    start_due(state, now, None).await?;
+    // Each part logs its own failure and the round goes on: one bad row must not stop all sending.
+    if let Err(e) = pause_for_paused_accounts(state).await {
+        tracing::error!(error = ?e, "pausing campaigns of paused accounts failed");
+    }
+    if let Err(e) = start_due(state, now, None).await {
+        tracing::error!(error = ?e, "starting due campaigns failed");
+    }
     let sending = sqlx::query_scalar!(
         "SELECT id FROM campaigns WHERE status = 'sending' ORDER BY next_wave_at NULLS FIRST LIMIT 100"
     )

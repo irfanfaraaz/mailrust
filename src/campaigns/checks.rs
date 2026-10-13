@@ -87,6 +87,8 @@ pub async fn sender(pool: &PgPool, account_id: Uuid) -> anyhow::Result<Option<Se
 
 pub struct Report {
     pub checks: Vec<Check>,
+    /// HTML bytes of the largest copy (None until the body is a valid document).
+    pub size: Option<usize>,
     pub warnings: Vec<String>,
     pub audience: Audience,
     /// The parsed document (None only when it is not a document at all).
@@ -153,13 +155,8 @@ pub async fn run(state: &AppState, c: &Campaign) -> anyhow::Result<Report> {
         Some(d) => match blocks::validate(d) {
             Err(e) => check(e.code(), false, e.to_string()),
             Ok(()) => {
-                let mut missing = false;
-                for id in blocks::image_ids(d) {
-                    if state.images.owner(id).await? != Some(c.account_id) {
-                        missing = true;
-                    }
-                }
-                if missing {
+                let ids = blocks::image_ids(d); // unique
+                if state.images.owned(c.account_id, &ids).await?.len() != ids.len() {
                     check(
                         "image_not_found",
                         false,
@@ -171,6 +168,13 @@ pub async fn run(state: &AppState, c: &Campaign) -> anyhow::Result<Report> {
             }
         },
     };
+    let tracking_base = match &sender {
+        Some(s) => domains::get_by_id(pool, s.domain_id)
+            .await?
+            .map(|d| crate::worker::tracking_base(&state.config, &d)),
+        None => None,
+    }
+    .unwrap_or_else(|| state.config.public_base());
     let size = match &doc {
         Some(d) => {
             let issue = Issue {
@@ -183,6 +187,7 @@ pub async fn run(state: &AppState, c: &Campaign) -> anyhow::Result<Report> {
             Some(campaign::email_size(
                 &issue,
                 &state.config.web_base(),
+                &tracking_base,
                 &state.config.tracking_secret,
             )?)
         }
@@ -268,6 +273,7 @@ pub async fn run(state: &AppState, c: &Campaign) -> anyhow::Result<Report> {
     };
     Ok(Report {
         checks,
+        size,
         warnings,
         audience,
         doc,

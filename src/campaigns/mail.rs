@@ -53,8 +53,8 @@ impl CampaignCache {
 
 pub enum Prepared {
     Send(EmailParts),
-    /// The reader left: mark it suppressed, never send.
-    Skip,
+    /// The reader left (the reason is logged on the email): mark it suppressed, never send.
+    Skip(&'static str),
     /// The issue was paused or cancelled after this was queued: delete it and free the reader.
     TakeBack,
 }
@@ -96,15 +96,16 @@ pub async fn prepare(state: &AppState, email: &ClaimedEmail) -> anyhow::Result<P
     .fetch_optional(&state.pool)
     .await?;
     let Some(row) = row else {
-        return Ok(Prepared::Skip);
+        return Ok(Prepared::Skip("campaign deleted"));
     };
     if row.status != CampaignStatus::Sending {
         return Ok(Prepared::TakeBack);
     }
-    let (Some(contact_id), Some(ContactStatus::Subscribed)) =
-        (email.contact_id, row.contact_status)
-    else {
-        return Ok(Prepared::Skip);
+    let contact_id = match (email.contact_id, row.contact_status) {
+        (Some(id), Some(ContactStatus::Subscribed)) => id,
+        (Some(_), Some(ContactStatus::Unsubscribed)) => return Ok(Prepared::Skip("unsubscribed")),
+        (Some(_), Some(ContactStatus::Pending)) => return Ok(Prepared::Skip("not subscribed")),
+        (None, _) | (_, None) => return Ok(Prepared::Skip("contact deleted")),
     };
     let c = cached(state, campaign_id).await?;
     let data = MergeData {

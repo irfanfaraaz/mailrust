@@ -95,16 +95,20 @@ async fn after_batch(state: &AppState, accounts: HashSet<Uuid>) {
     }
 }
 
+/// Where tracked links and the open pixel of this domain's emails point.
+pub fn tracking_base(config: &Config, domain: &Domain) -> String {
+    match (&domain.tracking_subdomain, domain.tracking_verified) {
+        (Some(host), true) => format!("https://{host}"),
+        _ => config.public_base(),
+    }
+}
+
 fn tracking_for<'a>(config: &'a Config, domain: &Domain) -> Option<Tracking<'a>> {
     if !domain.open_tracking && !domain.click_tracking {
         return None;
     }
-    let base_url = match (&domain.tracking_subdomain, domain.tracking_verified) {
-        (Some(host), true) => format!("https://{host}"),
-        _ => config.public_base(),
-    };
     Some(Tracking {
-        base_url,
+        base_url: tracking_base(config, domain),
         secret: &config.tracking_secret,
         opens: domain.open_tracking,
         clicks: domain.click_tracking,
@@ -138,8 +142,8 @@ async fn process(
         None => None,
         Some(_) => match crate::campaigns::mail::prepare(state, &email).await? {
             crate::campaigns::mail::Prepared::Send(parts) => Some(parts),
-            crate::campaigns::mail::Prepared::Skip => {
-                queue::mark_skipped(pool, &email, "unsubscribed").await?;
+            crate::campaigns::mail::Prepared::Skip(reason) => {
+                queue::mark_skipped(pool, &email, reason).await?;
                 return Ok(());
             }
             crate::campaigns::mail::Prepared::TakeBack => {

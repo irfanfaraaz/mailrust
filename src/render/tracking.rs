@@ -44,6 +44,11 @@ pub fn apply(
             }
             Ok(())
         }));
+    } else {
+        handlers.push(element!("a[data-mr-skip]", |el| {
+            el.remove_attribute("data-mr-skip");
+            Ok(())
+        }));
     }
     if t.opens {
         handlers.push(element!("body", |el| {
@@ -65,4 +70,22 @@ pub fn apply(
         out.push_str(&pixel);
     }
     Ok((out, links.into_inner()))
+}
+
+/// No tracking: only drop the unsubscribe link's marker (it means nothing to a mail client).
+pub fn strip_skip(html: &str) -> Result<String, RenderError> {
+    if !html.contains("data-mr-skip") {
+        return Ok(html.to_string());
+    }
+    rewrite_str(
+        html,
+        RewriteStrSettings {
+            element_content_handlers: vec![element!("a[data-mr-skip]", |el| {
+                el.remove_attribute("data-mr-skip");
+                Ok(())
+            })],
+            ..RewriteStrSettings::new()
+        },
+    )
+    .map_err(|e| RenderError::Html(e.to_string()))
 }

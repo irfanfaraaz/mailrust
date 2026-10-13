@@ -1,6 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -20,24 +20,33 @@ export function SendDialog({ account, campaign, tags, beforeOpen }: Props) {
   const [at, setAt] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const key = (inc: string[], exc: string[]) => JSON.stringify([[...inc].sort(), [...exc].sort()]);
+  const saved = useRef(key(campaign.include_tags, campaign.exclude_tags));
 
   useEffect(() => {
     if (!open) return;
     let live = true;
     (async () => {
       await beforeOpen?.();
-      const r = await setAudience(account, campaign.id, some ? include : [], exclude);
-      if (r.error) return live && setError(r.error);
+      const inc = some ? include : [];
+      // Same audience: no PATCH (it would be a no-op, and a scheduled issue must stay scheduled).
+      if (key(inc, exclude) !== saved.current) {
+        const r = await setAudience(account, campaign.id, inc, exclude);
+        if (r.error) return live && setError(r.error);
+        saved.current = key(inc, exclude);
+        if (campaign.status === "scheduled") router.refresh();
+      }
       const p = await previewCampaign(account, campaign.id);
       if (live) setPreview(p);
     })();
     return () => { live = false; };
-  }, [open, some, include, exclude, account, campaign.id, beforeOpen]);
+  }, [open, some, include, exclude, account, campaign.id, campaign.status, router, beforeOpen]);
 
   const toggle = (list: string[], set: (v: string[]) => void, id: string) => set(list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
   const ready = preview !== null && preview.checks.every((c) => c.ok);
   const go = async (sendAt?: string) => {
     setPending(true);
+    await beforeOpen?.(); // pending edits go out with the send
     const r = await changeStatus(account, campaign.id, "send", sendAt);
     setPending(false);
     if (r.error) return setError(r.error);

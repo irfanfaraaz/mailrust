@@ -19,6 +19,7 @@ export default function Confirm({ params }: Props) {
 
 async function Form({ params }: Props) {
   const { token } = await params;
-  const info = await engine<Schemas["ConfirmInfo"]>(`/public/confirm/${encodeURIComponent(token)}`, { auth: false });
-  return <ConfirmForm token={token} name={info.newsletter_name ?? null} slug={info.signup_slug ?? null} />;
+  // The name is a nicety: if the lookup fails (429, outage), still show the Confirm button.
+  const info = await engine<Schemas["ConfirmInfo"]>(`/public/confirm/${encodeURIComponent(token)}`, { auth: false }).catch(() => null);
+  return <ConfirmForm token={token} name={info?.newsletter_name ?? null} slug={info?.signup_slug ?? null} />;
 }

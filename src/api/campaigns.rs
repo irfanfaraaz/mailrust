@@ -87,14 +87,6 @@ async fn to_edit(
         }
         blocks::parse(b).map_err(|e| v(e.to_string()))?;
     }
-    for ids in [&body.include_tags, &body.exclude_tags]
-        .into_iter()
-        .flatten()
-    {
-        if campaigns::foreign_tags(&state.pool, account_id, ids).await? {
-            return Err(v("a tag in the audience does not exist".into()));
-        }
-    }
     let dedupe = |ids: Option<Vec<Uuid>>| {
         ids.map(|mut x| {
             x.sort();
@@ -102,6 +94,12 @@ async fn to_edit(
             x
         })
     };
+    let (include_tags, exclude_tags) = (dedupe(body.include_tags), dedupe(body.exclude_tags));
+    for ids in [&include_tags, &exclude_tags].into_iter().flatten() {
+        if campaigns::foreign_tags(&state.pool, account_id, ids).await? {
+            return Err(v("a tag in the audience does not exist".into()));
+        }
+    }
     Ok(Edit {
         subject: body
             .subject
@@ -116,8 +114,8 @@ async fn to_edit(
             .transpose()
             .map_err(v)?,
         blocks: body.blocks,
-        include_tags: dedupe(body.include_tags),
-        exclude_tags: dedupe(body.exclude_tags),
+        include_tags,
+        exclude_tags,
         archive_hidden: body.archive_hidden,
     })
 }
@@ -138,16 +136,23 @@ pub(crate) async fn list(
     let limit = q.limit.unwrap_or(50).clamp(1, 100);
     let data = sqlx::query_as!(
         CampaignSummary,
-        r#"SELECT c.id, c.subject, c.status AS "status: CampaignStatus", c.send_at, c.started_at, c.finished_at,
-                  c.created_at, c.updated_at,
-                  (SELECT count(*) FROM emails e WHERE e.campaign_id = c.id) AS "recipients!",
-                  (SELECT count(DISTINCT v.email_id) FROM email_events v JOIN emails e ON e.id = v.email_id
-                   WHERE e.campaign_id = c.id AND v.type = 'opened' AND NOT v.likely_bot) AS "opened!",
-                  (SELECT count(DISTINCT v.email_id) FROM email_events v JOIN emails e ON e.id = v.email_id
-                   WHERE e.campaign_id = c.id AND v.type = 'clicked' AND NOT v.likely_bot) AS "clicked!"
-           FROM campaigns c
-           WHERE c.account_id = $1 AND ($2::uuid IS NULL OR c.id < $2)
-           ORDER BY c.id DESC LIMIT $3"#,
+        r#"WITH page AS (
+             SELECT * FROM campaigns c
+             WHERE c.account_id = $1 AND ($2::uuid IS NULL OR c.id < $2)
+             ORDER BY c.id DESC LIMIT $3
+           ), counts AS (
+             SELECT e.campaign_id, count(DISTINCT e.id) AS recipients,
+                    count(DISTINCT v.email_id) FILTER (WHERE v.type = 'opened' AND NOT v.likely_bot) AS opened,
+                    count(DISTINCT v.email_id) FILTER (WHERE v.type = 'clicked' AND NOT v.likely_bot) AS clicked
+             FROM emails e LEFT JOIN email_events v ON v.email_id = e.id AND v.type IN ('opened', 'clicked')
+             WHERE e.campaign_id IN (SELECT id FROM page)
+             GROUP BY e.campaign_id
+           )
+           SELECT p.id, p.subject, p.status AS "status: CampaignStatus", p.send_at, p.started_at, p.finished_at,
+                  p.created_at, p.updated_at, COALESCE(n.recipients, 0) AS "recipients!",
+                  COALESCE(n.opened, 0) AS "opened!", COALESCE(n.clicked, 0) AS "clicked!"
+           FROM page p LEFT JOIN counts n ON n.campaign_id = p.id
+           ORDER BY p.id DESC"#,
         auth.account_id(),
         q.after,
         limit
@@ -263,7 +268,7 @@ pub(crate) async fn preview(
     auth.require_full()?;
     let c = load(&state, &auth, id).await?;
     let r = campaigns::checks::run(&state, &c).await?;
-    let (html, text, fallback, size_bytes) = match &r.doc {
+    let (html, text, fallback) = match &r.doc {
         Some(doc) => {
             let issue = crate::render::campaign::Issue {
                 subject: &c.subject,
@@ -278,20 +283,14 @@ pub(crate) async fn preview(
                 &state.config.web_base(),
                 Some("#"),
             );
-            let size = crate::render::campaign::email_size(
-                &issue,
-                &state.config.web_base(),
-                &state.config.tracking_secret,
-            )
-            .ok();
-            (p.html, p.text, blocks::first_name_fallback(doc), size)
+            (p.html, p.text, blocks::first_name_fallback(doc))
         }
-        None => (String::new(), String::new(), None, None),
+        None => (String::new(), String::new(), None),
     };
     Ok(Json(CampaignPreview {
         html,
         text,
-        size_bytes,
+        size_bytes: r.size,
         waves: campaigns::plan::wave_sizes(r.audience.readers as usize),
         readers: r.audience.readers,
         missing_first_name: r.audience.missing_first_name,

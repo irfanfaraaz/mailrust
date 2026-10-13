@@ -205,10 +205,21 @@ async fn the_store_knows_the_owner(pool: sqlx::PgPool) {
     let t = common::app(pool).await;
     let (_, b) = upload(&t, &common::png_1x1(), "image/png").await;
     let id: uuid::Uuid = b["id"].as_str().unwrap().parse().unwrap();
-    assert_eq!(t.state.images.owner(id).await.unwrap(), Some(t.account.id));
+    let stranger = uuid::Uuid::now_v7();
     assert_eq!(
-        t.state.images.owner(uuid::Uuid::now_v7()).await.unwrap(),
-        None
+        t.state
+            .images
+            .owned(t.account.id, &[id, stranger])
+            .await
+            .unwrap(),
+        vec![id]
+    );
+    let other = mailrust::accounts::create(&t.state.pool, "Other")
+        .await
+        .unwrap();
+    assert_eq!(
+        t.state.images.owned(other.id, &[id]).await.unwrap(),
+        Vec::<uuid::Uuid>::new()
     );
 }
 
@@ -395,6 +406,65 @@ async fn only_drafts_and_scheduled_issues_can_change(pool: sqlx::PgPool) {
         (s, b["error"]["code"].as_str()),
         (StatusCode::CONFLICT, Some("campaign_not_draft"))
     );
+}
+
+#[sqlx::test]
+async fn a_no_op_patch_keeps_the_schedule(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    let tag: uuid::Uuid = sqlx::query_scalar(
+        "INSERT INTO tags (id, account_id, name) VALUES (gen_random_uuid(), $1, 'vip') RETURNING id",
+    )
+    .bind(t.account.id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let same = json!({
+        "subject": "Hi", "preview_text": "Soon", "blocks": doc_with("Hello"),
+        "include_tags": [tag], "exclude_tags": []
+    });
+    let (_, c) = api(&t, "POST", "/campaigns", Some(same.clone())).await;
+    let id: uuid::Uuid = c["id"].as_str().unwrap().parse().unwrap();
+    let uri = format!("/campaigns/{id}");
+    sqlx::query("UPDATE campaigns SET status = 'scheduled', send_at = now() + interval '1 day' WHERE id = $1")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    // What the dashboard sends on Preview, Send test and opening the Send dialog.
+    for body in [same, json!({"include_tags": [tag, tag]})] {
+        let (s, c) = api(&t, "PATCH", &uri, Some(body)).await;
+        assert_eq!(s, StatusCode::OK, "{c}");
+        assert_eq!(
+            (c["status"].as_str(), c["send_at"].is_null()),
+            (Some("scheduled"), false),
+            "nothing changed, so it stays scheduled"
+        );
+    }
+
+    let (_, c) = api(&t, "PATCH", &uri, Some(json!({"preview_text": ""}))).await;
+    assert_eq!(c["status"], "draft", "a real change unschedules it");
+}
+
+#[sqlx::test]
+async fn a_repeated_tag_is_not_a_foreign_tag(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    let tag: uuid::Uuid = sqlx::query_scalar(
+        "INSERT INTO tags (id, account_id, name) VALUES (gen_random_uuid(), $1, 'vip') RETURNING id",
+    )
+    .bind(t.account.id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let (s, c) = api(
+        &t,
+        "POST",
+        "/campaigns",
+        Some(json!({"include_tags": [tag, tag], "exclude_tags": [tag, tag]})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{c}");
+    assert_eq!(c["include_tags"], json!([tag]));
 }
 
 #[sqlx::test]

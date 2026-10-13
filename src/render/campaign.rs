@@ -102,7 +102,13 @@ fn long_merge_data(doc: &Doc) -> MergeData {
 }
 
 /// HTML bytes of the largest copy any reader can get: footer, opens + clicks tracking, long merge values.
-pub fn email_size(issue: &Issue, web_base: &str, secret: &[u8]) -> Result<usize, RenderError> {
+/// `tracking_base` is the one the worker uses for the sending domain (`worker::tracking_base`).
+pub fn email_size(
+    issue: &Issue,
+    web_base: &str,
+    tracking_base: &str,
+    secret: &[u8],
+) -> Result<usize, RenderError> {
     let unsubscribe = format!("{web_base}/u/{}", "x".repeat(86));
     let parts = email(
         issue,
@@ -111,7 +117,7 @@ pub fn email_size(issue: &Issue, web_base: &str, secret: &[u8]) -> Result<usize,
         Some(&unsubscribe),
     );
     let t = Tracking {
-        base_url: web_base.to_string(),
+        base_url: tracking_base.to_string(),
         secret,
         opens: true,
         clicks: true,
@@ -251,14 +257,42 @@ mod tests {
         )
         .html
         .len();
-        let measured = email_size(&issue(&d), "https://app.shop.com", S).unwrap();
+        let measured = email_size(
+            &issue(&d),
+            "https://app.shop.com",
+            "https://app.shop.com",
+            S,
+        )
+        .unwrap();
         assert!(
             measured > plain + 90,
             "a 100-char first name and the tracked links are counted"
         );
         assert!(measured < MAX_EMAIL_HTML);
         let big = parse(&json!({"type": "doc", "content": (0..1200).map(|_| json!({"type": "paragraph", "content": [{"type": "text", "text": "x".repeat(90)}]})).collect::<Vec<_>>()})).unwrap();
-        assert!(email_size(&issue(&big), "https://app.shop.com", S).unwrap() > MAX_EMAIL_HTML);
+        assert!(
+            email_size(
+                &issue(&big),
+                "https://app.shop.com",
+                "https://app.shop.com",
+                S
+            )
+            .unwrap()
+                > MAX_EMAIL_HTML
+        );
+    }
+
+    #[test]
+    fn the_size_uses_the_tracking_base_the_worker_uses() {
+        let d = doc();
+        let web = "https://app.shop.com";
+        let long = "https://a-much-longer-tracking-host.news.shop.com";
+        let short = email_size(&issue(&d), web, web, S).unwrap();
+        let tracked = email_size(&issue(&d), web, long, S).unwrap();
+        assert!(
+            tracked >= short + 2 * (long.len() - web.len()),
+            "the pixel and the click link both use the tracking base"
+        );
     }
 
     #[test]

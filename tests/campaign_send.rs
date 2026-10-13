@@ -288,7 +288,7 @@ async fn a_scheduled_issue_starts_at_its_time(pool: PgPool) {
 }
 
 #[sqlx::test]
-async fn a_scheduled_issue_that_fails_its_checks_at_start_is_paused(pool: PgPool) {
+async fn a_scheduled_issue_that_fails_its_checks_at_start_goes_back_to_draft(pool: PgPool) {
     let t = common::app(pool.clone()).await;
     ready(&t).await;
     readers(&pool, t.account.id, 3).await;
@@ -319,9 +319,113 @@ async fn a_scheduled_issue_that_fails_its_checks_at_start_is_paused(pool: PgPool
         .fetch_one(&pool)
         .await
         .unwrap();
-    assert_eq!(st, "paused");
+    assert_eq!(st, "draft", "a draft can be fixed, deleted or sent again");
     assert!(reason.unwrap().contains("postal address"));
     assert!(started.is_none());
+    let (_, c) = api(&t, "GET", &format!("/campaigns/{id}"), None).await;
+    assert!(c["send_at"].is_null());
+    let (s, _) = api(
+        &t,
+        "PATCH",
+        &format!("/campaigns/{id}"),
+        Some(json!({"subject": "Fixed"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+}
+
+#[sqlx::test]
+async fn one_failing_account_does_not_stop_the_campaign_loop(pool: PgPool) {
+    let t = common::app(pool.clone()).await;
+    ready(&t).await;
+    readers(&pool, t.account.id, 3).await;
+    let id = new_campaign(&t, json!({"subject": "Later"})).await;
+    let at = Utc::now() + Duration::hours(1);
+    api(
+        &t,
+        "POST",
+        &format!("/campaigns/{id}/send"),
+        Some(json!({"send_at": at})),
+    )
+    .await;
+
+    // Another account: sending, then paused, and its pause cannot be written.
+    let other = mailrust::accounts::create(&pool, "Other").await.unwrap();
+    let stuck: Uuid = sqlx::query_scalar(
+        "INSERT INTO campaigns (id, account_id, status, started_at) VALUES (gen_random_uuid(), $1, 'sending', now()) RETURNING id",
+    )
+    .bind(other.id).fetch_one(&pool).await.unwrap();
+    mailrust::accounts::pause(&pool, other.id, "test")
+        .await
+        .unwrap();
+    sqlx::query(&format!(
+        "CREATE FUNCTION no_pause() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
+           IF NEW.id = '{stuck}' AND NEW.status = 'paused' THEN RAISE EXCEPTION 'boom'; END IF; RETURN NEW; END $$"
+    ))
+    .execute(&pool).await.unwrap();
+    sqlx::query("CREATE TRIGGER no_pause BEFORE UPDATE ON campaigns FOR EACH ROW EXECUTE FUNCTION no_pause()")
+        .execute(&pool).await.unwrap();
+
+    send::tick(&t.state, at + Duration::seconds(1))
+        .await
+        .unwrap();
+    assert_eq!(
+        status(&pool, id).await,
+        "sending",
+        "this account's issue still starts"
+    );
+}
+
+#[sqlx::test]
+async fn an_unsubscribe_and_its_report_event_commit_together(pool: PgPool) {
+    let mut t = common::app(pool.clone()).await;
+    common::with_web_secret(&mut t);
+    ready(&t).await;
+    readers(&pool, t.account.id, 1).await;
+    let id = new_campaign(&t, json!({"subject": "Hello"})).await;
+    send_now(&t, id).await;
+    send::tick(&t.state, Utc::now()).await.unwrap(); // queued: the email row exists
+    let contact: Uuid =
+        sqlx::query_scalar("SELECT id FROM contacts WHERE email = 'r1@readers.test'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let token = tokens::sign_campaign_unsubscribe(&t.state.config.tracking_secret, contact, id);
+    let post = || {
+        common::call(
+            &t.router,
+            common::web_req(
+                "POST",
+                "/public/unsubscribe",
+                "10.0.0.9",
+                Some(json!({"token": token})),
+            ),
+        )
+    };
+    sqlx::query("CREATE FUNCTION no_events() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'boom'; END $$")
+        .execute(&pool).await.unwrap();
+    sqlx::query("CREATE TRIGGER no_events BEFORE INSERT ON email_events FOR EACH ROW EXECUTE FUNCTION no_events()")
+        .execute(&pool).await.unwrap();
+    let (s, _) = post().await;
+    assert_eq!(s, StatusCode::INTERNAL_SERVER_ERROR);
+    let st: String = sqlx::query_scalar("SELECT status::text FROM contacts WHERE id = $1")
+        .bind(contact)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        st, "subscribed",
+        "nothing changed, so the reader can press again"
+    );
+
+    sqlx::query("DROP TRIGGER no_events ON email_events")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, _) = post().await;
+    assert_eq!(s, StatusCode::OK);
+    let (_, r) = api(&t, "GET", &format!("/campaigns/{id}/report"), None).await;
+    assert_eq!(r["totals"]["unsubscribed"], 1);
 }
 
 #[sqlx::test]
@@ -552,8 +656,18 @@ async fn readers_who_left_after_the_snapshot_are_skipped_and_the_issue_finishes(
     )
     .bind(id).fetch_one(&pool).await.unwrap();
     assert_eq!(reason["reason"], "unsubscribed");
+    let reason: Value = sqlx::query_scalar(
+        "SELECT v.data FROM email_events v JOIN emails e ON e.id = v.email_id WHERE e.campaign_id = $1 AND e.to_addresses[1] = 'r2@readers.test' AND v.type = 'suppressed'",
+    )
+    .bind(id).fetch_one(&pool).await.unwrap();
+    assert_eq!(reason["reason"], "contact deleted");
     send::tick(&t.state, Utc::now()).await.unwrap();
     assert_eq!(status(&pool, id).await, "sent");
+    let (_, r) = api(&t, "GET", &format!("/campaigns/{id}/report"), None).await;
+    assert_eq!(
+        r["totals"]["unsubscribed"], 0,
+        "skips are not unsubscribes from this issue"
+    );
 }
 
 #[sqlx::test]
@@ -797,7 +911,7 @@ async fn resume_waits_for_the_other_issue_and_reruns_the_checks(pool: PgPool) {
 }
 
 #[sqlx::test]
-async fn resuming_an_issue_that_never_started_starts_it(pool: PgPool) {
+async fn an_issue_sent_back_to_draft_at_start_can_be_sent_again(pool: PgPool) {
     let t = common::app(pool.clone()).await;
     ready(&t).await;
     readers(&pool, t.account.id, 3).await;
@@ -820,7 +934,7 @@ async fn resuming_an_issue_that_never_started_starts_it(pool: PgPool) {
     send::tick(&t.state, at + Duration::seconds(1))
         .await
         .unwrap();
-    assert_eq!(status(&pool, id).await, "paused");
+    assert_eq!(status(&pool, id).await, "draft");
     api(
         &t,
         "PATCH",
@@ -828,10 +942,14 @@ async fn resuming_an_issue_that_never_started_starts_it(pool: PgPool) {
         Some(json!({"postal_address": "1 Main St"})),
     )
     .await;
-    let (s, c) = post(&t, id, "resume").await;
+    let c = send_now(&t, id).await;
     assert_eq!(
-        (s, c["status"].as_str(), c["archive_slug"].as_str()),
-        (StatusCode::OK, Some("sending"), Some("later"))
+        (
+            c["status"].as_str(),
+            c["archive_slug"].as_str(),
+            c["paused_reason"].is_null()
+        ),
+        (Some("sending"), Some("later"), true)
     );
     let n: i64 =
         sqlx::query_scalar("SELECT count(*) FROM campaign_recipients WHERE campaign_id = $1")
@@ -1020,6 +1138,14 @@ async fn the_report_counts_unique_people_per_link_and_provider(pool: PgPool) {
         (Some("Other"), Some(1))
     );
     assert_eq!(r["waves"], json!([{"wave": 1, "readers": 4, "done": 4}]));
+
+    let (_, l) = api(&t, "GET", "/campaigns", None).await;
+    let row = &l["data"][0];
+    assert_eq!(
+        (&row["recipients"], &row["opened"], &row["clicked"]),
+        (&json!(4), &json!(1), &json!(2)),
+        "the list counts what the report counts"
+    );
 }
 
 #[sqlx::test]

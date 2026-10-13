@@ -7,7 +7,6 @@ import { engine, type Schemas } from "@/lib/engine";
 import { utc } from "@/lib/format";
 import { CampaignEditor } from "./editor/campaign-editor";
 import { Report } from "./report";
-import { SendDialog } from "./send-dialog";
 
 export const metadata = { title: "Campaign" };
 
@@ -43,10 +42,9 @@ async function Body({ params }: Props) {
         <CampaignStatusBadge status={c.status} />
       </div>
       {c.status === "scheduled" && c.send_at && <p role="status" className="text-sm">Scheduled for {utc(c.send_at)}. Editing it puts it back to draft.</p>}
+      {c.status === "draft" && c.paused_reason && <p role="alert" className="text-sm text-destructive">Not sent: {c.paused_reason}</p>}
       {editable ? (
-        <CampaignEditor account={account} campaign={c} me={me.user.email}>
-          <SendDialog account={account} campaign={c} tags={tags.data} />
-        </CampaignEditor>
+        <CampaignEditor account={account} campaign={c} me={me.user.email} tags={tags.data} />
       ) : (
         <Report account={account} campaign={c} report={report!} archiveUrl={archiveUrl} />
       )}

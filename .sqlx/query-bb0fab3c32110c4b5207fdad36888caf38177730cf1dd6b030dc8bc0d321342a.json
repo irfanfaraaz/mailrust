@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH old AS (\n             SELECT id, (COALESCE($2, subject) IS DISTINCT FROM subject\n                         OR (CASE WHEN $3 THEN $4 ELSE preview_text END) IS DISTINCT FROM preview_text\n                         OR COALESCE($5, blocks) IS DISTINCT FROM blocks\n                         OR COALESCE($6, include_tags) IS DISTINCT FROM include_tags\n                         OR COALESCE($7, exclude_tags) IS DISTINCT FROM exclude_tags) AS changed\n             FROM campaigns WHERE id = $1\n           )\n           UPDATE campaigns c SET\n             subject = COALESCE($2, c.subject),\n             preview_text = CASE WHEN $3 THEN $4 ELSE c.preview_text END,\n             blocks = COALESCE($5, c.blocks),\n             include_tags = COALESCE($6, c.include_tags),\n             exclude_tags = COALESCE($7, c.exclude_tags),\n             archive_hidden = COALESCE($8, c.archive_hidden),\n             status = CASE WHEN old.changed AND c.status = 'scheduled' THEN 'draft'::campaign_status ELSE c.status END,\n             send_at = CASE WHEN old.changed AND c.status = 'scheduled' THEN NULL ELSE c.send_at END,\n             updated_at = now()\n           FROM old WHERE c.id = old.id",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Bool",
+        "Text",
+        "Jsonb",
+        "UuidArray",
+        "UuidArray",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bb0fab3c32110c4b5207fdad36888caf38177730cf1dd6b030dc8bc0d321342a"
+}

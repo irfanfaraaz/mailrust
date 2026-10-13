@@ -1,5 +1,6 @@
 "use client";
 import { EditorContent, useEditor, type JSONContent } from "@tiptap/react";
+import { useRouter } from "next/navigation";
 import StarterKit from "@tiptap/starter-kit";
 import { Placeholder } from "@tiptap/extensions";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -7,16 +8,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { Schemas } from "@/lib/engine";
 import { previewCampaign, saveDraft } from "../actions";
+import { SendDialog } from "../send-dialog";
 import { CampaignImage, EmailButton, MergeTag } from "./extensions";
 import { InsertDialogs } from "./insert-dialogs";
 import { PreviewDialog } from "./preview-dialog";
 import { SlashCommand, type DialogKind } from "./slash-menu";
 import { TestDialog } from "./test-dialog";
 
-type Props = { account: string; campaign: Schemas["Campaign"]; me: string; children?: React.ReactNode };
+type Props = { account: string; campaign: Schemas["Campaign"]; me: string; tags: Schemas["TagView"][] };
 type SaveState = "idle" | "saved" | "saving" | { error: string };
 
-export function CampaignEditor({ account, campaign, me, children }: Props) {
+export function CampaignEditor({ account, campaign, me, tags }: Props) {
+  const router = useRouter();
   const [subject, setSubject] = useState(campaign.subject);
   const [previewText, setPreviewText] = useState(campaign.preview_text ?? "");
   const [doc, setDoc] = useState<JSONContent>(campaign.blocks as JSONContent);
@@ -50,12 +53,15 @@ export function CampaignEditor({ account, campaign, me, children }: Props) {
     },
   });
 
+  // Nothing to save unless something changed: a save of a scheduled issue that changes it puts it back to draft.
   const flush = useCallback(async () => {
+    if (!dirty.current) return;
     setSave("saving");
     const r = await saveDraft(account, campaign.id, { subject, preview_text: previewText, blocks: doc });
     setSave(r.error ? { error: r.error } : "saved");
     dirty.current = Boolean(r.error);
-  }, [account, campaign.id, subject, previewText, doc]);
+    if (!r.error && campaign.status === "scheduled") router.refresh(); // the badge follows the engine
+  }, [account, campaign.id, campaign.status, router, subject, previewText, doc]);
 
   // Autosave 1.5 s after the last change.
   useEffect(() => {
@@ -87,7 +93,7 @@ export function CampaignEditor({ account, campaign, me, children }: Props) {
       <div className="flex flex-wrap items-center gap-2">
         <Button type="button" variant="outline" size="sm" onClick={async () => { await flush(); setPreview(await previewCampaign(account, campaign.id)); }}>Preview</Button>
         <TestDialog account={account} id={campaign.id} me={me} beforeSend={flush} />
-        {children /* the Send button (Task 16) */}
+        <SendDialog account={account} campaign={campaign} tags={tags} beforeOpen={flush} />
         <span role="status" className="ml-auto text-sm text-muted-foreground">
           {save === "idle" ? "" : save === "saved" ? "Saved" : save === "saving" ? "Saving…" : <span className="text-destructive">Not saved: {save.error}</span>}
         </span>

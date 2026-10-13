@@ -159,20 +159,29 @@ impl Edit {
     }
 }
 
-/// A content edit of a scheduled issue unschedules it: it is checked again when sent again.
+/// A content edit that changes a scheduled issue unschedules it: it is checked again when sent again.
+/// Saving the same values (autosave, opening the Send dialog) keeps the schedule.
 pub async fn apply(conn: &mut PgConnection, id: Uuid, e: &Edit) -> sqlx::Result<()> {
     sqlx::query!(
-        r#"UPDATE campaigns SET
-             subject = COALESCE($2, subject),
-             preview_text = CASE WHEN $3 THEN $4 ELSE preview_text END,
-             blocks = COALESCE($5, blocks),
-             include_tags = COALESCE($6, include_tags),
-             exclude_tags = COALESCE($7, exclude_tags),
-             archive_hidden = COALESCE($8, archive_hidden),
-             status = CASE WHEN $9 AND status = 'scheduled' THEN 'draft'::campaign_status ELSE status END,
-             send_at = CASE WHEN $9 AND status = 'scheduled' THEN NULL ELSE send_at END,
+        r#"WITH old AS (
+             SELECT id, (COALESCE($2, subject) IS DISTINCT FROM subject
+                         OR (CASE WHEN $3 THEN $4 ELSE preview_text END) IS DISTINCT FROM preview_text
+                         OR COALESCE($5, blocks) IS DISTINCT FROM blocks
+                         OR COALESCE($6, include_tags) IS DISTINCT FROM include_tags
+                         OR COALESCE($7, exclude_tags) IS DISTINCT FROM exclude_tags) AS changed
+             FROM campaigns WHERE id = $1
+           )
+           UPDATE campaigns c SET
+             subject = COALESCE($2, c.subject),
+             preview_text = CASE WHEN $3 THEN $4 ELSE c.preview_text END,
+             blocks = COALESCE($5, c.blocks),
+             include_tags = COALESCE($6, c.include_tags),
+             exclude_tags = COALESCE($7, c.exclude_tags),
+             archive_hidden = COALESCE($8, c.archive_hidden),
+             status = CASE WHEN old.changed AND c.status = 'scheduled' THEN 'draft'::campaign_status ELSE c.status END,
+             send_at = CASE WHEN old.changed AND c.status = 'scheduled' THEN NULL ELSE c.send_at END,
              updated_at = now()
-           WHERE id = $1"#,
+           FROM old WHERE c.id = old.id"#,
         id,
         e.subject,
         e.preview_text.is_some(),
@@ -180,8 +189,7 @@ pub async fn apply(conn: &mut PgConnection, id: Uuid, e: &Edit) -> sqlx::Result<
         e.blocks.clone().map(Json) as Option<Json<serde_json::Value>>,
         e.include_tags.as_deref(),
         e.exclude_tags.as_deref(),
-        e.archive_hidden,
-        e.touches_content()
+        e.archive_hidden
     )
     .execute(&mut *conn)
     .await?;

@@ -192,18 +192,23 @@ pub(crate) async fn unsubscribe(
             newsletter_name: None,
         }));
     };
+    // One transaction: the report event never fails after the contact already changed.
+    let mut tx = state.pool.begin().await?;
     let r = sqlx::query!(
         "UPDATE contacts SET status = 'unsubscribed', unsubscribed_at = now(), unsubscribed_via_link = true, updated_at = now()
          WHERE id = $1 AND status <> 'unsubscribed'",
         id
     )
-    .execute(&state.pool)
+    .execute(&mut *tx)
     .await?;
+    if r.rows_affected() == 1
+        && let Some(campaign_id) = campaign
+    {
+        record_unsubscribe(&mut tx, id, campaign_id).await?;
+    }
+    tx.commit().await?;
     if r.rows_affected() == 1 {
         tracing::info!(contact_id = %id, "unsubscribed by link");
-        if let Some(campaign_id) = campaign {
-            record_unsubscribe(&state, id, campaign_id).await?;
-        }
     }
     Ok(Json(UnsubscribeView {
         newsletter_name: name_of(&state, id).await?,
@@ -212,23 +217,22 @@ pub(crate) async fn unsubscribe(
 
 /// The report counts it for the issue the link came from (only when the click changed the contact).
 async fn record_unsubscribe(
-    state: &AppState,
+    conn: &mut sqlx::PgConnection,
     contact_id: Uuid,
     campaign_id: Uuid,
-) -> anyhow::Result<()> {
+) -> sqlx::Result<()> {
     let Some(e) = sqlx::query!(
         "SELECT id, account_id FROM emails WHERE campaign_id = $1 AND contact_id = $2",
         campaign_id,
         contact_id
     )
-    .fetch_optional(&state.pool)
+    .fetch_optional(&mut *conn)
     .await?
     else {
         return Ok(());
     };
-    let mut conn = state.pool.acquire().await?;
     crate::email_events::record(
-        &mut conn,
+        conn,
         crate::email_events::NewEvent {
             account_id: e.account_id,
             email_id: e.id,
