@@ -14,7 +14,7 @@ test("the sidebar groups the door 1 pages and the shared pages", async ({ page }
   await expect(nav.getByText("Sending API")).toBeVisible();
   await expect(nav.getByText("Newsletter")).toBeVisible();
   await expect(nav.getByText("Shared")).toBeVisible();
-  for (const name of ["Overview", "Emails", "API keys", "Webhooks", "Contacts", "Tags", "Signup form", "Domains", "Suppressions", "Team"]) {
+  for (const name of ["Overview", "Emails", "API keys", "Webhooks", "Campaigns", "Contacts", "Tags", "Signup form", "Domains", "Suppressions", "Team"]) {
     await expect(nav.getByRole("link", { name })).toBeVisible();
   }
 });

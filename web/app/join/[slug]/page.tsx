@@ -64,19 +64,21 @@ async function JoinForm({ params, searchParams }: Props) {
           />
           {bad && <p id="email-error" role="alert" className="text-sm text-destructive">That does not look like an email address. Check it and try again.</p>}
         </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="first_name">First name (optional)</Label>
-          <Input
-            id="first_name"
-            name="first_name"
-            autoComplete="given-name"
-            maxLength={100}
-            defaultValue={draft.first_name}
-            aria-invalid={badName || undefined}
-            aria-describedby={badName ? "first-name-error" : undefined}
-          />
-          {badName && <p id="first-name-error" role="alert" className="text-sm text-destructive">Use a first name of at most 100 characters, on one line.</p>}
-        </div>
+        {n.ask_name && (
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="first_name">First name (optional)</Label>
+            <Input
+              id="first_name"
+              name="first_name"
+              autoComplete="given-name"
+              maxLength={100}
+              defaultValue={draft.first_name}
+              aria-invalid={badName || undefined}
+              aria-describedby={badName ? "first-name-error" : undefined}
+            />
+            {badName && <p id="first-name-error" role="alert" className="text-sm text-destructive">Use a first name of at most 100 characters, on one line.</p>}
+          </div>
+        )}
         {/* Honeypot: hidden from people and screen readers; bots fill it in. */}
         <input type="text" name={HONEYPOT} tabIndex={-1} autoComplete="nope" aria-hidden="true" className="absolute -left-[9999px] size-px" />
         <Button type="submit">Subscribe</Button>

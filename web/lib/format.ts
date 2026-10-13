@@ -21,3 +21,11 @@ export function closedMessage(reason: string): { text: string; domains?: boolean
   };
   return { text: known[reason] ?? `Closed: ${reason}.` };
 }
+
+const n = (x: number) => x.toLocaleString("en-US");
+
+/** "3 contacts", or "Showing 50 of 1,234 contacts" when the list has more than one page. */
+export function contactCount(total: number, shown: number, paged: boolean): string {
+  if (paged) return `Showing ${n(shown)} of ${n(total)} contacts`;
+  return `${n(total)} ${total === 1 ? "contact" : "contacts"}`;
+}

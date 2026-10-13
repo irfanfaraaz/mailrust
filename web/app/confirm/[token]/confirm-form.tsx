@@ -5,9 +5,7 @@ import { confirmSubscription, type ConfirmState } from "./actions";
 
 const heading = "text-2xl font-semibold";
 
-// shortcut: the engine names the newsletter only after a confirm and returns no signup slug, so the
-// ask and expired states cannot name it or link back to its join page; add a GET /public/confirm/<token> to do both.
-export function ConfirmForm({ token }: { token: string }) {
+export function ConfirmForm({ token, name, slug }: { token: string; name: string | null; slug: string | null }) {
   const [state, action, pending] = useActionState<ConfirmState>(confirmSubscription.bind(null, token), {});
   if (state.name) {
     return (
@@ -27,13 +25,14 @@ export function ConfirmForm({ token }: { token: string }) {
           <p className="text-sm text-muted-foreground">
             If you confirmed before, you are already subscribed. If not, sign up again on the newsletter&apos;s signup form to get a new link.
           </p>
+          {slug && <a className="underline underline-offset-2" href={`/join/${encodeURIComponent(slug)}`}>Sign up again</a>}
         </div>
       </>
     );
   }
   return (
     <>
-      <h1 className={heading}>Confirm your subscription</h1>
+      <h1 className={heading}>{name ? `Confirm your subscription to ${name}` : "Confirm your subscription"}</h1>
       <form action={action} className="flex flex-col gap-3">
         <p>Press the button to start getting this newsletter.</p>
         <Button type="submit" disabled={pending} className="self-start">{pending ? "Confirming…" : "Confirm"}</Button>

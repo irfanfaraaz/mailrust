@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { NativeSelect } from "@/components/native-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import type { Schemas } from "@/lib/engine";
 import { saveNewsletter, type SaveState } from "./actions";
 
@@ -42,7 +43,7 @@ export function SettingsForm({ account, settings, domains, origin }: Props) {
         </p>
       ) : (
         <div className="flex flex-col gap-1">
-          <span>Confirm emails come from</span>
+          <span>Emails come from</span>
           <span className="flex items-center gap-1">
             <Input aria-label="From address" name="from_local" defaultValue={local} placeholder="hello" />
             <span aria-hidden>@</span>
@@ -50,6 +51,7 @@ export function SettingsForm({ account, settings, domains, origin }: Props) {
               {domainOptions.map((d) => <option key={d} value={d}>{d === domain && unverified ? `${d} (not verified)` : d}</option>)}
             </NativeSelect>
           </span>
+          <p className="text-muted-foreground">Confirm emails and every issue go out from this address.</p>
           {unverified && (
             <p className="text-muted-foreground">
               {domain} is not verified any more, so the form takes no signups. <Link className="underline underline-offset-2" href={`/a/${account}/domains`}>Verify it again</Link> or pick another domain.
@@ -61,6 +63,23 @@ export function SettingsForm({ account, settings, domains, origin }: Props) {
         <input type="checkbox" name="signup_enabled" defaultChecked={settings.signup_enabled} className="size-4" />
         Take signups
       </label>
+      <label className="flex items-center gap-2">
+        <input type="checkbox" name="signup_ask_name" defaultChecked={settings.signup_ask_name} className="size-4" />
+        Ask for first name
+      </label>
+      <div className="flex flex-col gap-1">
+        <label htmlFor="postal_address">Postal address</label>
+        <Textarea
+          id="postal_address"
+          name="postal_address"
+          rows={3}
+          maxLength={300}
+          defaultValue={settings.postal_address ?? ""}
+          placeholder={"Shop Ltd\n1 Main Street\nLondon"}
+          aria-describedby="postal-hint"
+        />
+        <p id="postal-hint" className="text-muted-foreground">Shown at the bottom of every issue. Most countries require it, and issues cannot be sent without it.</p>
+      </div>
       {state.error && <p role="alert" className="text-destructive">{state.error}</p>}
       <Button type="submit" disabled={pending} className="self-start">Save</Button>
     </form>

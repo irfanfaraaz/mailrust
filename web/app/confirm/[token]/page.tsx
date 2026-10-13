@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { engine, type Schemas } from "@/lib/engine";
 import { ConfirmForm } from "./confirm-form";
 
 export const metadata = { title: "Confirm your subscription" };
@@ -18,5 +19,6 @@ export default function Confirm({ params }: Props) {
 
 async function Form({ params }: Props) {
   const { token } = await params;
-  return <ConfirmForm token={token} />;
+  const info = await engine<Schemas["ConfirmInfo"]>(`/public/confirm/${encodeURIComponent(token)}`, { auth: false });
+  return <ConfirmForm token={token} name={info.newsletter_name ?? null} slug={info.signup_slug ?? null} />;
 }

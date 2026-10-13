@@ -213,6 +213,663 @@
         "security": []
       }
     },
+    "/campaigns": {
+      "get": {
+        "tags": [
+          "campaigns"
+        ],
+        "operationId": "list_campaigns",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignList"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "operationId": "create_campaign",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CampaignRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Campaign"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/campaigns/{id}": {
+      "get": {
+        "tags": [
+          "campaigns"
+        ],
+        "operationId": "get_campaign",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Campaign"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "campaigns"
+        ],
+        "operationId": "delete_campaign",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "campaigns"
+        ],
+        "operationId": "update_campaign",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CampaignRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Campaign"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/campaigns/{id}/cancel": {
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "operationId": "cancel_campaign",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Campaign"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/campaigns/{id}/pause": {
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "operationId": "pause_campaign",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Campaign"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/campaigns/{id}/preview": {
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "operationId": "preview_campaign",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignPreview"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/campaigns/{id}/report": {
+      "get": {
+        "tags": [
+          "campaigns"
+        ],
+        "operationId": "campaign_report",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignReport"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/campaigns/{id}/resume": {
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "operationId": "resume_campaign",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Campaign"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/campaigns/{id}/send": {
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "operationId": "send_campaign",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Campaign"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Named by the first failed check",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/campaigns/{id}/test": {
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "operationId": "test_campaign",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestSendRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestSendResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/contacts": {
       "get": {
         "tags": [
@@ -1186,6 +1843,76 @@
         "security": []
       }
     },
+    "/images": {
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "operationId": "upload_image",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/ImageUpload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageUploaded"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/invites/accept": {
       "post": {
         "tags": [
@@ -1335,6 +2062,122 @@
         }
       }
     },
+    "/public/archive/{slug}": {
+      "get": {
+        "tags": [
+          "public"
+        ],
+        "operationId": "public_archive",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Mailrust-Web",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArchiveIndex"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/public/archive/{slug}/{issue}": {
+      "get": {
+        "tags": [
+          "public"
+        ],
+        "operationId": "public_archive_issue",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "issue",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Mailrust-Web",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The archive page, served with a strict CSP",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
     "/public/confirm": {
       "post": {
         "tags": [
@@ -1373,6 +2216,95 @@
             }
           },
           "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/public/confirm/{token}": {
+      "get": {
+        "tags": [
+          "public"
+        ],
+        "operationId": "public_confirm_info",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Mailrust-Web",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfirmInfo"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/public/img/{id}": {
+      "get": {
+        "tags": [
+          "public"
+        ],
+        "operationId": "public_image",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Mailrust-Web",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The image bytes",
+            "content": {
+              "image/*": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
             "description": "",
             "content": {
               "application/json": {
@@ -2322,6 +3254,49 @@
           }
         }
       },
+      "ArchiveIndex": {
+        "type": "object",
+        "required": [
+          "newsletter_name",
+          "signup_open",
+          "issues"
+        ],
+        "properties": {
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArchiveIssue"
+            }
+          },
+          "newsletter_name": {
+            "type": "string"
+          },
+          "signup_open": {
+            "type": "boolean",
+            "description": "Show a Subscribe link to `/join/<slug>`."
+          }
+        }
+      },
+      "ArchiveIssue": {
+        "type": "object",
+        "required": [
+          "title",
+          "slug",
+          "sent_at"
+        ],
+        "properties": {
+          "sent_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
       "AttachmentInput": {
         "type": "object",
         "required": [
@@ -2367,6 +3342,407 @@
           }
         }
       },
+      "Campaign": {
+        "type": "object",
+        "required": [
+          "id",
+          "subject",
+          "blocks",
+          "include_tags",
+          "exclude_tags",
+          "status",
+          "archive_hidden",
+          "wave",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "archive_hidden": {
+            "type": "boolean"
+          },
+          "archive_slug": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Set when the send starts: `/p/<newsletter slug>/<archive_slug>`."
+          },
+          "blocks": {
+            "type": "object",
+            "description": "The editor document (Tiptap JSON, see `render::blocks`)."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "exclude_tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Tag ids: skip contacts with any of these."
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "include_tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Tag ids: send only to contacts with any of these (empty = everyone subscribed)."
+          },
+          "next_wave_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "paused_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "preview_text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "send_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "started_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CampaignStatus"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "wave": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The last wave started (0 = none yet)."
+          }
+        }
+      },
+      "CampaignList": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CampaignSummary"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "CampaignPreview": {
+        "type": "object",
+        "required": [
+          "html",
+          "text",
+          "checks",
+          "warnings",
+          "readers",
+          "missing_first_name",
+          "waves"
+        ],
+        "properties": {
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Check"
+            }
+          },
+          "first_name_fallback": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What readers without a first name see, when the issue greets by name."
+          },
+          "html": {
+            "type": "string",
+            "description": "The email as a reader without merge values sees it (fallbacks), footer included."
+          },
+          "missing_first_name": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "readers": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "size_bytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The largest copy any reader can get, in bytes (None until the body is a valid document).",
+            "minimum": 0
+          },
+          "text": {
+            "type": "string"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "waves": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "Readers per wave."
+          }
+        }
+      },
+      "CampaignReport": {
+        "type": "object",
+        "required": [
+          "totals",
+          "rates",
+          "links",
+          "providers",
+          "waves"
+        ],
+        "properties": {
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LinkStat"
+            }
+          },
+          "providers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProviderStat"
+            }
+          },
+          "rates": {
+            "$ref": "#/components/schemas/ReportRates"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/ReportTotals"
+          },
+          "waves": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WaveStat"
+            }
+          }
+        }
+      },
+      "CampaignRequest": {
+        "type": "object",
+        "description": "Create and edit. Absent fields stay as they are; `preview_text: \"\"` clears it.",
+        "properties": {
+          "archive_hidden": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Hide a sent issue from the public archive. Works in any status."
+          },
+          "blocks": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "The editor document (Tiptap JSON). Saved when it is a document; the full rules run at send."
+          },
+          "exclude_tags": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "include_tags": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "preview_text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "subject": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "CampaignStatus": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "scheduled",
+          "sending",
+          "paused",
+          "sent",
+          "cancelled"
+        ]
+      },
+      "CampaignSummary": {
+        "type": "object",
+        "required": [
+          "id",
+          "subject",
+          "status",
+          "created_at",
+          "updated_at",
+          "recipients",
+          "opened",
+          "clicked"
+        ],
+        "properties": {
+          "clicked": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Readers who clicked (unique, bots left out)."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "opened": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Readers who opened (unique, bots left out)."
+          },
+          "recipients": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Emails queued or sent for this issue."
+          },
+          "send_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "started_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CampaignStatus"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Check": {
+        "type": "object",
+        "required": [
+          "code",
+          "ok",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ConfirmInfo": {
+        "type": "object",
+        "properties": {
+          "newsletter_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "None when the link is unknown; a used or expired link still names the newsletter."
+          },
+          "signup_slug": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The signup form's slug, for a \"sign up again\" link."
+          }
+        }
+      },
       "ConfirmView": {
         "type": "object",
         "required": [
@@ -2381,7 +3757,8 @@
       "ContactList": {
         "type": "object",
         "required": [
-          "data"
+          "data",
+          "total"
         ],
         "properties": {
           "data": {
@@ -2396,6 +3773,11 @@
               "null"
             ],
             "format": "uuid"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Contacts matching the filters, on every page."
           }
         }
       },
@@ -2997,6 +4379,49 @@
           }
         }
       },
+      "ImageUpload": {
+        "type": "object",
+        "description": "The multipart body of `POST /images` (documentation only).",
+        "required": [
+          "file"
+        ],
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "description": "PNG, JPEG, GIF or WebP, ≤ 5 MB. The type is read from the bytes."
+          }
+        }
+      },
+      "ImageUploaded": {
+        "type": "object",
+        "required": [
+          "id",
+          "url",
+          "width",
+          "height"
+        ],
+        "properties": {
+          "height": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "url": {
+            "type": "string",
+            "description": "Where readers load it: `{WEB_URL}/img/{id}`, whatever the store."
+          },
+          "width": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
       "ImportList": {
         "type": "object",
         "required": [
@@ -3241,6 +4666,27 @@
           }
         }
       },
+      "LinkStat": {
+        "type": "object",
+        "required": [
+          "url",
+          "clicks",
+          "unique_clicks"
+        ],
+        "properties": {
+          "clicks": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "unique_clicks": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      },
       "LoginRequest": {
         "type": "object",
         "required": [
@@ -3336,6 +4782,7 @@
         "type": "object",
         "required": [
           "signup_enabled",
+          "signup_ask_name",
           "signup_open"
         ],
         "properties": {
@@ -3358,11 +4805,21 @@
               "null"
             ]
           },
+          "postal_address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Shown in the footer of every issue; required to send."
+          },
           "public_slug": {
             "type": [
               "string",
               "null"
             ]
+          },
+          "signup_ask_name": {
+            "type": "boolean"
           },
           "signup_enabled": {
             "type": "boolean"
@@ -3428,6 +4885,43 @@
           "bulk"
         ]
       },
+      "ProviderStat": {
+        "type": "object",
+        "required": [
+          "provider",
+          "sent",
+          "delivered",
+          "opened",
+          "clicked",
+          "bounced"
+        ],
+        "properties": {
+          "bounced": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "clicked": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "delivered": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "opened": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "provider": {
+            "type": "string",
+            "description": "Gmail, Outlook, Yahoo, iCloud, Proton or Other."
+          },
+          "sent": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "PublicJoinRequest": {
         "type": "object",
         "required": [
@@ -3457,15 +4951,107 @@
         "type": "object",
         "required": [
           "name",
-          "open"
+          "open",
+          "ask_name"
         ],
         "properties": {
+          "ask_name": {
+            "type": "boolean",
+            "description": "False: hide the first-name field."
+          },
           "name": {
             "type": "string"
           },
           "open": {
             "type": "boolean",
             "description": "False: show \"This newsletter is not taking signups right now.\""
+          }
+        }
+      },
+      "ReportRates": {
+        "type": "object",
+        "description": "Each over `sent`, 0..1.",
+        "required": [
+          "open_rate",
+          "click_rate",
+          "bounce_rate",
+          "unsubscribe_rate"
+        ],
+        "properties": {
+          "bounce_rate": {
+            "type": "number",
+            "format": "double"
+          },
+          "click_rate": {
+            "type": "number",
+            "format": "double"
+          },
+          "open_rate": {
+            "type": "number",
+            "format": "double"
+          },
+          "unsubscribe_rate": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "ReportTotals": {
+        "type": "object",
+        "required": [
+          "recipients",
+          "sent",
+          "delivered",
+          "bounced",
+          "complained",
+          "failed",
+          "skipped",
+          "opened",
+          "clicked",
+          "unsubscribed"
+        ],
+        "properties": {
+          "bounced": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "clicked": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "complained": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "delivered": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "opened": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "recipients": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sent": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Handed to the sender (everything but queued, failed, skipped and cancelled)."
+          },
+          "skipped": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Readers who left or were blocked before their copy went out."
+          },
+          "unsubscribed": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -3567,6 +5153,19 @@
           }
         },
         "additionalProperties": false
+      },
+      "SendRequest": {
+        "type": "object",
+        "properties": {
+          "send_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When to start; absent or past = now. At most 30 days ahead."
+          }
+        }
       },
       "SendResponse": {
         "type": "object",
@@ -3736,6 +5335,33 @@
           }
         }
       },
+      "TestSendRequest": {
+        "type": "object",
+        "required": [
+          "to"
+        ],
+        "properties": {
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "1-5 addresses of members of this account."
+          }
+        }
+      },
+      "TestSendResult": {
+        "type": "object",
+        "required": [
+          "queued"
+        ],
+        "properties": {
+          "queued": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
       "TokenRequest": {
         "type": "object",
         "required": [
@@ -3841,11 +5467,25 @@
               "null"
             ]
           },
+          "postal_address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Shown at the bottom of every issue; sending needs it. `\"\"` clears it."
+          },
           "public_slug": {
             "type": [
               "string",
               "null"
             ]
+          },
+          "signup_ask_name": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Show the first-name field on the signup form."
           },
           "signup_enabled": {
             "type": [
@@ -3868,6 +5508,29 @@
           "id": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "WaveStat": {
+        "type": "object",
+        "required": [
+          "wave",
+          "readers",
+          "done"
+        ],
+        "properties": {
+          "done": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Readers whose copy reached a final state."
+          },
+          "readers": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "wave": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },

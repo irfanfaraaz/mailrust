@@ -100,6 +100,150 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/campaigns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_campaigns"];
+        put?: never;
+        post: operations["create_campaign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_campaign"];
+        put?: never;
+        post?: never;
+        delete: operations["delete_campaign"];
+        options?: never;
+        head?: never;
+        patch: operations["update_campaign"];
+        trace?: never;
+    };
+    "/campaigns/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["cancel_campaign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["pause_campaign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["preview_campaign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["campaign_report"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["resume_campaign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["send_campaign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["test_campaign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/contacts": {
         parameters: {
             query?: never;
@@ -308,6 +452,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/images": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["upload_image"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/invites/accept": {
         parameters: {
             query?: never;
@@ -356,6 +516,38 @@ export interface paths {
         patch: operations["update_newsletter"];
         trace?: never;
     };
+    "/public/archive/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["public_archive"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/archive/{slug}/{issue}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["public_archive_issue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/public/confirm": {
         parameters: {
             query?: never;
@@ -366,6 +558,38 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["public_confirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/confirm/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["public_confirm_info"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/img/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["public_image"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -637,6 +861,18 @@ export interface components {
         AddSuppressionRequest: {
             address: string;
         };
+        ArchiveIndex: {
+            issues: components["schemas"]["ArchiveIssue"][];
+            newsletter_name: string;
+            /** @description Show a Subscribe link to `/join/<slug>`. */
+            signup_open: boolean;
+        };
+        ArchiveIssue: {
+            /** Format: date-time */
+            sent_at: string;
+            slug: string;
+            title: string;
+        };
         AttachmentInput: {
             /** @description Base64-encoded file content. */
             content: string;
@@ -649,6 +885,124 @@ export interface components {
         BatchResponse: {
             data: components["schemas"]["SendResponse"][];
         };
+        Campaign: {
+            archive_hidden: boolean;
+            /** @description Set when the send starts: `/p/<newsletter slug>/<archive_slug>`. */
+            archive_slug?: string | null;
+            /** @description The editor document (Tiptap JSON, see `render::blocks`). */
+            blocks: Record<string, never>;
+            /** Format: date-time */
+            created_at: string;
+            /** @description Tag ids: skip contacts with any of these. */
+            exclude_tags: string[];
+            /** Format: date-time */
+            finished_at?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** @description Tag ids: send only to contacts with any of these (empty = everyone subscribed). */
+            include_tags: string[];
+            /** Format: date-time */
+            next_wave_at?: string | null;
+            paused_reason?: string | null;
+            preview_text?: string | null;
+            /** Format: date-time */
+            send_at?: string | null;
+            /** Format: date-time */
+            started_at?: string | null;
+            status: components["schemas"]["CampaignStatus"];
+            subject: string;
+            /** Format: date-time */
+            updated_at: string;
+            /**
+             * Format: int32
+             * @description The last wave started (0 = none yet).
+             */
+            wave: number;
+        };
+        CampaignList: {
+            data: components["schemas"]["CampaignSummary"][];
+            /** Format: uuid */
+            next_cursor?: string | null;
+        };
+        CampaignPreview: {
+            checks: components["schemas"]["Check"][];
+            /** @description What readers without a first name see, when the issue greets by name. */
+            first_name_fallback?: string | null;
+            /** @description The email as a reader without merge values sees it (fallbacks), footer included. */
+            html: string;
+            /** Format: int64 */
+            missing_first_name: number;
+            /** Format: int64 */
+            readers: number;
+            /** @description The largest copy any reader can get, in bytes (None until the body is a valid document). */
+            size_bytes?: number | null;
+            text: string;
+            warnings: string[];
+            /** @description Readers per wave. */
+            waves: number[];
+        };
+        CampaignReport: {
+            links: components["schemas"]["LinkStat"][];
+            providers: components["schemas"]["ProviderStat"][];
+            rates: components["schemas"]["ReportRates"];
+            totals: components["schemas"]["ReportTotals"];
+            waves: components["schemas"]["WaveStat"][];
+        };
+        /** @description Create and edit. Absent fields stay as they are; `preview_text: ""` clears it. */
+        CampaignRequest: {
+            /** @description Hide a sent issue from the public archive. Works in any status. */
+            archive_hidden?: boolean | null;
+            /** @description The editor document (Tiptap JSON). Saved when it is a document; the full rules run at send. */
+            blocks?: Record<string, never> | null;
+            exclude_tags?: string[] | null;
+            include_tags?: string[] | null;
+            preview_text?: string | null;
+            subject?: string | null;
+        };
+        /** @enum {string} */
+        CampaignStatus: "draft" | "scheduled" | "sending" | "paused" | "sent" | "cancelled";
+        CampaignSummary: {
+            /**
+             * Format: int64
+             * @description Readers who clicked (unique, bots left out).
+             */
+            clicked: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            finished_at?: string | null;
+            /** Format: uuid */
+            id: string;
+            /**
+             * Format: int64
+             * @description Readers who opened (unique, bots left out).
+             */
+            opened: number;
+            /**
+             * Format: int64
+             * @description Emails queued or sent for this issue.
+             */
+            recipients: number;
+            /** Format: date-time */
+            send_at?: string | null;
+            /** Format: date-time */
+            started_at?: string | null;
+            status: components["schemas"]["CampaignStatus"];
+            subject: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        Check: {
+            code: string;
+            message: string;
+            ok: boolean;
+        };
+        ConfirmInfo: {
+            /** @description None when the link is unknown; a used or expired link still names the newsletter. */
+            newsletter_name?: string | null;
+            /** @description The signup form's slug, for a "sign up again" link. */
+            signup_slug?: string | null;
+        };
         ConfirmView: {
             newsletter_name: string;
         };
@@ -656,6 +1010,11 @@ export interface components {
             data: components["schemas"]["ContactView"][];
             /** Format: uuid */
             next_cursor?: string | null;
+            /**
+             * Format: int64
+             * @description Contacts matching the filters, on every page.
+             */
+            total: number;
         };
         /** @enum {string} */
         ContactSource: "form" | "import" | "api" | "dashboard";
@@ -813,6 +1172,24 @@ export interface components {
             recipient?: string | null;
             type: string;
         };
+        /** @description The multipart body of `POST /images` (documentation only). */
+        ImageUpload: {
+            /**
+             * Format: binary
+             * @description PNG, JPEG, GIF or WebP, ≤ 5 MB. The type is read from the bytes.
+             */
+            file: string;
+        };
+        ImageUploaded: {
+            /** Format: int32 */
+            height: number;
+            /** Format: uuid */
+            id: string;
+            /** @description Where readers load it: `{WEB_URL}/img/{id}`, whatever the store. */
+            url: string;
+            /** Format: int32 */
+            width: number;
+        };
         ImportList: {
             data: components["schemas"]["ImportView"][];
         };
@@ -895,6 +1272,13 @@ export interface components {
             name: string;
             prefix: string;
         };
+        LinkStat: {
+            /** Format: int64 */
+            clicks: number;
+            /** Format: int64 */
+            unique_clicks: number;
+            url: string;
+        };
         LoginRequest: {
             email: string;
         };
@@ -925,7 +1309,10 @@ export interface components {
             closed_reason?: string | null;
             newsletter_from?: string | null;
             newsletter_name?: string | null;
+            /** @description Shown in the footer of every issue; required to send. */
+            postal_address?: string | null;
             public_slug?: string | null;
+            signup_ask_name: boolean;
             signup_enabled: boolean;
             /** @description True when `/join/<slug>` takes signups right now. */
             signup_open: boolean;
@@ -952,6 +1339,20 @@ export interface components {
          * @enum {string}
          */
         Priority: "urgent" | "normal" | "bulk";
+        ProviderStat: {
+            /** Format: int64 */
+            bounced: number;
+            /** Format: int64 */
+            clicked: number;
+            /** Format: int64 */
+            delivered: number;
+            /** Format: int64 */
+            opened: number;
+            /** @description Gmail, Outlook, Yahoo, iCloud, Proton or Other. */
+            provider: string;
+            /** Format: int64 */
+            sent: number;
+        };
         PublicJoinRequest: {
             email: string;
             first_name?: string | null;
@@ -960,9 +1361,50 @@ export interface components {
             website?: string;
         };
         PublicNewsletter: {
+            /** @description False: hide the first-name field. */
+            ask_name: boolean;
             name: string;
             /** @description False: show "This newsletter is not taking signups right now." */
             open: boolean;
+        };
+        /** @description Each over `sent`, 0..1. */
+        ReportRates: {
+            /** Format: double */
+            bounce_rate: number;
+            /** Format: double */
+            click_rate: number;
+            /** Format: double */
+            open_rate: number;
+            /** Format: double */
+            unsubscribe_rate: number;
+        };
+        ReportTotals: {
+            /** Format: int64 */
+            bounced: number;
+            /** Format: int64 */
+            clicked: number;
+            /** Format: int64 */
+            complained: number;
+            /** Format: int64 */
+            delivered: number;
+            /** Format: int64 */
+            failed: number;
+            /** Format: int64 */
+            opened: number;
+            /** Format: int64 */
+            recipients: number;
+            /**
+             * Format: int64
+             * @description Handed to the sender (everything but queued, failed, skipped and cancelled).
+             */
+            sent: number;
+            /**
+             * Format: int64
+             * @description Readers who left or were blocked before their copy went out.
+             */
+            skipped: number;
+            /** Format: int64 */
+            unsubscribed: number;
         };
         RoleRequest: {
             role: components["schemas"]["MemberRole"];
@@ -987,6 +1429,13 @@ export interface components {
             };
             text?: string | null;
             to: string[];
+        };
+        SendRequest: {
+            /**
+             * Format: date-time
+             * @description When to start; absent or past = now. At most 30 days ahead.
+             */
+            send_at?: string | null;
         };
         SendResponse: {
             /** Format: uuid */
@@ -1034,6 +1483,13 @@ export interface components {
             invites: components["schemas"]["InviteView"][];
             members: components["schemas"]["MemberView"][];
         };
+        TestSendRequest: {
+            /** @description 1-5 addresses of members of this account. */
+            to: string[];
+        };
+        TestSendResult: {
+            queued: number;
+        };
         TokenRequest: {
             token: string;
         };
@@ -1058,13 +1514,28 @@ export interface components {
             /** @description Must be on a verified domain of this account. */
             newsletter_from?: string | null;
             newsletter_name?: string | null;
+            /** @description Shown at the bottom of every issue; sending needs it. `""` clears it. */
+            postal_address?: string | null;
             public_slug?: string | null;
+            /** @description Show the first-name field on the signup form. */
+            signup_ask_name?: boolean | null;
             signup_enabled?: boolean | null;
         };
         User: {
             email: string;
             /** Format: uuid */
             id: string;
+        };
+        WaveStat: {
+            /**
+             * Format: int64
+             * @description Readers whose copy reached a final state.
+             */
+            done: number;
+            /** Format: int64 */
+            readers: number;
+            /** Format: int32 */
+            wave: number;
         };
         WebhookList: {
             data: components["schemas"]["WebhookView"][];
@@ -1259,6 +1730,480 @@ export interface operations {
                 };
             };
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_campaigns: {
+        parameters: {
+            query?: {
+                limit?: number;
+                after?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignList"];
+                };
+            };
+        };
+    };
+    create_campaign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CampaignRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Campaign"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_campaign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Campaign"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    delete_campaign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    update_campaign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CampaignRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Campaign"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    cancel_campaign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Campaign"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    pause_campaign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Campaign"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    preview_campaign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignPreview"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    campaign_report: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignReport"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    resume_campaign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Campaign"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    send_campaign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Campaign"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Named by the first failed check */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    test_campaign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TestSendRequest"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestSendResult"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1961,6 +2906,61 @@ export interface operations {
             };
         };
     };
+    upload_image: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["ImageUpload"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageUploaded"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     invites_accept: {
         parameters: {
             query?: never;
@@ -2085,6 +3085,78 @@ export interface operations {
             };
         };
     };
+    public_archive: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Mailrust-Web": string;
+            };
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArchiveIndex"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    public_archive_issue: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Mailrust-Web": string;
+            };
+            path: {
+                slug: string;
+                issue: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The archive page, served with a strict CSP */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     public_confirm: {
         parameters: {
             query?: never;
@@ -2109,6 +3181,61 @@ export interface operations {
                 };
             };
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    public_confirm_info: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Mailrust-Web": string;
+            };
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfirmInfo"];
+                };
+            };
+        };
+    };
+    public_image: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Mailrust-Web": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The image bytes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
+                };
+            };
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

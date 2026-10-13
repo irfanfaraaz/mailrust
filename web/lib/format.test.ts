@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { closedMessage, isoDate } from "./format";
+import { closedMessage, contactCount, isoDate } from "./format";
 
 describe("isoDate", () => {
   it("turns a date-time input value into ISO", () => {
@@ -25,5 +25,13 @@ describe("closedMessage", () => {
 
   it("passes an unknown reason through", () => {
     expect(closedMessage("something new")).toEqual({ text: "Closed: something new." });
+  });
+});
+
+describe("contactCount", () => {
+  it("says the total, and the page size when paged", () => {
+    expect(contactCount(1, 1, false)).toBe("1 contact");
+    expect(contactCount(3, 3, false)).toBe("3 contacts");
+    expect(contactCount(1234, 50, true)).toBe("Showing 50 of 1,234 contacts");
   });
 });

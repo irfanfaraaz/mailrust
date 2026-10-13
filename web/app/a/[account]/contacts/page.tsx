@@ -8,7 +8,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { engine, type Schemas } from "@/lib/engine";
-import { utc } from "@/lib/format";
+import { contactCount, utc } from "@/lib/format";
 import { AddContact } from "./add-contact";
 
 export const metadata = { title: "Contacts" };
@@ -60,8 +60,7 @@ async function List({ params, searchParams }: Props) {
   const older = new URLSearchParams({ ...filters, after: list.next_cursor ?? "" });
   const hasFilters = Object.keys(filters).length > 0;
   const n = list.data.length;
-  // shortcut: the engine returns no total, so the count is this page's; add a total to ContactList to show "of N".
-  const count = `${n} ${n === 1 ? "contact" : "contacts"}${list.next_cursor || sp.after ? " on this page" : ""}`;
+  const count = contactCount(list.total, n, Boolean(list.next_cursor || sp.after));
   const clear = <Link className="underline underline-offset-2" href={base}>Clear filters</Link>;
   return (
     <>
