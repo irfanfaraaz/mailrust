@@ -317,6 +317,29 @@ pub struct ListFilter {
     pub q: Option<String>,
 }
 
+/// How many contacts match `f` (the list's filters, without paging).
+pub async fn count(pool: &PgPool, account_id: Uuid, f: &ListFilter) -> sqlx::Result<i64> {
+    let pattern =
+        f.q.as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(crate::emails::like_pattern);
+    sqlx::query_scalar!(
+        r#"SELECT count(*) AS "n!" FROM contacts c
+           WHERE c.account_id = $1
+             AND ($2::contact_status IS NULL OR c.status = $2)
+             AND ($3::uuid IS NULL OR EXISTS (SELECT 1 FROM contact_tags x WHERE x.contact_id = c.id AND x.tag_id = $3))
+             AND ($4::text IS NULL OR c.email ILIKE $4 OR c.first_name ILIKE $4 OR c.last_name ILIKE $4
+                  OR concat_ws(' ', c.first_name, c.last_name) ILIKE $4)"#,
+        account_id,
+        f.status as Option<ContactStatus>,
+        f.tag,
+        pattern
+    )
+    .fetch_one(pool)
+    .await
+}
+
 pub async fn list(
     pool: &PgPool,
     account_id: Uuid,

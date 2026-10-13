@@ -21,6 +21,10 @@ pub struct UpdateNewsletterRequest {
     /// Must be on a verified domain of this account.
     pub newsletter_from: Option<String>,
     pub signup_enabled: Option<bool>,
+    /// Shown at the bottom of every issue; sending needs it. `""` clears it.
+    pub postal_address: Option<String>,
+    /// Show the first-name field on the signup form.
+    pub signup_ask_name: Option<bool>,
 }
 
 pub(crate) async fn show(
@@ -78,13 +82,21 @@ pub(crate) async fn update(
             "choose a public address before turning signups on".into(),
         ));
     }
+    let postal = match body.postal_address.as_deref() {
+        Some(s) => newsletter::clean_postal(s).map_err(ApiError::Validation)?,
+        None => n.postal_address.clone(),
+    };
+    let ask_name = body.signup_ask_name.unwrap_or(n.signup_ask_name);
     sqlx::query!(
-        "UPDATE accounts SET public_slug = $2, newsletter_name = $3, newsletter_from = $4, signup_enabled = $5 WHERE id = $1",
+        "UPDATE accounts SET public_slug = $2, newsletter_name = $3, newsletter_from = $4, signup_enabled = $5,
+                postal_address = $6, signup_ask_name = $7 WHERE id = $1",
         account_id,
         slug,
         name,
         from,
-        enabled
+        enabled,
+        postal,
+        ask_name
     )
     .execute(&state.pool)
     .await

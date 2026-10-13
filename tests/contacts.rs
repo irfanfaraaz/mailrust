@@ -619,3 +619,26 @@ async fn ensure_tags_dedupes_and_keeps_input_order(pool: sqlx::PgPool) {
         .unwrap();
     assert_eq!(n, 2);
 }
+
+#[sqlx::test]
+async fn the_list_carries_the_total_for_its_filters(pool: sqlx::PgPool) {
+    let t = common::app(pool).await;
+    for i in 0..3 {
+        add(&t, json!({"email": format!("t{i}@x.com"), "tags": ["vip"]})).await;
+    }
+    add(&t, json!({"email": "other@x.com"})).await;
+    let (s, b) = common::call(
+        &t.router,
+        common::req("GET", "/contacts?limit=2", Some(&t.key), None),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(b["data"].as_array().unwrap().len(), 2);
+    assert_eq!(b["total"], 4);
+    let (_, b) = common::call(
+        &t.router,
+        common::req("GET", "/contacts?q=t1%40x", Some(&t.key), None),
+    )
+    .await;
+    assert_eq!(b["total"], 1);
+}

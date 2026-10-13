@@ -19,7 +19,7 @@ use crate::{
         login::{LoginRequest, SessionResponse, TokenRequest},
         me::MeResponse,
         newsletter::UpdateNewsletterRequest,
-        public::{ConfirmView, PublicJoinRequest, PublicNewsletter, UnsubscribeView},
+        public::{ConfirmInfo, ConfirmView, PublicJoinRequest, PublicNewsletter, UnsubscribeView},
         suppressions::{AddSuppressionRequest, SuppressionList, SuppressionView},
         tags::{TagList, TagRequest, TagView},
         team::{InviteRequest, RoleRequest},
@@ -282,6 +282,11 @@ fn public_join() {}
     responses((status = 200, body = ConfirmView), (status = 401, body = ErrorBody)))]
 fn public_confirm() {}
 
+#[utoipa::path(get, path = "/public/confirm/{token}", tag = "public", security(),
+    params(("token" = String, Path), ("X-Mailrust-Web" = String, Header)),
+    responses((status = 200, body = ConfirmInfo)))]
+fn public_confirm_info() {}
+
 #[utoipa::path(post, path = "/contacts/imports", tag = "audience",
     request_body(content = ImportUpload, content_type = "multipart/form-data"),
     responses((status = 201, body = ImportView), (status = 400, body = ErrorBody), (status = 413, body = ErrorBody),
@@ -305,7 +310,7 @@ fn get_import() {}
           list_contacts, export_contacts, create_contact, get_contact, update_contact, delete_contact,
           list_tags, create_tag, rename_tag, delete_tag, get_newsletter, update_newsletter,
           public_newsletter, public_unsubscribe_info, public_unsubscribe, public_resubscribe,
-          public_join, public_confirm, upload_import, list_imports, get_import),
+          public_join, public_confirm, public_confirm_info, upload_import, list_imports, get_import),
     components(schemas(SendEmailRequest, AttachmentInput, SendResponse, BatchResponse, EmailView, EmailSummary, EmailList,
         EventView, EmailStatus, Priority, Domain, DomainStatus, DnsRecord, DomainList, CreateDomainRequest, UpdateDomainRequest,
         KeySummary, KeyAccess, CreateKeyRequest, CreatedKey, KeyList, CreateWebhookRequest, WebhookView, WebhookList,
@@ -313,7 +318,7 @@ fn get_import() {}
         MeResponse, MyAccount, User, MemberRole, TeamView, MemberView, InviteView, InviteRequest, RoleRequest, Overview, Counts, ErrorBody, ErrorDetail,
         ContactView, ContactList, ContactStatus, ContactSource, TagRef, CreateContactRequest, UpdateContactRequest,
         TagView, TagList, TagRequest, NewsletterSettings, UpdateNewsletterRequest,
-        PublicNewsletter, UnsubscribeView, PublicJoinRequest, ConfirmView,
+        PublicNewsletter, UnsubscribeView, PublicJoinRequest, ConfirmView, ConfirmInfo,
         ImportView, ImportList, ImportStatus, ImportRowError, ImportUpload)),
     modifiers(&BearerAuth),
     security(("bearer" = []))

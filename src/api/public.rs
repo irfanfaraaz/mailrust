@@ -26,6 +26,7 @@ use crate::{
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/public/newsletter/{slug}", get(show_newsletter))
+        .route("/public/confirm/{token}", get(confirm_info))
         .route("/public/unsubscribe/{token}", get(unsubscribe_info))
         .route("/public/unsubscribe", post(unsubscribe))
         .route("/public/resubscribe", post(resubscribe))
@@ -70,6 +71,8 @@ pub struct PublicNewsletter {
     pub name: String,
     /// False: show "This newsletter is not taking signups right now."
     pub open: bool,
+    /// False: hide the first-name field.
+    pub ask_name: bool,
 }
 
 #[derive(Serialize, utoipa::ToSchema)]
@@ -110,6 +113,35 @@ pub(crate) async fn show_newsletter(
     Ok(Json(PublicNewsletter {
         name: n.display_name().to_string(),
         open,
+        ask_name: n.signup_ask_name,
+    }))
+}
+
+#[derive(Serialize, utoipa::ToSchema)]
+pub struct ConfirmInfo {
+    /// None when the link is unknown; a used or expired link still names the newsletter.
+    pub newsletter_name: Option<String>,
+    /// The signup form's slug, for a "sign up again" link.
+    pub signup_slug: Option<String>,
+}
+
+/// Read-only: names the newsletter on the confirm page before the reader presses Confirm.
+pub(crate) async fn confirm_info(
+    State(state): State<AppState>,
+    _: WebCaller,
+    Path(token): Path<String>,
+) -> Result<Json<ConfirmInfo>, ApiError> {
+    let r = sqlx::query!(
+        r#"SELECT COALESCE(a.newsletter_name, a.name) AS "name!", a.public_slug
+           FROM contact_confirmations cc JOIN contacts c ON c.id = cc.contact_id JOIN accounts a ON a.id = c.account_id
+           WHERE cc.token_hash = $1"#,
+        hash_token(token.trim())
+    )
+    .fetch_optional(&state.pool)
+    .await?;
+    Ok(Json(ConfirmInfo {
+        newsletter_name: r.as_ref().map(|r| r.name.clone()),
+        signup_slug: r.and_then(|r| r.public_slug),
     }))
 }
 

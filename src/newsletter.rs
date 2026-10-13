@@ -27,6 +27,9 @@ pub struct Newsletter {
     pub newsletter_name: Option<String>,
     pub newsletter_from: Option<String>,
     pub signup_enabled: bool,
+    /// Shown in the footer of every issue; required to send.
+    pub postal_address: Option<String>,
+    pub signup_ask_name: bool,
 }
 
 #[derive(Debug, Serialize, utoipa::ToSchema)]
@@ -35,6 +38,9 @@ pub struct NewsletterSettings {
     pub newsletter_name: Option<String>,
     pub newsletter_from: Option<String>,
     pub signup_enabled: bool,
+    /// Shown in the footer of every issue; required to send.
+    pub postal_address: Option<String>,
+    pub signup_ask_name: bool,
     /// True when `/join/<slug>` takes signups right now.
     pub signup_open: bool,
     /// Why the form is closed, when it is.
@@ -78,6 +84,8 @@ impl Newsletter {
             newsletter_name: self.newsletter_name.clone(),
             newsletter_from: self.newsletter_from.clone(),
             signup_enabled: self.signup_enabled,
+            postal_address: self.postal_address.clone(),
+            signup_ask_name: self.signup_ask_name,
             signup_open: closed_reason.is_none(),
             closed_reason,
         })
@@ -88,7 +96,8 @@ pub async fn get(pool: &PgPool, account_id: Uuid) -> sqlx::Result<Option<Newslet
     sqlx::query_as!(
         Newsletter,
         r#"SELECT id AS account_id, name AS account_name, status AS "status: AccountStatus",
-                  public_slug, newsletter_name, newsletter_from, signup_enabled
+                  public_slug, newsletter_name, newsletter_from, signup_enabled,
+                  postal_address, signup_ask_name
            FROM accounts WHERE id = $1"#,
         account_id
     )
@@ -100,12 +109,32 @@ pub async fn by_slug(pool: &PgPool, slug: &str) -> sqlx::Result<Option<Newslette
     sqlx::query_as!(
         Newsletter,
         r#"SELECT id AS account_id, name AS account_name, status AS "status: AccountStatus",
-                  public_slug, newsletter_name, newsletter_from, signup_enabled
+                  public_slug, newsletter_name, newsletter_from, signup_enabled,
+                  postal_address, signup_ask_name
            FROM accounts WHERE public_slug = $1"#,
         slug
     )
     .fetch_optional(pool)
     .await
+}
+
+pub const MAX_POSTAL: usize = 300;
+
+/// The postal address for issue footers: trimmed, line breaks kept, `""` clears it.
+pub fn clean_postal(raw: &str) -> Result<Option<String>, String> {
+    let s = raw.trim().replace("\r\n", "\n");
+    if s.is_empty() {
+        return Ok(None);
+    }
+    if s.chars().count() > MAX_POSTAL {
+        return Err(format!(
+            "the postal address is at most {MAX_POSTAL} characters"
+        ));
+    }
+    if s.chars().any(|c| c.is_control() && c != '\n') {
+        return Err("the postal address cannot contain control characters".into());
+    }
+    Ok(Some(s))
 }
 
 pub fn normalize_slug(raw: &str) -> Result<Option<String>, String> {
@@ -244,5 +273,20 @@ mod tests {
         assert_eq!(normalize_from("").unwrap(), None);
         assert!(normalize_from("nope").is_err());
         assert_eq!(from_domain("hi@news.shop.com"), "news.shop.com");
+    }
+
+    #[test]
+    fn postal_addresses_are_trimmed_and_checked() {
+        assert_eq!(
+            clean_postal("  Shop Ltd\r\n1 Main St  ")
+                .unwrap()
+                .as_deref(),
+            Some("Shop Ltd\n1 Main St")
+        );
+        assert_eq!(clean_postal("   ").unwrap(), None);
+        assert!(clean_postal(&"x".repeat(301)).is_err());
+        assert!(clean_postal(&"x".repeat(300)).is_ok());
+        assert!(clean_postal("a\u{0}b").is_err());
+        assert!(clean_postal("a\tb").is_err());
     }
 }

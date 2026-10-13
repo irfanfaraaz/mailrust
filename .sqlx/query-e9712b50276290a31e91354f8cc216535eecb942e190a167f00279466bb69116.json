@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id AS account_id, name AS account_name, status AS \"status: AccountStatus\",\n                  public_slug, newsletter_name, newsletter_from, signup_enabled\n           FROM accounts WHERE public_slug = $1",
+  "query": "SELECT id AS account_id, name AS account_name, status AS \"status: AccountStatus\",\n                  public_slug, newsletter_name, newsletter_from, signup_enabled,\n                  postal_address, signup_ask_name\n           FROM accounts WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -47,11 +47,21 @@
         "ordinal": 6,
         "name": "signup_enabled",
         "type_info": "Bool"
+      },
+      {
+        "ordinal": 7,
+        "name": "postal_address",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "signup_ask_name",
+        "type_info": "Bool"
       }
     ],
     "parameters": {
       "Left": [
-        "Text"
+        "Uuid"
       ]
     },
     "nullable": [
@@ -61,8 +71,10 @@
       true,
       true,
       true,
+      false,
+      true,
       false
     ]
   },
-  "hash": "b26f74f772c7b71b110d6133da282b1b4345673bcdba5837907e4f92562efefd"
+  "hash": "e9712b50276290a31e91354f8cc216535eecb942e190a167f00279466bb69116"
 }
