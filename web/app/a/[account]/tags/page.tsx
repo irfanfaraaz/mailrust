@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { ConfirmAction } from "@/components/confirm-action";
+import { EmptyState } from "@/components/empty-state";
 import { Loading } from "@/components/loading";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { engine, type Schemas } from "@/lib/engine";
@@ -30,7 +31,7 @@ async function List({ params }: Props) {
     <>
       <AddTag account={account} />
       {tags.data.length === 0 ? (
-        <p className="text-muted-foreground">No tags yet.</p>
+        <EmptyState title="No tags yet" hint="Create one above, or add a tags column to a CSV import and the tags are made for you." />
       ) : (
         <Table>
           <TableHeader>
@@ -44,7 +45,6 @@ async function List({ params }: Props) {
             {tags.data.map((t) => (
               <TableRow key={t.id}>
                 <TableCell>
-                  <span className="sr-only">{t.name}</span>
                   <RenameTag account={account} id={t.id} name={t.name} />
                 </TableCell>
                 <TableCell className="text-right tabular-nums">

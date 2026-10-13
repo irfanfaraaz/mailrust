@@ -3,6 +3,7 @@ import { useActionState, useEffect } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import type { Schemas } from "@/lib/engine";
 import { formatFields } from "@/lib/fields";
 import { updateContact, type ContactState } from "../actions";
@@ -28,8 +29,8 @@ export function EditContact({ account, contact }: { account: string; contact: Sc
         <Input name="tags" defaultValue={contact.tags.map((t) => t.name).join(", ")} placeholder="vip, news" />
       </label>
       <label className="flex flex-col gap-1">Fields
-        <textarea name="fields" rows={5} defaultValue={formatFields(contact.fields)} placeholder={"plan=pro\ncity=Pune"} className="rounded-lg border bg-transparent p-2 font-mono text-xs" />
-        <span className="text-xs text-muted-foreground">One name=value per line. Names use a-z, 0-9 and _.</span>
+        <Textarea name="fields" rows={5} defaultValue={formatFields(contact.fields)} placeholder={"plan=pro\ncity=Pune"} aria-describedby="fields-hint" className="min-h-24 font-mono" />
+        <span id="fields-hint" className="text-xs text-muted-foreground">One name=value per line. Names use a-z, 0-9 and _.</span>
       </label>
       {state.error && <p role="alert" className="text-destructive">{state.error}</p>}
       <Button type="submit" disabled={pending} className="self-start">Save</Button>

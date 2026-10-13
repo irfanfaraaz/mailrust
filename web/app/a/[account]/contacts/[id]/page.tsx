@@ -1,7 +1,9 @@
+import Link from "next/link";
 import { Suspense } from "react";
+import { BackLink } from "@/components/back-link";
 import { ConfirmAction } from "@/components/confirm-action";
 import { Loading } from "@/components/loading";
-import { BlockedBadge, ContactStatusBadge } from "@/components/status-badge";
+import { BlockedBadge, ContactStatusBadge, PENDING_HINT } from "@/components/status-badge";
 import { engine, type Schemas } from "@/lib/engine";
 import { utc } from "@/lib/format";
 import { deleteContact, unsubscribeContact } from "../actions";
@@ -24,7 +26,7 @@ async function Detail({ params }: Props) {
   const c = await engine<Schemas["ContactView"]>(`/contacts/${id}`, { account, nextPath: `/a/${account}/contacts/${id}` });
   return (
     <div className="flex flex-col gap-6">
-      <a href={`/a/${account}/contacts`} className="text-sm text-muted-foreground underline-offset-2 hover:underline">← Contacts</a>
+      <BackLink href={`/a/${account}/contacts`}>Contacts</BackLink>
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="break-all text-2xl font-semibold">{c.email}</h1>
         <ContactStatusBadge status={c.status} />
@@ -36,7 +38,13 @@ async function Detail({ params }: Props) {
         {c.subscribed_at && (<><dt className="text-muted-foreground">Subscribed at</dt><dd>{utc(c.subscribed_at)}</dd></>)}
         {c.unsubscribed_at && (<><dt className="text-muted-foreground">Unsubscribed at</dt><dd>{utc(c.unsubscribed_at)}</dd></>)}
       </dl>
-      {c.blocked && <p className="max-w-prose text-sm text-muted-foreground">This address is on your suppression list, so nothing will be sent to it.</p>}
+      {c.status === "pending" && <p className="max-w-prose text-sm text-muted-foreground">Pending: {PENDING_HINT.charAt(0).toLowerCase() + PENDING_HINT.slice(1)}</p>}
+      {c.blocked && (
+        <p className="max-w-prose text-sm text-muted-foreground">
+          This address is on your{" "}
+          <Link className="text-foreground underline underline-offset-2" href={`/a/${account}/suppressions`}>suppression list</Link>, so nothing will be sent to it.
+        </p>
+      )}
       <EditContact account={account} contact={c} />
       <div className="flex flex-wrap gap-2">
         {c.status !== "unsubscribed" && (

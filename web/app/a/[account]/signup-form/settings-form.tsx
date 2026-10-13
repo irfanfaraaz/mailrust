@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useActionState, useEffect } from "react";
 import { toast } from "sonner";
 import { NativeSelect } from "@/components/native-select";
@@ -20,8 +21,9 @@ export function SettingsForm({ account, settings, domains, origin }: Props) {
   return (
     <form action={action} className="flex max-w-xl flex-col gap-4 text-sm">
       <label className="flex flex-col gap-1">Public address
-        <span className="flex items-center gap-1">
-          <span className="shrink-0 text-muted-foreground">{origin}/join/</span>
+        {/* On a phone the long origin sits above the field instead of squeezing it. */}
+        <span className="flex flex-col gap-1 sm:flex-row sm:items-center">
+          <span className="break-all text-muted-foreground sm:shrink-0 sm:break-normal">{origin}/join/</span>
           <Input name="public_slug" defaultValue={settings.public_slug ?? ""} placeholder="weekly" />
         </span>
       </label>
@@ -30,7 +32,7 @@ export function SettingsForm({ account, settings, domains, origin }: Props) {
       </label>
       {domains.length === 0 ? (
         <p className="text-muted-foreground">
-          Confirm emails go out from one of your verified domains. <a className="underline" href={`/a/${account}/domains`}>Verify a domain</a> first.
+          Confirm emails go out from one of your verified domains. <Link className="underline underline-offset-2" href={`/a/${account}/domains`}>Verify a domain</Link> first.
         </p>
       ) : (
         <div className="flex flex-col gap-1">

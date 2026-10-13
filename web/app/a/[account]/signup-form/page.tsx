@@ -1,8 +1,10 @@
 import { headers } from "next/headers";
+import Link from "next/link";
 import { Suspense } from "react";
 import { Loading } from "@/components/loading";
 import { engine, type Schemas } from "@/lib/engine";
 import { embedSnippet } from "@/lib/embed";
+import { closedMessage } from "@/lib/format";
 import { EmbedCode } from "./embed-code";
 import { SettingsForm } from "./settings-form";
 
@@ -36,10 +38,12 @@ async function Settings({ params }: Props) {
   const origin = `${h.get("x-forwarded-proto") ?? "http"}://${h.get("x-forwarded-host") ?? h.get("host")}`;
   const verified = domains.data.filter((d) => d.status === "verified").map((d) => d.name);
   const link = s.public_slug ? `${origin}/join/${s.public_slug}` : null;
+  const closed = s.signup_open ? null : closedMessage(s.closed_reason ?? "unknown reason");
   return (
     <>
-      <p role="status" className={s.signup_open ? "text-sm font-medium text-emerald-700 dark:text-emerald-300" : "text-sm text-muted-foreground"}>
-        {s.signup_open ? "Open: the form takes signups." : `Closed: ${s.closed_reason}.`}
+      <p role="status" className={closed ? "max-w-prose text-sm text-muted-foreground" : "text-sm font-medium text-emerald-700 dark:text-emerald-300"}>
+        {closed ? closed.text : "Open: the form takes signups."}
+        {closed?.domains && <> <Link className="text-foreground underline underline-offset-2" href={`/a/${account}/domains`}>Go to Domains</Link></>}
       </p>
       <SettingsForm account={account} settings={s} domains={verified} origin={origin} />
       {link && (

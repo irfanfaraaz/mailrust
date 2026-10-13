@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import { BackLink } from "@/components/back-link";
 import { Loading } from "@/components/loading";
+import { ImportStatusBadge } from "@/components/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { engine, type Schemas } from "@/lib/engine";
 import { utc } from "@/lib/format";
@@ -14,13 +16,21 @@ type Props = { params: Promise<{ account: string }>; searchParams: Promise<{ job
 export default function Import(props: Props) {
   return (
     <div className="flex flex-col gap-6">
-      <a href="../contacts" className="text-sm text-muted-foreground underline-offset-2 hover:underline">← Contacts</a>
+      {/* The back link needs the account from params: request data, so it reads inside Suspense too. */}
+      <Suspense fallback={<span className="h-5" />}>
+        <Back params={props.params} />
+      </Suspense>
       <h1 className="text-2xl font-semibold">Import contacts</h1>
       <Suspense fallback={<Loading />}>
         <Body {...props} />
       </Suspense>
     </div>
   );
+}
+
+async function Back({ params }: Pick<Props, "params">) {
+  const { account } = await params;
+  return <BackLink href={`/a/${account}/contacts`}>Contacts</BackLink>;
 }
 
 async function Body({ params, searchParams }: Props) {
@@ -55,7 +65,7 @@ async function Body({ params, searchParams }: Props) {
               {past.data.map((p) => (
                 <TableRow key={p.id}>
                   <TableCell className="tabular-nums">{utc(p.created_at)}</TableCell>
-                  <TableCell>{p.status}</TableCell>
+                  <TableCell><ImportStatusBadge status={p.status} /></TableCell>
                   <TableCell className="text-right tabular-nums">{p.rows_total}</TableCell>
                   <TableCell className="text-right tabular-nums">{p.added}</TableCell>
                   <TableCell className="text-right tabular-nums">{p.updated}</TableCell>

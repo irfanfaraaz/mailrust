@@ -40,9 +40,11 @@ test("tags are created, renamed and deleted", async ({ page }) => {
   const name = `t${Date.now()}`;
   await page.getByLabel("New tag").fill(name);
   await page.getByRole("button", { name: "Add tag" }).click();
-  const row = page.getByRole("row", { name: new RegExp(name) });
-  await row.getByLabel("Name").fill(`${name}-x`);
-  await row.getByRole("button", { name: "Rename" }).click();
+  await expect(page.getByText("Tag added")).toBeVisible();
+  await expect(page.getByLabel("New tag")).toHaveValue("");
+  await page.getByRole("button", { name: `Rename ${name}` }).click();
+  await page.getByLabel(`New name for ${name}`).fill(`${name}-x`);
+  await page.getByRole("button", { name: "Save", exact: true }).click();
   const renamed = page.getByRole("row", { name: new RegExp(`${name}-x`) });
   await expect(renamed).toBeVisible();
   await renamed.getByRole("button", { name: "Delete" }).click();

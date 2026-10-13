@@ -8,8 +8,7 @@ type Props = { params: Promise<{ token: string }> };
 export default function Confirm({ params }: Props) {
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-4 px-4">
-      <h1 className="text-2xl font-semibold">Confirm your subscription</h1>
-      {/* A button, not an automatic confirm: mail scanners open links, people press buttons. */}
+      {/* A button, not an automatic confirm: mail scanners open links, people press buttons. The heading follows the state, so it lives in the form. */}
       <Suspense>
         <Form params={params} />
       </Suspense>
