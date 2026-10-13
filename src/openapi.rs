@@ -11,6 +11,7 @@ use crate::{
     accounts::AccountStatus,
     api::{
         AppState,
+        campaigns::{CampaignList, CampaignRequest, CampaignSummary},
         contacts::{ContactList, CreateContactRequest, UpdateContactRequest},
         domains::{CreateDomainRequest, DomainList, UpdateDomainRequest},
         emails::{BatchResponse, EmailList},
@@ -26,6 +27,7 @@ use crate::{
         team::{InviteRequest, RoleRequest},
         webhooks::{CreateWebhookRequest, WebhookList},
     },
+    campaigns::{Campaign, CampaignStatus},
     contacts::{ContactSource, ContactStatus, ContactView, TagRef},
     domains::{Domain, DomainStatus},
     emails::{
@@ -312,6 +314,28 @@ fn upload_image() {}
     responses((status = 200, content_type = "image/*", body = String, description = "The image bytes"), (status = 404, body = ErrorBody)))]
 fn public_image() {}
 
+#[utoipa::path(get, path = "/campaigns", tag = "campaigns",
+    params(("limit" = Option<i64>, Query), ("after" = Option<uuid::Uuid>, Query)),
+    responses((status = 200, body = CampaignList)))]
+fn list_campaigns() {}
+
+#[utoipa::path(post, path = "/campaigns", tag = "campaigns", request_body = CampaignRequest,
+    responses((status = 201, body = Campaign), (status = 400, body = ErrorBody), (status = 422, body = ErrorBody)))]
+fn create_campaign() {}
+
+#[utoipa::path(get, path = "/campaigns/{id}", tag = "campaigns", params(("id" = uuid::Uuid, Path)),
+    responses((status = 200, body = Campaign), (status = 404, body = ErrorBody)))]
+fn get_campaign() {}
+
+#[utoipa::path(patch, path = "/campaigns/{id}", tag = "campaigns", params(("id" = uuid::Uuid, Path)), request_body = CampaignRequest,
+    responses((status = 200, body = Campaign), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody),
+               (status = 409, body = ErrorBody), (status = 422, body = ErrorBody)))]
+fn update_campaign() {}
+
+#[utoipa::path(delete, path = "/campaigns/{id}", tag = "campaigns", params(("id" = uuid::Uuid, Path)),
+    responses((status = 204), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+fn delete_campaign() {}
+
 #[derive(OpenApi)]
 #[openapi(
     info(title = "Mailrust API", version = "0.1.0", description = "Send transactional email through your own Amazon SES. Auth: `Authorization: Bearer mr_live_…` (API key), or `Bearer mr_sess_…` (dashboard session) plus `X-Mailrust-Account: <account id>`."),
@@ -323,7 +347,8 @@ fn public_image() {}
           list_tags, create_tag, rename_tag, delete_tag, get_newsletter, update_newsletter,
           public_newsletter, public_unsubscribe_info, public_unsubscribe, public_resubscribe,
           public_join, public_confirm, public_confirm_info, upload_import, list_imports, get_import,
-          upload_image, public_image),
+          upload_image, public_image,
+          list_campaigns, create_campaign, get_campaign, update_campaign, delete_campaign),
     components(schemas(SendEmailRequest, AttachmentInput, SendResponse, BatchResponse, EmailView, EmailSummary, EmailList,
         EventView, EmailStatus, Priority, Domain, DomainStatus, DnsRecord, DomainList, CreateDomainRequest, UpdateDomainRequest,
         KeySummary, KeyAccess, CreateKeyRequest, CreatedKey, KeyList, CreateWebhookRequest, WebhookView, WebhookList,
@@ -332,7 +357,8 @@ fn public_image() {}
         ContactView, ContactList, ContactStatus, ContactSource, TagRef, CreateContactRequest, UpdateContactRequest,
         TagView, TagList, TagRequest, NewsletterSettings, UpdateNewsletterRequest,
         PublicNewsletter, UnsubscribeView, PublicJoinRequest, ConfirmView, ConfirmInfo,
-        ImportView, ImportList, ImportStatus, ImportRowError, ImportUpload, ImageUpload, ImageUploaded)),
+        ImportView, ImportList, ImportStatus, ImportRowError, ImportUpload, ImageUpload, ImageUploaded,
+        Campaign, CampaignStatus, CampaignRequest, CampaignSummary, CampaignList)),
     modifiers(&BearerAuth),
     security(("bearer" = []))
 )]

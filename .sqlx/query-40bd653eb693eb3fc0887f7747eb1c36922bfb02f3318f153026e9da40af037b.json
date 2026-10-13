@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE campaigns SET\n             subject = COALESCE($2, subject),\n             preview_text = CASE WHEN $3 THEN $4 ELSE preview_text END,\n             blocks = COALESCE($5, blocks),\n             include_tags = COALESCE($6, include_tags),\n             exclude_tags = COALESCE($7, exclude_tags),\n             archive_hidden = COALESCE($8, archive_hidden),\n             status = CASE WHEN $9 AND status = 'scheduled' THEN 'draft'::campaign_status ELSE status END,\n             send_at = CASE WHEN $9 AND status = 'scheduled' THEN NULL ELSE send_at END,\n             updated_at = now()\n           WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Bool",
+        "Text",
+        "Jsonb",
+        "UuidArray",
+        "UuidArray",
+        "Bool",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "40bd653eb693eb3fc0887f7747eb1c36922bfb02f3318f153026e9da40af037b"
+}

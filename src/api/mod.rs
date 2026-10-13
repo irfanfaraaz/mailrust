@@ -14,6 +14,7 @@ use uuid::Uuid;
 use crate::{config::Config, sender::Sender};
 
 pub mod auth;
+pub mod campaigns;
 pub mod contacts;
 pub mod domains;
 pub mod emails;
@@ -75,6 +76,7 @@ impl AppState {
 pub fn router(state: AppState) -> Router {
     Router::new()
         .merge(health::routes())
+        .merge(campaigns::routes())
         .merge(contacts::routes())
         .merge(images::routes())
         .merge(imports::routes())

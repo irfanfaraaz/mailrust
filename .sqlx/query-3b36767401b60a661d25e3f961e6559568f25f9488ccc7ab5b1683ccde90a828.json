@@ -1,0 +1,98 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT c.id, c.subject, c.status AS \"status: CampaignStatus\", c.send_at, c.started_at, c.finished_at,\n                  c.created_at, c.updated_at,\n                  (SELECT count(*) FROM emails e WHERE e.campaign_id = c.id) AS \"recipients!\",\n                  (SELECT count(DISTINCT v.email_id) FROM email_events v JOIN emails e ON e.id = v.email_id\n                   WHERE e.campaign_id = c.id AND v.type = 'opened' AND NOT v.likely_bot) AS \"opened!\",\n                  (SELECT count(DISTINCT v.email_id) FROM email_events v JOIN emails e ON e.id = v.email_id\n                   WHERE e.campaign_id = c.id AND v.type = 'clicked' AND NOT v.likely_bot) AS \"clicked!\"\n           FROM campaigns c\n           WHERE c.account_id = $1 AND ($2::uuid IS NULL OR c.id < $2)\n           ORDER BY c.id DESC LIMIT $3",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "subject",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "status: CampaignStatus",
+        "type_info": {
+          "Custom": {
+            "name": "campaign_status",
+            "kind": {
+              "Enum": [
+                "draft",
+                "scheduled",
+                "sending",
+                "paused",
+                "sent",
+                "cancelled"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "send_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "started_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "finished_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "recipients!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 9,
+        "name": "opened!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 10,
+        "name": "clicked!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "3b36767401b60a661d25e3f961e6559568f25f9488ccc7ab5b1683ccde90a828"
+}

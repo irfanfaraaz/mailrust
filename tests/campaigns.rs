@@ -211,3 +211,239 @@ async fn the_store_knows_the_owner(pool: sqlx::PgPool) {
         None
     );
 }
+
+fn doc_with(text: &str) -> serde_json::Value {
+    json!({"type": "doc", "content": [{"type": "paragraph", "content": [{"type": "text", "text": text}]}]})
+}
+
+async fn api(
+    t: &common::TestApp,
+    method: &str,
+    uri: &str,
+    body: Option<serde_json::Value>,
+) -> (StatusCode, serde_json::Value) {
+    common::call(&t.router, common::req(method, uri, Some(&t.key), body)).await
+}
+
+#[sqlx::test]
+async fn a_campaign_is_created_edited_listed_and_deleted(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    let (s, tag) = api(&t, "POST", "/tags", Some(json!({"name": "vip"}))).await;
+    assert_eq!(s, StatusCode::CREATED);
+    let (s, c) = api(
+        &t,
+        "POST",
+        "/campaigns",
+        Some(json!({"subject": "  Hello  ", "blocks": doc_with("Hi")})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{c}");
+    assert_eq!(
+        (c["subject"].as_str(), c["status"].as_str()),
+        (Some("Hello"), Some("draft"))
+    );
+    assert!(c.get("account_id").is_none(), "never in the API");
+    let id = c["id"].as_str().unwrap().to_string();
+
+    let (s, c) = api(
+        &t,
+        "PATCH",
+        &format!("/campaigns/{id}"),
+        Some(json!({
+            "preview_text": "Short", "include_tags": [tag["id"]], "blocks": doc_with("Bye")
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{c}");
+    assert_eq!(c["preview_text"], "Short");
+    assert_eq!(c["include_tags"], json!([tag["id"]]));
+    assert_eq!(c["blocks"]["content"][0]["content"][0]["text"], "Bye");
+    let (_, c) = api(
+        &t,
+        "PATCH",
+        &format!("/campaigns/{id}"),
+        Some(json!({"preview_text": ""})),
+    )
+    .await;
+    assert!(c["preview_text"].is_null());
+    assert_eq!(c["subject"], "Hello", "absent fields stay");
+
+    let (s, l) = api(&t, "GET", "/campaigns", None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(l["data"][0]["id"], id.as_str());
+    assert_eq!(l["data"][0]["recipients"], 0);
+
+    let (s, _) = api(&t, "DELETE", &format!("/campaigns/{id}"), None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (s, _) = api(&t, "GET", &format!("/campaigns/{id}"), None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+}
+
+#[sqlx::test]
+async fn bad_input_is_refused(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    let (s, _) = api(
+        &t,
+        "POST",
+        "/campaigns",
+        Some(json!({"subject": "x".repeat(201)})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, _) = api(
+        &t,
+        "POST",
+        "/campaigns",
+        Some(json!({"subject": "two\nlines"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, _) = api(
+        &t,
+        "POST",
+        "/campaigns",
+        Some(json!({"preview_text": "x".repeat(201)})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, b) = api(
+        &t,
+        "POST",
+        "/campaigns",
+        Some(json!({"blocks": {"type": "doc", "content": [{"type": "table"}]}})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{b}");
+    let huge = doc_with(&"x".repeat(600 * 1024));
+    let (s, b) = api(&t, "POST", "/campaigns", Some(json!({"blocks": huge}))).await;
+    assert_eq!(
+        (s, b["error"]["code"].as_str()),
+        (StatusCode::UNPROCESSABLE_ENTITY, Some("blocks_too_large"))
+    );
+    // A half-written merge tag (no fallback yet) still saves: the rules apply at send.
+    let draft = json!({"type": "doc", "content": [{"type": "paragraph", "content": [{"type": "mergeTag", "attrs": {"key": "first_name"}}]}]});
+    let (s, _) = api(&t, "POST", "/campaigns", Some(json!({"blocks": draft}))).await;
+    assert_eq!(s, StatusCode::CREATED);
+
+    let other = mailrust::accounts::create(&pool, "Other").await.unwrap();
+    let foreign: uuid::Uuid = sqlx::query_scalar(
+        "INSERT INTO tags (id, account_id, name) VALUES (gen_random_uuid(), $1, 'x') RETURNING id",
+    )
+    .bind(other.id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let (s, _) = api(
+        &t,
+        "POST",
+        "/campaigns",
+        Some(json!({"exclude_tags": [foreign]})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+}
+
+#[sqlx::test]
+async fn only_drafts_and_scheduled_issues_can_change(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    let (_, c) = api(&t, "POST", "/campaigns", Some(json!({"subject": "Hi"}))).await;
+    let id: uuid::Uuid = c["id"].as_str().unwrap().parse().unwrap();
+    let uri = format!("/campaigns/{id}");
+
+    sqlx::query("UPDATE campaigns SET status = 'scheduled', send_at = now() + interval '1 day' WHERE id = $1")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, c) = api(&t, "PATCH", &uri, Some(json!({"subject": "Changed"}))).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(
+        (c["status"].as_str(), c["send_at"].is_null()),
+        (Some("draft"), true),
+        "an edit unschedules it"
+    );
+
+    sqlx::query("UPDATE campaigns SET status = 'sent' WHERE id = $1")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, b) = api(&t, "PATCH", &uri, Some(json!({"subject": "Late"}))).await;
+    assert_eq!(
+        (s, b["error"]["code"].as_str()),
+        (StatusCode::CONFLICT, Some("campaign_locked"))
+    );
+    let (s, c) = api(&t, "PATCH", &uri, Some(json!({"archive_hidden": true}))).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(c["archive_hidden"], true);
+    let (s, b) = api(&t, "DELETE", &uri, None).await;
+    assert_eq!(
+        (s, b["error"]["code"].as_str()),
+        (StatusCode::CONFLICT, Some("campaign_not_draft"))
+    );
+}
+
+#[sqlx::test]
+async fn campaigns_are_private_to_their_account_and_need_a_full_key(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    let (_, c) = api(&t, "POST", "/campaigns", Some(json!({"subject": "Mine"}))).await;
+    let id = c["id"].as_str().unwrap().to_string();
+    let u = common::app(pool.clone()).await;
+    for (m, body) in [
+        ("GET", None),
+        ("PATCH", Some(json!({"subject": "x"}))),
+        ("DELETE", None),
+    ] {
+        let (s, _) = api(&u, m, &format!("/campaigns/{id}"), body).await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "{m}");
+    }
+    let (_, l) = api(&u, "GET", "/campaigns", None).await;
+    assert_eq!(l["data"], json!([]));
+    let key = mailrust::keys::create(
+        &pool,
+        t.account.id,
+        "send",
+        mailrust::keys::KeyAccess::Sending,
+    )
+    .await
+    .unwrap()
+    .token;
+    let (s, _) = common::call(
+        &t.router,
+        common::req("GET", "/campaigns", Some(&key), None),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+}
+
+#[sqlx::test]
+async fn the_list_pages_newest_first(pool: sqlx::PgPool) {
+    let t = common::app(pool).await;
+    for i in 0..3 {
+        api(
+            &t,
+            "POST",
+            "/campaigns",
+            Some(json!({"subject": format!("n{i}")})),
+        )
+        .await;
+    }
+    let (_, a) = api(&t, "GET", "/campaigns?limit=2", None).await;
+    assert_eq!(
+        (
+            a["data"][0]["subject"].as_str(),
+            a["data"][1]["subject"].as_str()
+        ),
+        (Some("n2"), Some("n1"))
+    );
+    let cursor = a["next_cursor"].as_str().unwrap();
+    let (_, b) = api(
+        &t,
+        "GET",
+        &format!("/campaigns?limit=2&after={cursor}"),
+        None,
+    )
+    .await;
+    assert_eq!(b["data"].as_array().unwrap().len(), 1);
+    assert!(b["next_cursor"].is_null());
+}

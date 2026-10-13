@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM campaigns WHERE id = $1 AND status = 'draft'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1b74e938408ed8050a0c7fd850def9132d6623faa6b02f20e323e29fcd49be61"
+}
