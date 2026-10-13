@@ -5,37 +5,66 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::{
+    accounts::{self, AccountStatus},
     api::AppState,
-    domains::{self, DomainStatus},
-    emails::{self, Priority, SendEmailRequest, UrgentCap},
+    domains::{self, Domain, DomainStatus},
+    emails::{self, Priority, SendEmailRequest, UrgentCap, ValidEmail},
 };
+
+/// Tag key on every system email. Customers cannot set it, and the API never shows the body of an
+/// email that has it: login and invite emails carry one-time links.
+pub const SYSTEM_TAG: &str = "mailrust_system";
+
+const PROBE_TO: &str = "check@example.com";
 
 /// Why system emails cannot be sent right now, if anything is wrong.
 pub async fn setup_problem(state: &AppState) -> anyhow::Result<Option<String>> {
+    Ok(check(state, PROBE_TO, "x", "x".into()).await?.err())
+}
+
+/// The system account, the email to queue and the domain it sends from, or why it cannot be sent.
+async fn check(
+    state: &AppState,
+    to: &str,
+    subject: &str,
+    text: String,
+) -> anyhow::Result<Result<(Uuid, ValidEmail, Domain), String>> {
     let c = &state.config;
     let (Some(account_id), Some(from)) = (c.system_account_id, c.system_from.as_deref()) else {
-        return Ok(Some(
+        return Ok(Err(
             "SYSTEM_ACCOUNT_ID and SYSTEM_FROM are not set; login and invite emails cannot be sent"
                 .into(),
         ));
     };
-    let email = match emails::validate(
-        request(from, "check@example.com", "x", "x".into()),
-        Utc::now(),
-    ) {
+    let mut email = match emails::validate(request(from, to, subject, text), Utc::now()) {
         Ok(e) => e,
-        Err(e) => return Ok(Some(format!("SYSTEM_FROM is not usable: {e}"))),
+        // Blame SYSTEM_FROM only if it fails on its own; a bad recipient is the caller's error.
+        Err(e) => match emails::validate(request(from, PROBE_TO, "x", "x".into()), Utc::now()) {
+            Err(from_err) => return Ok(Err(format!("SYSTEM_FROM is not usable: {from_err}"))),
+            Ok(_) => anyhow::bail!("system email invalid: {e}"),
+        },
     };
-    match domains::find_by_name(&state.pool, account_id, &email.from_domain).await? {
-        None => Ok(Some(format!(
-            "{} is not added to the system account",
-            email.from_domain
-        ))),
-        Some(d) if d.status != DomainStatus::Verified => {
-            Ok(Some(format!("{} is not verified yet", email.from_domain)))
-        }
-        Some(_) => Ok(None),
+    email.tags.insert(SYSTEM_TAG.into(), "true".into());
+    if let Some(a) = accounts::get(&state.pool, account_id).await?
+        && a.status == AccountStatus::Paused
+    {
+        return Ok(Err(format!(
+            "the system account is paused ({}); resume it to send login and invite emails",
+            a.paused_reason.as_deref().unwrap_or("no reason given")
+        )));
     }
+    Ok(
+        match domains::find_by_name(&state.pool, account_id, &email.from_domain).await? {
+            None => Err(format!(
+                "{} is not added to the system account",
+                email.from_domain
+            )),
+            Some(d) if d.status != DomainStatus::Verified => {
+                Err(format!("{} is not verified yet", email.from_domain))
+            }
+            Some(d) => Ok((account_id, email, d)),
+        },
+    )
 }
 
 /// Queues a text-only, urgent email from SYSTEM_FROM. Text only: the worker rewrites links
@@ -47,19 +76,13 @@ pub async fn queue(
     subject: &str,
     text: String,
 ) -> anyhow::Result<Option<Uuid>> {
-    if let Some(problem) = setup_problem(state).await? {
-        tracing::error!(%problem, "system email not sent");
-        return Ok(None);
-    }
-    let c = &state.config;
-    let (Some(account_id), Some(from)) = (c.system_account_id, c.system_from.as_deref()) else {
-        return Ok(None);
+    let (account_id, email, domain) = match check(state, to, subject, text).await? {
+        Ok(found) => found,
+        Err(problem) => {
+            tracing::error!(%problem, "system email not sent");
+            return Ok(None);
+        }
     };
-    let email = emails::validate(request(from, to, subject, text), Utc::now())
-        .map_err(|e| anyhow::anyhow!("system email invalid: {e}"))?;
-    let domain = domains::find_by_name(&state.pool, account_id, &email.from_domain)
-        .await?
-        .ok_or_else(|| anyhow::anyhow!("system domain vanished"))?;
     let mut tx = state.pool.begin().await?;
     let (id, _) = emails::insert(
         &mut tx,

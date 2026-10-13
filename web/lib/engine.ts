@@ -2,9 +2,9 @@ import "server-only";
 import { cookies, headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import type { components } from "./engine-types";
+import { SESSION_COOKIE } from "./session-cookie";
 
 export type Schemas = components["schemas"];
-export const SESSION_COOKIE = "mr_session";
 
 export class EngineError extends Error {
   constructor(public status: number, public code: string, message: string) {
@@ -29,7 +29,8 @@ function loginUrl(nextPath?: string) {
 
 async function clientIp(): Promise<string | null> {
   const h = await headers();
-  return h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip");
+  // The rightmost entry is the one our proxy (Caddy) appended; anything left of it is client-controlled.
+  return h.get("x-forwarded-for")?.split(",").at(-1)?.trim() || h.get("x-real-ip");
 }
 
 /** The only place that calls the Rust engine. */

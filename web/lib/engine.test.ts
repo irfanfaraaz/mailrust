@@ -31,7 +31,8 @@ beforeEach(() => {
 describe("engine", () => {
   it("sends the session, account, secret and client ip", async () => {
     cookieStore.set("mr_session", "mr_sess_abc");
-    headerStore.set("x-forwarded-for", "9.9.9.9, 10.0.0.1");
+    // The leftmost entry is whatever the client sent; the rightmost is what our proxy saw.
+    headerStore.set("x-forwarded-for", "6.6.6.6, 9.9.9.9");
     const f = respond(200, { ok: true });
     await engine("/emails", { account: "acc-1" });
     const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit];
@@ -41,6 +42,14 @@ describe("engine", () => {
     expect(h["x-mailrust-account"]).toBe("acc-1");
     expect(h["x-mailrust-web"]).toBe("s".repeat(32));
     expect(h["x-mailrust-client-ip"]).toBe("9.9.9.9");
+  });
+
+  it("falls back to x-real-ip without x-forwarded-for", async () => {
+    headerStore.set("x-real-ip", "8.8.8.8");
+    const f = respond(200, {});
+    await engine("/auth/login", { auth: false, method: "POST", body: {} });
+    const h = (f.mock.calls[0] as unknown as [string, RequestInit])[1].headers as Record<string, string>;
+    expect(h["x-mailrust-client-ip"]).toBe("8.8.8.8");
   });
 
   it("sends people with no session to login, keeping where they were", async () => {

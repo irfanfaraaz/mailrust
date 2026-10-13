@@ -8,6 +8,7 @@ use axum::{
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use subtle::ConstantTimeEq;
 
 use super::{AppState, json::ApiJson};
 use crate::{auth_tokens, error::ApiError, keys::hash_token, sessions, system_mail, users};
@@ -48,7 +49,7 @@ impl FromRequestParts<AppState> for ClientIp {
     async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, ApiError> {
         let h = &parts.headers;
         let trusted = match (&state.config.web_secret, h.get("x-mailrust-web")) {
-            (Some(secret), Some(v)) => v.as_bytes() == secret.as_bytes(),
+            (Some(secret), Some(v)) => v.as_bytes().ct_eq(secret.as_bytes()).into(),
             _ => false,
         };
         if trusted

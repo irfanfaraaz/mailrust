@@ -6,7 +6,10 @@ describe("safeNext", () => {
     expect(safeNext("/a/123/emails?status=sent")).toBe("/a/123/emails?status=sent");
   });
   it("drops anything that can leave the site", () => {
-    for (const bad of ["//evil.com", "https://evil.com", "/\\evil.com", "javascript:alert(1)", "", null, undefined]) {
+    for (const bad of [
+      "//evil.com", "https://evil.com", "/\\evil.com", "javascript:alert(1)", "", null, undefined,
+      "/\t/evil.com", "/\n/evil.com", "/\r/evil.com", "\t//evil.com", "/ /evil.com", "/\u0000/evil.com",
+    ]) {
       expect(safeNext(bad)).toBe("/");
     }
   });

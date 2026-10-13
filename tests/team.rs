@@ -284,3 +284,27 @@ async fn an_owner_can_cancel_an_invite(pool: sqlx::PgPool) {
     .await;
     assert_eq!(s, StatusCode::UNAUTHORIZED);
 }
+
+#[sqlx::test]
+async fn inviting_without_system_email_fails_and_creates_nothing(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    let owner = common::session_for(&pool, t.account.id, "owner@shop.com", MemberRole::Owner).await;
+    let (s, b) = common::call(
+        &t.router,
+        common::sreq(
+            "POST",
+            "/team/invites",
+            &owner,
+            Some(t.account.id),
+            Some(json!({"email": "bo@shop.com", "role": "member"})),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{b}");
+    assert_eq!(b["error"]["code"], "system_email_not_set_up");
+    let invites: i64 = sqlx::query_scalar("SELECT count(*) FROM invites")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(invites, 0);
+}

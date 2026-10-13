@@ -72,6 +72,17 @@ pub(crate) async fn invite(
             format!("{email} is already in this account"),
         ));
     }
+    if let Some(problem) = system_mail::setup_problem(&state).await? {
+        tracing::error!(%problem, "invite not created");
+        return Err(ApiError::Conflict(
+            "system_email_not_set_up",
+            "Invite emails cannot be sent: system email is not set up on this server. Check the server log."
+                .into(),
+        ));
+    }
+    let account = accounts::get(&state.pool, account_id)
+        .await?
+        .ok_or(ApiError::NotFound)?;
     let token = auth_tokens::generate(auth_tokens::INVITE_PREFIX);
     let mut tx = state.pool.begin().await?;
     sqlx::query!(
@@ -99,9 +110,6 @@ pub(crate) async fn invite(
     .await?;
     tx.commit().await?;
 
-    let account = accounts::get(&state.pool, account_id)
-        .await?
-        .ok_or(ApiError::NotFound)?;
     let link = format!("{}/invite?token={token}", state.config.web_base());
     if state.config.dev_log_links {
         tracing::info!(%link, "DEV_LOG_LINKS invite link");

@@ -273,7 +273,11 @@ pub fn validate(req: SendEmailRequest, now: DateTime<Utc>) -> Result<ValidEmail,
         return Err(bad("at most 20 tags"));
     }
     for (k, v) in &req.tags {
-        if !is_tag_part(k) || !is_tag_part(v) || k == crate::sender::EMAIL_ID_TAG {
+        if !is_tag_part(k)
+            || !is_tag_part(v)
+            || k == crate::sender::EMAIL_ID_TAG
+            || k == crate::system_mail::SYSTEM_TAG
+        {
             return Err(bad(format!(
                 "tag {k} must use letters, digits, '_' or '-' (1-256 chars)"
             )));
@@ -539,6 +543,8 @@ pub async fn view(pool: &PgPool, account_id: Uuid, id: Uuid) -> sqlx::Result<Opt
     )
     .fetch_all(pool)
     .await?;
+    // System emails hold one-time login and invite links; only the recipient may see them.
+    let hide = r.tags.0.contains_key(crate::system_mail::SYSTEM_TAG);
     Ok(Some(EmailView {
         id: r.id,
         from: r.from_address,
@@ -547,8 +553,8 @@ pub async fn view(pool: &PgPool, account_id: Uuid, id: Uuid) -> sqlx::Result<Opt
         bcc: r.bcc_addresses,
         reply_to: r.reply_to,
         subject: r.subject,
-        html: r.html,
-        text: r.text_body,
+        html: r.html.filter(|_| !hide),
+        text: r.text_body.filter(|_| !hide),
         status: api_status(r.status, r.send_at, Utc::now()).to_string(),
         priority: r.priority,
         scheduled_at: r.send_at,

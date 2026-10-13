@@ -169,6 +169,11 @@ async fn the_ip_limit_uses_the_passed_ip_only_with_the_secret(pool: sqlx::PgPool
     // Without the secret the header is ignored, so this request is not counted against 1.2.3.4.
     common::call(&t.router, from_ip("1.2.3.4", None, "ana@shop.com")).await;
     assert_eq!(login_mails(&pool, "ana@shop.com").await.len(), 1);
+
+    // A wrong secret of the same length is ignored too.
+    let wrong = "x".repeat(32);
+    common::call(&t.router, from_ip("1.2.3.4", Some(&wrong), "ana@shop.com")).await;
+    assert_eq!(login_mails(&pool, "ana@shop.com").await.len(), 2);
 }
 
 #[sqlx::test]

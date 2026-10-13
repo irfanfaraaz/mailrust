@@ -61,7 +61,7 @@ async function Detail({ params }: Props) {
       <section className="flex flex-col gap-2">
         <h2 className="text-lg font-medium">Body</h2>
         {/* Customer content: show text only, never render e.html. */}
-        <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border p-3 text-sm">{e.text ?? "(HTML only)"}</pre>
+        <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border p-3 text-sm">{e.text ?? (e.html ? "(HTML only)" : "(Hidden: login and invite emails hold one-time links.)")}</pre>
       </section>
     </article>
   );
