@@ -82,3 +82,146 @@ async fn another_accounts_contact_is_invisible(pool: sqlx::PgPool) {
         .unwrap();
     assert!(contacts::view(&pool, t.account.id, id).await.unwrap().is_none());
 }
+
+use axum::http::StatusCode;
+use serde_json::{Value, json};
+
+async fn add(t: &common::TestApp, body: Value) -> (StatusCode, Value) {
+    common::call(&t.router, common::req("POST", "/contacts", Some(&t.key), Some(body))).await
+}
+
+#[sqlx::test]
+async fn adding_twice_updates_and_adds_tags(pool: sqlx::PgPool) {
+    let t = common::app(pool).await;
+    let (s, a) = add(&t, json!({"email": "Ana@Shop.com", "first_name": "Ana", "tags": ["VIP"], "fields": {"plan": "free"}})).await;
+    assert_eq!(s, StatusCode::CREATED, "{a}");
+    assert_eq!(a["status"], "subscribed");
+    assert_eq!(a["source"], "api");
+    let (s, b) = add(&t, json!({"email": " ana@shop.com ", "last_name": "Lopez", "tags": ["News"], "fields": {"plan": "pro"}})).await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    assert_eq!(b["id"], a["id"]);
+    assert_eq!(b["first_name"], "Ana");
+    assert_eq!(b["last_name"], "Lopez");
+    assert_eq!(b["fields"]["plan"], "pro");
+    let tags: Vec<&str> = b["tags"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect();
+    assert_eq!(tags, ["News", "VIP"]);
+}
+
+#[sqlx::test]
+async fn bad_contacts_are_refused(pool: sqlx::PgPool) {
+    let t = common::app(pool).await;
+    let many: serde_json::Map<String, Value> = (0..51).map(|i| (format!("k{i}"), json!("v"))).collect();
+    for body in [
+        json!({"email": "nope"}),
+        json!({"email": "a@b.com", "fields": many}),
+        json!({"email": "a@b.com", "fields": {"Bad Key": "v"}}),
+        json!({"email": "a@b.com", "fields": {"k": "x".repeat(501)}}),
+    ] {
+        let (s, b) = add(&t, body).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{b}");
+    }
+}
+
+#[sqlx::test]
+async fn a_dashboard_add_is_marked_dashboard(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    let s = common::session_for(&pool, t.account.id, "me@shop.com", mailrust::users::MemberRole::Member).await;
+    let (st, b) = common::call(
+        &t.router,
+        common::sreq("POST", "/contacts", &s, Some(t.account.id), Some(json!({"email": "x@y.com"}))),
+    )
+    .await;
+    assert_eq!(st, StatusCode::CREATED, "{b}");
+    assert_eq!(b["source"], "dashboard");
+}
+
+#[sqlx::test]
+async fn list_filters_and_pages(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    add(&t, json!({"email": "ana@x.com", "first_name": "Ana", "tags": ["VIP"]})).await;
+    add(&t, json!({"email": "bo_b@x.com", "first_name": "Bob"})).await;
+    let (_, c) = add(&t, json!({"email": "cy@x.com", "last_name": "Lopez"})).await;
+    sqlx::query("UPDATE contacts SET status = 'unsubscribed' WHERE id = $1::uuid")
+        .bind(c["id"].as_str().unwrap())
+        .execute(&pool)
+        .await
+        .unwrap();
+    let get = |q: &str| common::call(&t.router, common::req("GET", &format!("/contacts?{q}"), Some(&t.key), None));
+
+    let (_, all) = get("limit=2").await;
+    assert_eq!(all["data"].as_array().unwrap().len(), 2);
+    assert_eq!(all["data"][0]["email"], "cy@x.com", "newest first");
+    let cursor = all["next_cursor"].as_str().unwrap();
+    let (_, rest) = get(&format!("limit=2&after={cursor}")).await;
+    assert_eq!(rest["data"].as_array().unwrap().len(), 1);
+    assert!(rest["next_cursor"].is_null());
+
+    let (_, unsub) = get("status=unsubscribed").await;
+    assert_eq!(unsub["data"].as_array().unwrap().len(), 1);
+    let (_, by_name) = get("q=LOPEZ").await;
+    assert_eq!(by_name["data"][0]["email"], "cy@x.com");
+    let (_, literal) = get("q=o_b").await;
+    assert_eq!(literal["data"].as_array().unwrap().len(), 1, "_ is not a wildcard");
+    let (_, ana) = get("q=ana").await;
+    let tag = ana["data"][0]["tags"][0]["id"].as_str().unwrap().to_string();
+    let (_, by_tag) = get(&format!("tag={tag}")).await;
+    assert_eq!(by_tag["data"].as_array().unwrap().len(), 1);
+}
+
+#[sqlx::test]
+async fn patch_edits_but_never_resubscribes(pool: sqlx::PgPool) {
+    let t = common::app(pool).await;
+    let (_, a) = add(&t, json!({"email": "ana@x.com", "first_name": "Ana", "tags": ["A", "B"], "fields": {"x": "1"}})).await;
+    let uri = format!("/contacts/{}", a["id"].as_str().unwrap());
+    let patch = |body: Value| common::call(&t.router, common::req("PATCH", &uri, Some(&t.key), Some(body)));
+
+    let (s, b) = patch(json!({"first_name": "", "fields": {"y": "2"}, "tags": ["b", "C"]})).await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    assert!(b["first_name"].is_null());
+    assert_eq!(b["fields"], json!({"y": "2"}));
+    let tags: Vec<&str> = b["tags"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect();
+    assert_eq!(tags, ["B", "C"]);
+
+    let (s, b) = patch(json!({"status": "unsubscribed"})).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(b["status"], "unsubscribed");
+    assert!(b["unsubscribed_at"].is_string());
+    let (s, b) = patch(json!({"status": "subscribed"})).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    assert_eq!(b["error"]["code"], "resubscribe_not_allowed");
+    let (s, _) = patch(json!({"status": "pending"})).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+}
+
+#[sqlx::test]
+async fn another_account_gets_404(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    let other = mailrust::accounts::create(&pool, "Other").await.unwrap();
+    let key = mailrust::keys::create(&pool, other.id, "k", mailrust::keys::KeyAccess::Full).await.unwrap().token;
+    let (_, a) = add(&t, json!({"email": "ana@x.com"})).await;
+    let uri = format!("/contacts/{}", a["id"].as_str().unwrap());
+    for (m, body) in [("GET", None), ("PATCH", Some(json!({"first_name": "X"}))), ("DELETE", None)] {
+        let (s, _) = common::call(&t.router, common::req(m, &uri, Some(&key), body)).await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "{m}");
+    }
+}
+
+#[sqlx::test]
+async fn delete_erases_tag_links_and_confirmations(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    let (_, a) = add(&t, json!({"email": "ana@x.com", "tags": ["A"]})).await;
+    let id: uuid::Uuid = a["id"].as_str().unwrap().parse().unwrap();
+    sqlx::query("INSERT INTO contact_confirmations (token_hash, contact_id, expires_at) VALUES ('\\x01', $1, now() + interval '1 day')")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, _) = common::call(&t.router, common::req("DELETE", &format!("/contacts/{id}"), Some(&t.key), None)).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    for table in ["contacts", "contact_tags", "contact_confirmations"] {
+        let n: i64 = sqlx::query_scalar(&format!("SELECT count(*) FROM {table}")).fetch_one(&pool).await.unwrap();
+        assert_eq!(n, 0, "{table}");
+    }
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM tags").fetch_one(&pool).await.unwrap();
+    assert_eq!(n, 1, "the tag itself stays");
+}

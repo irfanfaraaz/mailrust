@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT status AS \"status: ContactStatus\" FROM contacts WHERE id = $1 AND account_id = $2 FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "status: ContactStatus",
+        "type_info": {
+          "Custom": {
+            "name": "contact_status",
+            "kind": {
+              "Enum": [
+                "pending",
+                "subscribed",
+                "unsubscribed"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "0fffba71e75fe2a4c25ff59f13d5ea7dce0ba43b102cbcc088f332efcba822fa"
+}

@@ -11,6 +11,7 @@ use crate::{
     accounts::AccountStatus,
     api::{
         AppState,
+        contacts::{ContactList, CreateContactRequest, UpdateContactRequest},
         domains::{CreateDomainRequest, DomainList, UpdateDomainRequest},
         emails::{BatchResponse, EmailList},
         keys::{CreateKeyRequest, CreatedKey, KeyList},
@@ -20,6 +21,7 @@ use crate::{
         team::{InviteRequest, RoleRequest},
         webhooks::{CreateWebhookRequest, WebhookList},
     },
+    contacts::{ContactSource, ContactStatus, ContactView, TagRef},
     domains::{Domain, DomainStatus},
     emails::{
         AttachmentInput, EmailStatus, EmailSummary, EmailView, EventView, Priority,
@@ -193,18 +195,44 @@ fn invites_accept() {}
 #[utoipa::path(get, path = "/stats/overview", tag = "stats", responses((status = 200, body = Overview)))]
 fn stats_overview() {}
 
+#[utoipa::path(get, path = "/contacts", tag = "audience",
+    params(("status" = Option<ContactStatus>, Query), ("tag" = Option<uuid::Uuid>, Query, description = "Tag id"),
+        ("q" = Option<String>, Query, description = "Email or name, case-insensitive"),
+        ("limit" = Option<i64>, Query), ("after" = Option<uuid::Uuid>, Query)),
+    responses((status = 200, body = ContactList)))]
+fn list_contacts() {}
+
+#[utoipa::path(post, path = "/contacts", tag = "audience", request_body = CreateContactRequest,
+    responses((status = 201, body = ContactView), (status = 200, body = ContactView, description = "The address existed: updated"),
+               (status = 400, body = ErrorBody)))]
+fn create_contact() {}
+
+#[utoipa::path(get, path = "/contacts/{id}", tag = "audience", params(("id" = uuid::Uuid, Path)),
+    responses((status = 200, body = ContactView), (status = 404, body = ErrorBody)))]
+fn get_contact() {}
+
+#[utoipa::path(patch, path = "/contacts/{id}", tag = "audience", params(("id" = uuid::Uuid, Path)), request_body = UpdateContactRequest,
+    responses((status = 200, body = ContactView), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+fn update_contact() {}
+
+#[utoipa::path(delete, path = "/contacts/{id}", tag = "audience", params(("id" = uuid::Uuid, Path)),
+    responses((status = 204), (status = 404, body = ErrorBody)))]
+fn delete_contact() {}
+
 #[derive(OpenApi)]
 #[openapi(
     info(title = "Mailrust API", version = "0.1.0", description = "Send transactional email through your own Amazon SES. Auth: `Authorization: Bearer mr_live_…` (API key), or `Bearer mr_sess_…` (dashboard session) plus `X-Mailrust-Account: <account id>`."),
     paths(send_email, send_batch, list_emails, get_email, cancel_email, create_domain, list_domains, get_domain, update_domain,
           delete_domain, verify_domain, create_key, list_keys, delete_key, create_webhook, list_webhooks, delete_webhook,
           list_suppressions, add_suppression, delete_suppression, health, auth_login, auth_verify, me, auth_logout, auth_logout_all,
-          team_list, team_invite, team_cancel_invite, team_set_role, team_remove, invites_accept, stats_overview),
+          team_list, team_invite, team_cancel_invite, team_set_role, team_remove, invites_accept, stats_overview,
+          list_contacts, create_contact, get_contact, update_contact, delete_contact),
     components(schemas(SendEmailRequest, AttachmentInput, SendResponse, BatchResponse, EmailView, EmailSummary, EmailList,
         EventView, EmailStatus, Priority, Domain, DomainStatus, DnsRecord, DomainList, CreateDomainRequest, UpdateDomainRequest,
         KeySummary, KeyAccess, CreateKeyRequest, CreatedKey, KeyList, CreateWebhookRequest, WebhookView, WebhookList,
         SuppressionView, SuppressionList, AddSuppressionRequest, SuppressionReason, AccountStatus, LoginRequest, TokenRequest, SessionResponse,
-        MeResponse, MyAccount, User, MemberRole, TeamView, MemberView, InviteView, InviteRequest, RoleRequest, Overview, Counts, ErrorBody, ErrorDetail)),
+        MeResponse, MyAccount, User, MemberRole, TeamView, MemberView, InviteView, InviteRequest, RoleRequest, Overview, Counts, ErrorBody, ErrorDetail,
+        ContactView, ContactList, ContactStatus, ContactSource, TagRef, CreateContactRequest, UpdateContactRequest)),
     modifiers(&BearerAuth),
     security(("bearer" = []))
 )]
@@ -230,6 +258,14 @@ mod tests {
             "/invites/accept",
             "/stats/overview",
         ] {
+            assert!(doc["paths"][p].is_object(), "missing {p}");
+        }
+    }
+
+    #[test]
+    fn the_document_lists_the_audience_routes() {
+        let doc = serde_json::to_value(super::ApiDoc::openapi()).unwrap();
+        for p in ["/contacts", "/contacts/{id}"] {
             assert!(doc["paths"][p].is_object(), "missing {p}");
         }
     }

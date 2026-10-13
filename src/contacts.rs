@@ -245,6 +245,51 @@ pub async fn view(pool: &PgPool, account_id: Uuid, id: Uuid) -> sqlx::Result<Opt
     .await
 }
 
+#[derive(Debug, Default)]
+pub struct ListFilter {
+    pub status: Option<ContactStatus>,
+    pub tag: Option<Uuid>,
+    /// Matches email, first name, last name or "first last", ignoring case; `%` and `_` are literal.
+    pub q: Option<String>,
+}
+
+pub async fn list(
+    pool: &PgPool,
+    account_id: Uuid,
+    f: &ListFilter,
+    after: Option<Uuid>,
+    limit: i64,
+) -> sqlx::Result<Vec<ContactView>> {
+    let pattern = f.q.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(crate::emails::like_pattern);
+    sqlx::query_as!(
+        ContactView,
+        r#"SELECT c.id, c.email, c.first_name, c.last_name,
+                  c.fields AS "fields!: Json<Fields>",
+                  c.status AS "status!: ContactStatus", c.source AS "source!: ContactSource",
+                  COALESCE((SELECT json_agg(json_build_object('id', t.id, 'name', t.name) ORDER BY lower(t.name))
+                            FROM contact_tags ct JOIN tags t ON t.id = ct.tag_id
+                            WHERE ct.contact_id = c.id), '[]'::json) AS "tags!: Json<Vec<TagRef>>",
+                  EXISTS (SELECT 1 FROM suppressions s WHERE s.account_id = c.account_id AND s.address = c.email) AS "blocked!",
+                  c.subscribed_at, c.unsubscribed_at, c.created_at, c.updated_at
+           FROM contacts c
+           WHERE c.account_id = $1
+             AND ($2::contact_status IS NULL OR c.status = $2)
+             AND ($3::uuid IS NULL OR EXISTS (SELECT 1 FROM contact_tags x WHERE x.contact_id = c.id AND x.tag_id = $3))
+             AND ($4::text IS NULL OR c.email ILIKE $4 OR c.first_name ILIKE $4 OR c.last_name ILIKE $4
+                  OR concat_ws(' ', c.first_name, c.last_name) ILIKE $4)
+             AND ($5::uuid IS NULL OR c.id < $5)
+           ORDER BY c.id DESC LIMIT $6"#,
+        account_id,
+        f.status as Option<ContactStatus>,
+        f.tag,
+        pattern,
+        after,
+        limit
+    )
+    .fetch_all(pool)
+    .await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

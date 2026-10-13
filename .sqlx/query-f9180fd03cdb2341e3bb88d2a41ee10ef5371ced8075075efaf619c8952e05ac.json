@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE contacts SET\n             first_name = CASE WHEN $3 THEN $4 ELSE first_name END,\n             last_name = CASE WHEN $5 THEN $6 ELSE last_name END,\n             fields = COALESCE($7, fields),\n             status = COALESCE($8, status),\n             subscribed_at = CASE WHEN $8 = 'subscribed' AND status <> 'subscribed' THEN now() ELSE subscribed_at END,\n             unsubscribed_at = CASE WHEN $8 = 'unsubscribed' AND status <> 'unsubscribed' THEN now() ELSE unsubscribed_at END,\n             unsubscribed_via_link = CASE WHEN $8 = 'unsubscribed' AND status <> 'unsubscribed' THEN false ELSE unsubscribed_via_link END,\n             updated_at = now()\n           WHERE id = $1 AND account_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Bool",
+        "Text",
+        "Bool",
+        "Text",
+        "Jsonb",
+        {
+          "Custom": {
+            "name": "contact_status",
+            "kind": {
+              "Enum": [
+                "pending",
+                "subscribed",
+                "unsubscribed"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f9180fd03cdb2341e3bb88d2a41ee10ef5371ced8075075efaf619c8952e05ac"
+}
