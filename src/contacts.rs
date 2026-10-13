@@ -413,12 +413,22 @@ pub async fn export_page(
     .await
 }
 
+const FORMULA_START: [char; 6] = ['=', '+', '-', '@', '\t', '\r'];
+
 /// OWASP CSV injection: a cell a spreadsheet would run as a formula gets a leading `'`.
 fn defuse(cell: String) -> String {
-    if cell.starts_with(['=', '+', '-', '@', '\t', '\r']) {
+    if cell.starts_with(FORMULA_START) {
         format!("'{cell}")
     } else {
         cell
+    }
+}
+
+/// Undoes `defuse` on import, so an export imports back unchanged.
+pub fn undefuse(cell: &str) -> &str {
+    match cell.strip_prefix('\'') {
+        Some(rest) if rest.starts_with(FORMULA_START) => rest,
+        _ => cell,
     }
 }
 

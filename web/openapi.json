@@ -3098,7 +3098,7 @@
             "items": {
               "$ref": "#/components/schemas/ImportRowError"
             },
-            "description": "The first 1,000 bad rows."
+            "description": "The first 1,000 bad rows. Empty in the import list: get one import to see them."
           },
           "finished_at": {
             "type": [
@@ -3449,7 +3449,7 @@
           },
           "website": {
             "type": "string",
-            "description": "Honeypot: people never fill it; a filled one gets the normal answer and nothing happens."
+            "description": "Honeypot (the form's `hp_f3a1` input): people never fill it; a filled one gets the normal answer and nothing happens."
           }
         }
       },

@@ -664,7 +664,7 @@ async fn cleanup_forgets_old_pending_but_remembers_who_left(pool: sqlx::PgPool) 
     let t = common::app(pool.clone()).await;
     let a = t.account.id;
     sqlx::query(
-        "INSERT INTO contacts (id, account_id, email, status, source, unsubscribed_at, updated_at) VALUES
+        "INSERT INTO contacts (id, account_id, email, status, source, unsubscribed_at, pending_since) VALUES
            (gen_random_uuid(), $1, 'old@x.com',   'pending',    'form', NULL,  now() - interval '31 days'),
            (gen_random_uuid(), $1, 'back@x.com',  'pending',    'form', now() - interval '40 days', now() - interval '31 days'),
            (gen_random_uuid(), $1, 'fresh@x.com', 'pending',    'form', NULL,  now() - interval '29 days'),
@@ -719,4 +719,183 @@ async fn a_newsletter_name_cannot_hold_line_breaks(pool: sqlx::PgPool) {
         let (s, b) = settings(&t, &t.key, Some(json!({"newsletter_name": name}))).await;
         assert_eq!(s, StatusCode::BAD_REQUEST, "{name:?}: {b}");
     }
+}
+
+async fn confirm_with(t: &common::TestApp, token: &str) -> StatusCode {
+    common::call(
+        &t.router,
+        common::web_req(
+            "POST",
+            "/public/confirm",
+            "1.1.1.1",
+            Some(json!({"token": token})),
+        ),
+    )
+    .await
+    .0
+}
+
+async fn unsubscribe_by_link(t: &common::TestApp, email: &str) {
+    let id: uuid::Uuid = sqlx::query_scalar("SELECT id FROM contacts WHERE email = $1")
+        .bind(email)
+        .fetch_one(&t.state.pool)
+        .await
+        .unwrap();
+    let token = tokens::sign_unsubscribe(&t.state.config.tracking_secret, id);
+    let (s, _) = common::call(
+        &t.router,
+        common::web_req(
+            "POST",
+            "/public/unsubscribe",
+            "1.1.1.1",
+            Some(json!({"token": token})),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+}
+
+#[sqlx::test]
+async fn a_new_confirm_link_replaces_the_old_one(pool: sqlx::PgPool) {
+    let t = open_form(&pool).await;
+    join(&t, "two@x.com", "1.1.1.1").await;
+    wait_for_mails(&pool, "two@x.com", 1).await;
+    sqlx::query("UPDATE contact_confirmations SET created_at = now() - interval '11 minutes'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    join(&t, "two@x.com", "1.1.1.2").await;
+    let mails = wait_for_mails(&pool, "two@x.com", 2).await;
+    let (t1, t2) = (confirm_token(&mails[0]), confirm_token(&mails[1]));
+    assert_eq!(confirm_with(&t, &t1).await, StatusCode::UNAUTHORIZED);
+    assert_eq!(confirm_with(&t, &t2).await, StatusCode::OK);
+    assert_eq!(
+        contact_status(&pool, "two@x.com").await.as_deref(),
+        Some("subscribed")
+    );
+}
+
+#[sqlx::test]
+async fn a_leftover_confirm_link_cannot_undo_an_unsubscribe(pool: sqlx::PgPool) {
+    let t = open_form(&pool).await;
+    join(&t, "left@x.com", "1.1.1.1").await;
+    let mails = wait_for_mails(&pool, "left@x.com", 1).await;
+    // A second live link for the same reader (e.g. issued before the replace-on-join rule).
+    let t2 = "mr_conf_leftover";
+    sqlx::query(
+        "INSERT INTO contact_confirmations (token_hash, contact_id, expires_at)
+         SELECT $1, id, now() + interval '1 day' FROM contacts WHERE email = 'left@x.com'",
+    )
+    .bind(mailrust::keys::hash_token(t2))
+    .execute(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        confirm_with(&t, &confirm_token(&mails[0])).await,
+        StatusCode::OK
+    );
+    unsubscribe_by_link(&t, "left@x.com").await;
+    assert_eq!(confirm_with(&t, t2).await, StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        contact_status(&pool, "left@x.com").await.as_deref(),
+        Some("unsubscribed")
+    );
+}
+
+#[sqlx::test]
+async fn the_link_cannot_subscribe_someone_who_never_confirmed(pool: sqlx::PgPool) {
+    let t = open_form(&pool).await;
+    join(&t, "never@x.com", "1.1.1.1").await;
+    wait_for_mails(&pool, "never@x.com", 1).await;
+    unsubscribe_by_link(&t, "never@x.com").await;
+    let id: uuid::Uuid = sqlx::query_scalar("SELECT id FROM contacts WHERE email = 'never@x.com'")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let token = tokens::sign_unsubscribe(&t.state.config.tracking_secret, id);
+    let (s, b) = common::call(
+        &t.router,
+        common::web_req(
+            "POST",
+            "/public/resubscribe",
+            "1.1.1.1",
+            Some(json!({"token": token})),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{b}");
+    assert_eq!(
+        contact_status(&pool, "never@x.com").await.as_deref(),
+        Some("unsubscribed")
+    );
+}
+
+#[sqlx::test]
+async fn an_import_does_not_keep_a_pending_signup_alive(pool: sqlx::PgPool) {
+    let t = open_form(&pool).await;
+    join(&t, "stale@x.com", "1.1.1.1").await;
+    wait_for_mails(&pool, "stale@x.com", 1).await;
+    // The signup went unconfirmed for 31 days; an import (the same upsert as POST /contacts) touches it now.
+    sqlx::query("UPDATE contact_confirmations SET created_at = now() - interval '31 days', expires_at = now() - interval '24 days'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE contacts SET pending_since = now() - interval '31 days', updated_at = now() - interval '31 days'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, b) = common::call(
+        &t.router,
+        common::req(
+            "POST",
+            "/contacts",
+            Some(&t.key),
+            Some(json!({"email": "stale@x.com", "fields": {"plan": "pro"}})),
+        ),
+    )
+    .await;
+    assert!(s.is_success(), "{b}");
+    mailrust::background::cleanup_audience(&pool).await.unwrap();
+    assert_eq!(contact_status(&pool, "stale@x.com").await, None);
+}
+
+#[sqlx::test]
+async fn request_logs_never_hold_a_public_token(pool: sqlx::PgPool) {
+    use std::sync::{Arc, Mutex};
+    #[derive(Clone, Default)]
+    struct Buf(Arc<Mutex<Vec<u8>>>);
+    impl std::io::Write for Buf {
+        fn write(&mut self, b: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(b);
+            Ok(b.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let mut t = common::app(pool).await;
+    common::with_web_secret(&mut t);
+    let token = tokens::sign_unsubscribe(&t.state.config.tracking_secret, uuid::Uuid::now_v7());
+    let buf = Buf::default();
+    let w = buf.clone();
+    let sub = tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::DEBUG)
+        .with_ansi(false)
+        .with_writer(move || w.clone())
+        .finish();
+    let _guard = tracing::subscriber::set_default(sub);
+    let (s, _) = common::call(
+        &t.router,
+        common::web_req(
+            "GET",
+            &format!("/public/unsubscribe/{token}"),
+            "1.1.1.1",
+            None,
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let log = String::from_utf8(buf.0.lock().unwrap().clone()).unwrap();
+    assert!(log.contains("/public/unsubscribe/{token}"), "{log}");
+    assert!(!log.contains(&token), "{log}");
 }

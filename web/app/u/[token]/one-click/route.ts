@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { engine, EngineError } from "@/lib/engine";
-import { unsubscribeIntent } from "@/lib/public-routes";
+import { seeOther, unsubscribeIntent } from "@/lib/public-routes";
 
 /**
  * proxy.ts rewrites plain POSTs to /u/<token> here: RFC 8058 one-click unsubscribes (urlencoded or
@@ -11,7 +11,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   const form = await req.formData().catch(() => null);
   const intent = form && unsubscribeIntent(form);
   if (!intent) return new NextResponse("Expected List-Unsubscribe=One-Click", { status: 400 });
-  const back = (done: string) => NextResponse.redirect(new URL(`/u/${encodeURIComponent(token)}?done=${done}`, req.url), 303);
+  const back = (done: string) => seeOther(`/u/${encodeURIComponent(token)}?done=${done}`);
   if (intent === "resubscribe") {
     try {
       await engine("/public/resubscribe", { method: "POST", auth: false, body: { token } });

@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { HONEYPOT } from "@/lib/embed";
 import { engine, EngineError, type Schemas } from "@/lib/engine";
 import { DRAFT_COOKIE, readDraft } from "@/lib/join-draft";
 
@@ -77,7 +78,7 @@ async function JoinForm({ params, searchParams }: Props) {
           {badName && <p id="first-name-error" role="alert" className="text-sm text-destructive">Use a first name of at most 100 characters, on one line.</p>}
         </div>
         {/* Honeypot: hidden from people and screen readers; bots fill it in. */}
-        <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" className="absolute -left-[9999px] size-px" />
+        <input type="text" name={HONEYPOT} tabIndex={-1} autoComplete="nope" aria-hidden="true" className="absolute -left-[9999px] size-px" />
         <Button type="submit">Subscribe</Button>
       </form>
       <p className="text-xs text-muted-foreground">You will get an email to confirm. Unsubscribe any time from any issue.</p>

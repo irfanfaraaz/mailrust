@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { isOneClick, noJsUnsubState, publicPostTarget, unsubscribeIntent } from "./public-routes";
+import { isOneClick, noJsUnsubState, publicPostTarget, seeOther, unsubscribeIntent } from "./public-routes";
+
+describe("seeOther", () => {
+  it("redirects with a relative Location, so the scheme behind a TLS proxy stays right", () => {
+    const res = seeOther("/join/weekly/check-email");
+    expect(res.status).toBe(303);
+    expect(res.headers.get("location")).toBe("/join/weekly/check-email");
+  });
+});
 
 describe("publicPostTarget", () => {
   it("sends plain form posts to the route handlers", () => {

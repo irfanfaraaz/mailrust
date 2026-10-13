@@ -847,7 +847,7 @@ export interface components {
             /** Format: date-time */
             created_at: string;
             error?: string | null;
-            /** @description The first 1,000 bad rows. */
+            /** @description The first 1,000 bad rows. Empty in the import list: get one import to see them. */
             errors: components["schemas"]["ImportRowError"][];
             /** Format: date-time */
             finished_at?: string | null;
@@ -956,7 +956,7 @@ export interface components {
             email: string;
             first_name?: string | null;
             slug: string;
-            /** @description Honeypot: people never fill it; a filled one gets the normal answer and nothing happens. */
+            /** @description Honeypot (the form's `hp_f3a1` input): people never fill it; a filled one gets the normal answer and nothing happens. */
             website?: string;
         };
         PublicNewsletter: {

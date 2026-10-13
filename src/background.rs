@@ -78,12 +78,12 @@ pub async fn cleanup_auth(pool: &sqlx::PgPool) -> sqlx::Result<()> {
 pub async fn cleanup_audience(pool: &sqlx::PgPool) -> sqlx::Result<()> {
     sqlx::query!(
         "UPDATE contacts SET status = 'unsubscribed', updated_at = now()
-         WHERE status = 'pending' AND unsubscribed_at IS NOT NULL AND updated_at < now() - interval '30 days'"
+         WHERE status = 'pending' AND unsubscribed_at IS NOT NULL AND pending_since < now() - interval '30 days'"
     )
     .execute(pool)
     .await?;
     sqlx::query!(
-        "DELETE FROM contacts WHERE status = 'pending' AND unsubscribed_at IS NULL AND updated_at < now() - interval '30 days'"
+        "DELETE FROM contacts WHERE status = 'pending' AND unsubscribed_at IS NULL AND pending_since < now() - interval '30 days'"
     )
     .execute(pool)
     .await?;

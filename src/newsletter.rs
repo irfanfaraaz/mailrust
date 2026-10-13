@@ -151,7 +151,7 @@ pub async fn process_join(
     };
     let mut tx = state.pool.begin().await?;
     sqlx::query!(
-        "INSERT INTO contacts (id, account_id, email, first_name, status, source) VALUES ($1, $2, $3, $4, 'pending', 'form')
+        "INSERT INTO contacts (id, account_id, email, first_name, status, source, pending_since) VALUES ($1, $2, $3, $4, 'pending', 'form', now())
          ON CONFLICT (account_id, email) DO NOTHING",
         Uuid::now_v7(),
         n.account_id,
@@ -175,9 +175,16 @@ pub async fn process_join(
         return Ok(());
     }
     sqlx::query!(
-        "UPDATE contacts SET status = 'pending', first_name = COALESCE($2, first_name), updated_at = now() WHERE id = $1",
+        "UPDATE contacts SET status = 'pending', pending_since = now(), first_name = COALESCE($2, first_name), updated_at = now() WHERE id = $1",
         c.id,
         first_name
+    )
+    .execute(&mut *tx)
+    .await?;
+    // Only the newest link works: an older one left in an inbox cannot confirm later.
+    sqlx::query!(
+        "UPDATE contact_confirmations SET used_at = now() WHERE contact_id = $1 AND used_at IS NULL",
+        c.id
     )
     .execute(&mut *tx)
     .await?;

@@ -88,8 +88,19 @@ pub fn router(state: AppState) -> Router {
         .merge(crate::tracking::routes())
         .merge(crate::openapi::routes())
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
-        .layer(TraceLayer::new_for_http())
+        .layer(TraceLayer::new_for_http().make_span_with(request_span))
         .with_state(state)
+}
+
+/// The request span. /public/* paths carry unsubscribe tokens, so those log the route, not the URI.
+fn request_span(req: &axum::http::Request<axum::body::Body>) -> tracing::Span {
+    let uri = if req.uri().path().starts_with("/public/") {
+        let route = req.extensions().get::<axum::extract::MatchedPath>();
+        route.map_or("/public/…", |m| m.as_str()).to_string()
+    } else {
+        req.uri().to_string()
+    };
+    tracing::debug_span!("request", method = %req.method(), %uri, version = ?req.version())
 }
 
 /// Drops keys whose limit has fully refilled, so the maps do not grow with every IP and key ever seen.

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE contacts SET status = 'pending', pending_since = now(), first_name = COALESCE($2, first_name), updated_at = now() WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "33361ea0e96aee1a00105c96c836e8fad90f1a1e6a6e5d0dc07ef41c9f8b1894"
+}

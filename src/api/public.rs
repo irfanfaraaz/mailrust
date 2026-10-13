@@ -46,6 +46,15 @@ impl FromRequestParts<AppState> for WebCaller {
         if !from_web(parts, state) {
             return Err(ApiError::NotFound);
         }
+        if !parts.headers.contains_key("x-mailrust-client-ip") {
+            static WARNED: std::sync::Once = std::sync::Once::new();
+            WARNED.call_once(|| {
+                tracing::warn!(
+                    "a public request came without the reader's IP: every reader shares one rate limit; \
+                     make the reverse proxy in front of web/ set X-Forwarded-For"
+                );
+            });
+        }
         let ClientIp(ip) = ClientIp::from_request_parts(parts, state).await?;
         if let Some(ip) = ip
             && state.ip_limiter.check_key(&ip).is_err()
@@ -142,7 +151,8 @@ pub(crate) async fn unsubscribe(
     }))
 }
 
-/// Works only for a contact that left through this same link.
+/// Works only for a contact that left through this same link and had confirmed once
+/// (a pending signup that unsubscribes must still confirm by email).
 pub(crate) async fn resubscribe(
     State(state): State<AppState>,
     _: WebCaller,
@@ -153,7 +163,7 @@ pub(crate) async fn resubscribe(
     let r = sqlx::query!(
         "UPDATE contacts SET status = 'subscribed', subscribed_at = now(), unsubscribed_at = NULL,
                 unsubscribed_via_link = false, updated_at = now()
-         WHERE id = $1 AND status = 'unsubscribed' AND unsubscribed_via_link",
+         WHERE id = $1 AND status = 'unsubscribed' AND unsubscribed_via_link AND subscribed_at IS NOT NULL",
         id
     )
     .execute(&state.pool)
@@ -170,7 +180,7 @@ pub struct PublicJoinRequest {
     pub slug: String,
     pub email: String,
     pub first_name: Option<String>,
-    /// Honeypot: people never fill it; a filled one gets the normal answer and nothing happens.
+    /// Honeypot (the form's `hp_f3a1` input): people never fill it; a filled one gets the normal answer and nothing happens.
     #[serde(default)]
     pub website: String,
 }
@@ -203,6 +213,7 @@ pub(crate) async fn join(
         ));
     }
     if !body.website.trim().is_empty() {
+        tracing::info!(account_id = %n.account_id, "join honeypot filled");
         return Ok(StatusCode::ACCEPTED);
     }
     let ipnet = ip.map(sqlx::types::ipnetwork::IpNetwork::from);
@@ -250,14 +261,18 @@ pub(crate) async fn confirm(
     .fetch_optional(&mut *tx)
     .await?
     .ok_or(ApiError::BadToken)?;
-    sqlx::query!(
+    // Only a pending contact: a link left over from before an unsubscribe must not undo it.
+    let r = sqlx::query!(
         "UPDATE contacts SET status = 'subscribed', subscribed_at = now(), unsubscribed_at = NULL,
                 unsubscribed_via_link = false, updated_at = now()
-         WHERE id = $1 AND status <> 'subscribed'",
+         WHERE id = $1 AND status = 'pending'",
         contact_id
     )
     .execute(&mut *tx)
     .await?;
+    if r.rows_affected() == 0 {
+        return Err(ApiError::BadToken); // the transaction drops: the token stays unused
+    }
     tx.commit().await?;
     tracing::info!(%contact_id, "subscription confirmed");
     let newsletter_name = name_of(&state, contact_id)

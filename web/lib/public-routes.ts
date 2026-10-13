@@ -1,3 +1,10 @@
+import { NextResponse } from "next/server";
+
+/** 303 with a relative Location: built from req.url it would say http:// behind a TLS-terminating proxy. */
+export function seeOther(path: string): NextResponse {
+  return new NextResponse(null, { status: 303, headers: { location: path } });
+}
+
 /**
  * Plain HTML form posts (no server action) to a public page go to the route handler next to it:
  * forms embedded on other sites post to /join/<slug>, and mail clients post RFC 8058 one-click

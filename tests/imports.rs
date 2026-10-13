@@ -350,3 +350,102 @@ async fn a_job_that_keeps_failing_is_given_up(pool: sqlx::PgPool) {
         .unwrap();
     assert_eq!(n, 0, "a given-up job does not run again");
 }
+
+#[sqlx::test]
+async fn an_export_imports_back_unchanged(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    let fields = || async {
+        sqlx::query_scalar::<_, serde_json::Value>("SELECT fields FROM contacts")
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+    };
+    let csv = b"email,phone,delta,note,handle\na@x.com,+1 555 0100,-5,=1+1,@ana\n";
+    let (s, b) = common::call(
+        &t.router,
+        upload(&t.key, &[("file", &csv[..]), ("consent", TRUE)]),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{b}");
+    assert!(imports::run_once(&pool).await.unwrap());
+    let before = fields().await;
+    assert_eq!(before["phone"], "+1 555 0100");
+
+    let (_, _, export) = common::call_raw(
+        &t.router,
+        common::req("GET", "/contacts/export", Some(&t.key), None),
+    )
+    .await;
+    assert!(
+        export.contains(",'+1 555 0100"),
+        "the export stays defused: {export}"
+    );
+    let (s, b) = common::call(
+        &t.router,
+        upload(&t.key, &[("file", export.as_bytes()), ("consent", TRUE)]),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{b}");
+    assert!(imports::run_once(&pool).await.unwrap());
+    assert_eq!(
+        fields().await,
+        before,
+        "import → export → import round-trips"
+    );
+}
+
+#[sqlx::test]
+async fn a_slow_job_that_keeps_making_progress_is_not_given_up(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    let mut csv = String::from("email\n");
+    let rows = (imports::MAX_ATTEMPTS as usize + 2) * imports::BATCH;
+    for i in 0..rows {
+        csv.push_str(&format!("r{i}@x.com\n"));
+    }
+    let (s, b) = common::call(
+        &t.router,
+        upload(&t.key, &[("file", csv.as_bytes()), ("consent", TRUE)]),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{b}");
+    // Each run gets one batch done, then its lease runs out before it finishes.
+    for _ in 0..=imports::MAX_ATTEMPTS {
+        let job = imports::claim(&pool).await.unwrap().expect("claimed");
+        imports::run_job(&pool, job, 1).await.unwrap();
+        sqlx::query("UPDATE contact_imports SET lease_until = now() - interval '1 second'")
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+    assert!(imports::run_once(&pool).await.unwrap());
+    let (status, done): (String, i32) =
+        sqlx::query_as("SELECT status::text, rows_done FROM contact_imports")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!((status.as_str(), done as usize), ("done", rows));
+}
+
+#[sqlx::test]
+async fn the_import_list_leaves_out_row_errors(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    let (_, b) = common::call(
+        &t.router,
+        upload(
+            &t.key,
+            &[("file", &b"email\nbad\na@x.com\n"[..]), ("consent", TRUE)],
+        ),
+    )
+    .await;
+    assert!(imports::run_once(&pool).await.unwrap());
+    let get = |uri: String| common::req("GET", &uri, Some(&t.key), None);
+    let (_, list) = common::call(&t.router, get("/contacts/imports".into())).await;
+    assert_eq!(list["data"][0]["errors"], json!([]), "{list}");
+    assert_eq!(list["data"][0]["skipped"], 1);
+    let (_, one) = common::call(
+        &t.router,
+        get(format!("/contacts/imports/{}", b["id"].as_str().unwrap())),
+    )
+    .await;
+    assert_eq!(one["errors"][0]["line"], 2, "{one}");
+}

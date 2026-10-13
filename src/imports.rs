@@ -45,7 +45,7 @@ pub struct ImportView {
     pub added: i32,
     pub updated: i32,
     pub skipped: i32,
-    /// The first 1,000 bad rows.
+    /// The first 1,000 bad rows. Empty in the import list: get one import to see them.
     #[schema(value_type = Vec<ImportRowError>)]
     pub errors: Json<Vec<ImportRowError>>,
     pub error: Option<String>,
@@ -212,7 +212,7 @@ impl LineCounter<'_> {
 pub fn parse_row(c: &Columns, rec: &csv::StringRecord) -> Result<ContactInput, String> {
     let get = |i: Option<usize>| {
         i.and_then(|i| rec.get(i))
-            .map(str::trim)
+            .map(|s| contacts::undefuse(s.trim()))
             .filter(|s| !s.is_empty())
     };
     let email = get(Some(c.email)).ok_or("the email is empty")?;
@@ -271,7 +271,7 @@ pub async fn list(pool: &PgPool, account_id: Uuid) -> sqlx::Result<Vec<ImportVie
     sqlx::query_as!(
         ImportView,
         r#"SELECT id, status AS "status: ImportStatus", tag_id, rows_total, rows_done, added, updated, skipped,
-                  errors AS "errors: Json<Vec<ImportRowError>>", error, created_at, finished_at
+                  '[]'::jsonb AS "errors!: Json<Vec<ImportRowError>>", error, created_at, finished_at
            FROM contact_imports WHERE account_id = $1 ORDER BY id DESC LIMIT 20"#,
         account_id
     )
@@ -400,7 +400,7 @@ mod tests {
 
 pub const BATCH: usize = 1_000;
 pub const LEASE_SECS: i32 = 300;
-/// Claims a job gets before it is marked failed: each claim after the first means the last run died.
+/// Claims in a row without progress before a job is marked failed: each claim after the first means the last run died.
 pub const MAX_ATTEMPTS: i32 = 3;
 
 #[derive(Debug, Clone)]
@@ -497,9 +497,10 @@ pub async fn run_job(pool: &PgPool, job: ClaimedImport, max_batches: usize) -> a
         }
         let skipped = errors.len() as i32;
         errors.truncate(MAX_ERRORS.saturating_sub(listed as usize));
+        // attempts = 1: this run made progress, so only runs that die without any count toward MAX_ATTEMPTS.
         sqlx::query!(
             "UPDATE contact_imports SET rows_done = rows_done + $2, added = added + $3, updated = updated + $4,
-                    skipped = skipped + $5, errors = errors || $6
+                    skipped = skipped + $5, errors = errors || $6, attempts = 1
              WHERE id = $1",
             job.id,
             batch.len() as i32,

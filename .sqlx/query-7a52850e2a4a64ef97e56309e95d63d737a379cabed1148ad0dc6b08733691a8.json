@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE contacts SET status = 'unsubscribed', updated_at = now()\n         WHERE status = 'pending' AND unsubscribed_at IS NOT NULL AND pending_since < now() - interval '30 days'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "7a52850e2a4a64ef97e56309e95d63d737a379cabed1148ad0dc6b08733691a8"
+}

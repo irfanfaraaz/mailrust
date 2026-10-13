@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE contact_confirmations SET used_at = now() WHERE contact_id = $1 AND used_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7ae1f707367346ce910669f5b94f1354bcba661e0efdf76f7ac54c7a727b4015"
+}
