@@ -9,8 +9,10 @@ use serde_json::json;
 pub enum ApiError {
     #[error("{0}")]
     Validation(String),
-    #[error("missing or invalid API key")]
+    #[error("missing or invalid API key or session")]
     Unauthorized,
+    #[error("this link is invalid or has expired")]
+    BadToken,
     #[error("this API key is not allowed to do that")]
     Forbidden,
     #[error("this account is paused: {0}")]
@@ -40,6 +42,7 @@ impl ApiError {
         match self {
             ApiError::Validation(_) => (StatusCode::BAD_REQUEST, "validation_error"),
             ApiError::Unauthorized => (StatusCode::UNAUTHORIZED, "unauthorized"),
+            ApiError::BadToken => (StatusCode::UNAUTHORIZED, "invalid_token"),
             ApiError::Forbidden => (StatusCode::FORBIDDEN, "forbidden"),
             ApiError::AccountPaused(_) => (StatusCode::FORBIDDEN, "account_paused"),
             ApiError::NotFound => (StatusCode::NOT_FOUND, "not_found"),

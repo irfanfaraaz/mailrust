@@ -14,6 +14,7 @@ use crate::{
         domains::{CreateDomainRequest, DomainList, UpdateDomainRequest},
         emails::{BatchResponse, EmailList},
         keys::{CreateKeyRequest, CreatedKey, KeyList},
+        login::{LoginRequest, SessionResponse, TokenRequest},
         suppressions::{AddSuppressionRequest, SuppressionList, SuppressionView},
         webhooks::{CreateWebhookRequest, WebhookList},
     },
@@ -139,16 +140,24 @@ fn delete_suppression() {}
 #[utoipa::path(get, path = "/health", tag = "system", security(), responses((status = 200), (status = 503)))]
 fn health() {}
 
+#[utoipa::path(post, path = "/auth/login", tag = "dashboard", security(), request_body = LoginRequest,
+    responses((status = 202), (status = 400, body = ErrorBody)))]
+fn auth_login() {}
+
+#[utoipa::path(post, path = "/auth/verify", tag = "dashboard", security(), request_body = TokenRequest,
+    responses((status = 200, body = SessionResponse), (status = 401, body = ErrorBody)))]
+fn auth_verify() {}
+
 #[derive(OpenApi)]
 #[openapi(
     info(title = "Mailrust API", version = "0.1.0", description = "Send transactional email through your own Amazon SES. Auth: `Authorization: Bearer mr_live_…`."),
     paths(send_email, send_batch, list_emails, get_email, cancel_email, create_domain, list_domains, get_domain, update_domain,
           delete_domain, verify_domain, create_key, list_keys, delete_key, create_webhook, list_webhooks, delete_webhook,
-          list_suppressions, add_suppression, delete_suppression, health),
+          list_suppressions, add_suppression, delete_suppression, health, auth_login, auth_verify),
     components(schemas(SendEmailRequest, AttachmentInput, SendResponse, BatchResponse, EmailView, EmailSummary, EmailList,
         EventView, EmailStatus, Priority, Domain, DomainStatus, DnsRecord, DomainList, CreateDomainRequest, UpdateDomainRequest,
         KeySummary, KeyAccess, CreateKeyRequest, CreatedKey, KeyList, CreateWebhookRequest, WebhookView, WebhookList,
-        SuppressionView, SuppressionList, AddSuppressionRequest, SuppressionReason, AccountStatus, ErrorBody, ErrorDetail)),
+        SuppressionView, SuppressionList, AddSuppressionRequest, SuppressionReason, AccountStatus, LoginRequest, TokenRequest, SessionResponse, ErrorBody, ErrorDetail)),
     modifiers(&BearerAuth),
     security(("bearer" = []))
 )]

@@ -38,7 +38,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha1 = { version = "0.10", features = ["oid"] }
 sha2 = { version = "0.10", features = ["oid"] }
-sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "macros", "migrate", "uuid", "chrono", "json"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "macros", "migrate", "uuid", "chrono", "json", "ipnetwork"] }
 thiserror = "2"
 tokio = { version = "1", features = ["full"] }
 tokio-util = "0.7"

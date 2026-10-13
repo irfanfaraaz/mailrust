@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO login_requests (email, ip) VALUES ($1, $2)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Inet"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "789986d020f96d16a8437f0728496fbfd45df3c5793a6cf32b1e0ce4f25a6006"
+}
