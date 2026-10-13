@@ -17,6 +17,7 @@ use crate::{
         keys::{CreateKeyRequest, CreatedKey, KeyList},
         login::{LoginRequest, SessionResponse, TokenRequest},
         me::MeResponse,
+        newsletter::UpdateNewsletterRequest,
         suppressions::{AddSuppressionRequest, SuppressionList, SuppressionView},
         tags::{TagList, TagRequest, TagView},
         team::{InviteRequest, RoleRequest},
@@ -29,6 +30,7 @@ use crate::{
         SendEmailRequest, SendResponse,
     },
     keys::{KeyAccess, KeySummary},
+    newsletter::NewsletterSettings,
     safety::SuppressionReason,
     sender::DnsRecord,
     stats::{Counts, Overview},
@@ -225,6 +227,14 @@ fn update_contact() {}
     responses((status = 204), (status = 404, body = ErrorBody)))]
 fn delete_contact() {}
 
+#[utoipa::path(get, path = "/newsletter", tag = "audience", responses((status = 200, body = NewsletterSettings)))]
+fn get_newsletter() {}
+
+#[utoipa::path(patch, path = "/newsletter", tag = "audience", request_body = UpdateNewsletterRequest,
+    responses((status = 200, body = NewsletterSettings), (status = 400, body = ErrorBody),
+               (status = 409, body = ErrorBody), (status = 422, body = ErrorBody)))]
+fn update_newsletter() {}
+
 #[utoipa::path(get, path = "/tags", tag = "audience", responses((status = 200, body = TagList)))]
 fn list_tags() {}
 
@@ -248,14 +258,14 @@ fn delete_tag() {}
           list_suppressions, add_suppression, delete_suppression, health, auth_login, auth_verify, me, auth_logout, auth_logout_all,
           team_list, team_invite, team_cancel_invite, team_set_role, team_remove, invites_accept, stats_overview,
           list_contacts, export_contacts, create_contact, get_contact, update_contact, delete_contact,
-          list_tags, create_tag, rename_tag, delete_tag),
+          list_tags, create_tag, rename_tag, delete_tag, get_newsletter, update_newsletter),
     components(schemas(SendEmailRequest, AttachmentInput, SendResponse, BatchResponse, EmailView, EmailSummary, EmailList,
         EventView, EmailStatus, Priority, Domain, DomainStatus, DnsRecord, DomainList, CreateDomainRequest, UpdateDomainRequest,
         KeySummary, KeyAccess, CreateKeyRequest, CreatedKey, KeyList, CreateWebhookRequest, WebhookView, WebhookList,
         SuppressionView, SuppressionList, AddSuppressionRequest, SuppressionReason, AccountStatus, LoginRequest, TokenRequest, SessionResponse,
         MeResponse, MyAccount, User, MemberRole, TeamView, MemberView, InviteView, InviteRequest, RoleRequest, Overview, Counts, ErrorBody, ErrorDetail,
         ContactView, ContactList, ContactStatus, ContactSource, TagRef, CreateContactRequest, UpdateContactRequest,
-        TagView, TagList, TagRequest)),
+        TagView, TagList, TagRequest, NewsletterSettings, UpdateNewsletterRequest)),
     modifiers(&BearerAuth),
     security(("bearer" = []))
 )]
@@ -288,7 +298,7 @@ mod tests {
     #[test]
     fn the_document_lists_the_audience_routes() {
         let doc = serde_json::to_value(super::ApiDoc::openapi()).unwrap();
-        for p in ["/contacts", "/contacts/export", "/contacts/{id}", "/tags", "/tags/{id}"] {
+        for p in ["/contacts", "/contacts/export", "/contacts/{id}", "/tags", "/tags/{id}", "/newsletter"] {
             assert!(doc["paths"][p].is_object(), "missing {p}");
         }
     }

@@ -15,6 +15,7 @@ pub mod error;
 pub mod events;
 pub mod keys;
 pub mod limiter;
+pub mod newsletter;
 pub mod openapi;
 pub mod queue;
 pub mod quota;

@@ -18,6 +18,7 @@ pub mod json;
 pub mod keys;
 pub mod login;
 pub mod me;
+pub mod newsletter;
 pub mod ses;
 pub mod stats;
 pub mod suppressions;
@@ -57,6 +58,7 @@ pub fn router(state: AppState) -> Router {
     Router::new()
         .merge(health::routes())
         .merge(contacts::routes())
+        .merge(newsletter::routes())
         .merge(domains::routes())
         .merge(emails::routes())
         .merge(ses::routes())

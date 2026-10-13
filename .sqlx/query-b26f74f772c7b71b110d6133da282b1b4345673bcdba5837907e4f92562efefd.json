@@ -1,0 +1,68 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id AS account_id, name AS account_name, status AS \"status: AccountStatus\",\n                  public_slug, newsletter_name, newsletter_from, signup_enabled\n           FROM accounts WHERE public_slug = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "account_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "account_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "status: AccountStatus",
+        "type_info": {
+          "Custom": {
+            "name": "account_status",
+            "kind": {
+              "Enum": [
+                "active",
+                "paused"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "public_slug",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "newsletter_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "newsletter_from",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "signup_enabled",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "b26f74f772c7b71b110d6133da282b1b4345673bcdba5837907e4f92562efefd"
+}
