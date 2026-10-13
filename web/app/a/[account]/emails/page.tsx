@@ -4,7 +4,7 @@ import { Loading } from "@/components/loading";
 import { EmailStatusBadge, statusLabel } from "@/components/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { engine, type Schemas } from "@/lib/engine";
-import { utc } from "@/lib/format";
+import { isoDate, utc } from "@/lib/format";
 import { Filters } from "./filters";
 
 export const metadata = { title: "Emails" };
@@ -28,7 +28,10 @@ async function Log({ params, searchParams }: Props) {
   const { account } = await params;
   const sp = await searchParams;
   const qs = new URLSearchParams();
-  for (const [k, v] of Object.entries(sp)) if (v) qs.set(k, k === "since" || k === "until" ? new Date(v).toISOString() : v);
+  for (const [k, v] of Object.entries(sp)) {
+    const value = v && (k === "since" || k === "until" ? isoDate(v) : v);
+    if (value) qs.set(k, value);
+  }
   qs.set("limit", "50");
   const list = await engine<Schemas["EmailList"]>(`/emails?${qs}`, { account, nextPath: `/a/${account}/emails` });
   const older = new URLSearchParams({ ...sp, after: list.next_cursor ?? "" } as Record<string, string>);

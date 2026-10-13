@@ -15,7 +15,7 @@ Self-hosted email platform with two doors: a sending API (like Resend) and a new
 
 ```bash
 docker compose up -d postgres
-cp .env.example .env
+cp .env.example .env                                   # dev: also uncomment DEV_LOG_LINKS=true
 cargo run -- migrate
 cargo run -- account create --name "My app"              # prints the account id
 cargo run -- key create --account <account-id> --name dev # prints the API key once
@@ -30,7 +30,7 @@ cargo run -- user invite you@example.com --account <account-id> --role owner
 pnpm --dir web install && pnpm --dir web dev   # http://localhost:3000
 ```
 
-With `MAILRUST_SENDER=fake` the login link lands in `./outbox`, and with `DEV_LOG_LINKS=true` (dev only) it also lands in the server log.
+With `MAILRUST_SENDER=fake` the login link lands in `./outbox`. Uncomment `DEV_LOG_LINKS=true` in `.env` (dev only, never in production) to also print it to the server log.
 
 ```bash
 curl -s localhost:8080/emails \

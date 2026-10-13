@@ -308,3 +308,44 @@ async fn inviting_without_system_email_fails_and_creates_nothing(pool: sqlx::PgP
         .unwrap();
     assert_eq!(invites, 0);
 }
+
+#[sqlx::test]
+async fn owners_inviting_the_same_person_at_once_all_succeed(pool: sqlx::PgPool) {
+    let tm = team(pool.clone()).await;
+    let other =
+        common::session_for(&pool, tm.t.account.id, "other@shop.com", MemberRole::Owner).await;
+    let mut set = tokio::task::JoinSet::new();
+    for i in 0..10 {
+        let router = tm.t.router.clone();
+        let s = if i % 2 == 0 {
+            tm.owner.clone()
+        } else {
+            other.clone()
+        };
+        let account = tm.t.account.id;
+        set.spawn(async move {
+            common::call(
+                &router,
+                common::sreq(
+                    "POST",
+                    "/team/invites",
+                    &s,
+                    Some(account),
+                    Some(json!({"email": "bo@shop.com", "role": "member"})),
+                ),
+            )
+            .await
+        });
+    }
+    while let Some(r) = set.join_next().await {
+        let (s, b) = r.unwrap();
+        assert_eq!(s, StatusCode::CREATED, "{b}");
+    }
+    let open: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM invites WHERE email = 'bo@shop.com' AND accepted_at IS NULL AND revoked_at IS NULL",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(open, 1);
+}

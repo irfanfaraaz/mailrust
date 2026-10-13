@@ -187,6 +187,11 @@ pub async fn run() -> anyhow::Result<()> {
             if let Some(problem) = crate::system_mail::setup_problem(&state).await? {
                 tracing::warn!(%problem, "dashboard login emails will not be sent until this is fixed");
             }
+            if state.config.web_secret.is_none() {
+                tracing::warn!(
+                    "WEB_SECRET is not set: dashboard logins are rate-limited by the web server's IP, shared by every user"
+                );
+            }
             let shutdown = tokio_util::sync::CancellationToken::new();
             let mut tasks = tokio::task::JoinSet::new();
             if role != Role::Worker {

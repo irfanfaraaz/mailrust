@@ -43,14 +43,14 @@ services:
     restart: unless-stopped
     environment:
       ENGINE_URL: http://mailrust:8080
-      WEB_SECRET: ${WEB_SECRET}
+      WEB_SECRET: ${WEB_SECRET:?set WEB_SECRET in .env}
     depends_on: [mailrust]
 
   caddy:
     image: caddy:2
     restart: unless-stopped
     environment:
-      MAILRUST_DOMAIN: ${MAILRUST_DOMAIN}
+      MAILRUST_DOMAIN: ${MAILRUST_DOMAIN:?set MAILRUST_DOMAIN in .env}
     ports: ["80:80", "443:443"]
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro

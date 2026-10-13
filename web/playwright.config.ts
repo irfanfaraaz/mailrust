@@ -11,7 +11,7 @@ export default defineConfig({
   webServer: {
     command: "pnpm build && pnpm start",
     url: "http://localhost:3000/login",
-    env: { ENGINE_URL: "http://127.0.0.1:8080", WEB_SECRET },
+    env: { ENGINE_URL: "http://127.0.0.1:8080", WEB_SECRET, COOKIE_SECURE: "false" },
     timeout: 300_000,
     reuseExistingServer: !process.env.CI,
   },

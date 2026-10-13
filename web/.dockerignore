@@ -5,3 +5,5 @@ e2e/*
 !e2e/env.ts
 test-results
 playwright-report
+.env*
+!.env.example

@@ -85,6 +85,14 @@ pub(crate) async fn invite(
         .ok_or(ApiError::NotFound)?;
     let token = auth_tokens::generate(auth_tokens::INVITE_PREFIX);
     let mut tx = state.pool.begin().await?;
+    // Serialises concurrent invites for this account, so two owners inviting the same email
+    // cannot both pass the revoke and then collide on the invites_one_open index.
+    sqlx::query!(
+        "SELECT 1 AS one FROM accounts WHERE id = $1 FOR UPDATE",
+        account_id
+    )
+    .fetch_optional(&mut *tx)
+    .await?;
     sqlx::query!(
         "UPDATE invites SET revoked_at = now()
          WHERE account_id = $1 AND email = $2 AND accepted_at IS NULL AND revoked_at IS NULL",

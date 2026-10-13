@@ -7,7 +7,8 @@ const SESSION_DAYS = 30;
 export function sessionCookieOptions(expires: Date) {
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production" && !process.env.ENGINE_URL?.includes("127.0.0.1"),
+    // COOKIE_SECURE=false: a production build served over plain http (the e2e run on localhost).
+    secure: process.env.NODE_ENV === "production" && process.env.COOKIE_SECURE !== "false",
     sameSite: "lax" as const,
     path: "/",
     expires,
