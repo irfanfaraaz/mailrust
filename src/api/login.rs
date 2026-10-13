@@ -51,14 +51,13 @@ impl FromRequestParts<AppState> for ClientIp {
             (Some(secret), Some(v)) => v.as_bytes() == secret.as_bytes(),
             _ => false,
         };
-        if trusted {
-            if let Some(ip) = h
+        if trusted
+            && let Some(ip) = h
                 .get("x-mailrust-client-ip")
                 .and_then(|v| v.to_str().ok())
                 .and_then(|v| v.trim().parse().ok())
-            {
-                return Ok(ClientIp(Some(ip)));
-            }
+        {
+            return Ok(ClientIp(Some(ip)));
         }
         let peer = parts
             .extensions
