@@ -44,3 +44,14 @@ export function EmailStatusBadge({ status }: { status: string }) {
 export function DomainStatusBadge({ status }: { status: Schemas["DomainStatus"] }) {
   return <StatusBadge tone={domainTone[status]} status={status} />;
 }
+
+const contactTone: Record<Schemas["ContactStatus"], Tone> = { subscribed: "good", pending: "wait", unsubscribed: "quiet" };
+
+export function ContactStatusBadge({ status }: { status: Schemas["ContactStatus"] }) {
+  return <StatusBadge tone={contactTone[status]} status={status} />;
+}
+
+/** On the suppression list: nothing is sent to this address. */
+export function BlockedBadge() {
+  return <StatusBadge tone="bad" status="blocked" />;
+}
