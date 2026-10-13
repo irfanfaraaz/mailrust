@@ -13,12 +13,12 @@ export function CreateWebhook({ account }: { account: string }) {
     <div className="flex flex-col gap-4">
       <form action={action} className="flex flex-col gap-3 text-sm">
         <label className="flex flex-col gap-1">URL
-          <Input name="url" type="url" required placeholder="https://example.com/hook" />
+          <Input id="webhook-url" name="url" type="url" required placeholder="https://example.com/hook" />
         </label>
-        <fieldset className="flex flex-wrap gap-4">
+        <fieldset className="flex flex-wrap gap-x-4 gap-y-1">
           <legend className="mb-1">Events</legend>
           {EVENTS.map((e) => (
-            <label key={e} className="flex items-center gap-1.5">
+            <label key={e} className="flex items-center gap-1.5 max-md:min-h-11">
               <input type="checkbox" name="events" value={e} />{e}
             </label>
           ))}

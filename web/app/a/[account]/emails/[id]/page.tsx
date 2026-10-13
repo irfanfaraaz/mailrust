@@ -1,12 +1,19 @@
 import { Suspense } from "react";
+import { ConfirmAction } from "@/components/confirm-action";
+import { Loading } from "@/components/loading";
+import { EmailStatusBadge, statusLabel } from "@/components/status-badge";
+import { buttonVariants } from "@/components/ui/button";
 import { engine, type Schemas } from "@/lib/engine";
+import { utc } from "@/lib/format";
 import { cancelEmail } from "./actions";
+
+export const metadata = { title: "Email" };
 
 type Props = { params: Promise<{ account: string; id: string }> };
 
 export default function EmailDetail(props: Props) {
   return (
-    <Suspense>
+    <Suspense fallback={<Loading rows={5} />}>
       <Detail {...props} />
     </Suspense>
   );
@@ -17,27 +24,44 @@ async function Detail({ params }: Props) {
   const e = await engine<Schemas["EmailView"]>(`/emails/${id}`, { account, nextPath: `/a/${account}/emails/${id}` });
   return (
     <article className="flex flex-col gap-6">
-      <header className="flex flex-col gap-1">
+      <header className="flex flex-col gap-2">
         <h1 className="text-2xl font-semibold">{e.subject}</h1>
-        <p className="text-sm text-muted-foreground">From {e.from} to {e.to.join(", ")} · {e.status} · {e.priority}</p>
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+          <EmailStatusBadge status={e.status} />
+          <span>From {e.from} to {e.to.join(", ")}</span>
+          <span aria-hidden>·</span>
+          <span>{statusLabel(e.priority)} priority</span>
+        </p>
       </header>
       {(e.status === "queued" || e.status === "scheduled") && (
-        <form action={cancelEmail.bind(null, account, id)}><button className="underline" type="submit">Cancel this email</button></form>
+        <ConfirmAction
+          trigger="Cancel this email"
+          triggerClassName={`${buttonVariants({ variant: "outline" })} self-start`}
+          title="Cancel this email?"
+          description="It will not be sent. This cannot be undone."
+          dismiss="Keep it"
+          confirm="Cancel email"
+          action={cancelEmail.bind(null, account, id)}
+        />
       )}
       {e.last_error && <p role="alert" className="text-sm text-destructive">{e.last_error}</p>}
-      <section>
-        <h2 className="font-medium">Events</h2>
-        <ol aria-label="Events" className="mt-2 flex flex-col gap-1 text-sm">
+      <section className="flex flex-col gap-2">
+        <h2 className="text-lg font-medium">Events</h2>
+        <ol aria-label="Events" className="flex flex-col gap-1 text-sm">
           {e.events.map((ev, i) => (
-            <li key={i} className="tabular-nums">{new Date(ev.created_at).toLocaleString()} — {ev.type}{ev.recipient ? ` (${ev.recipient})` : ""}{ev.likely_bot ? " · likely a bot" : ""}</li>
+            <li key={i}>
+              <span className="tabular-nums text-muted-foreground">{utc(ev.created_at)}</span> — {ev.type}
+              {ev.recipient ? ` (${ev.recipient})` : ""}
+              {ev.likely_bot ? " · likely a bot" : ""}
+            </li>
           ))}
           {e.events.length === 0 && <li className="text-muted-foreground">Nothing yet.</li>}
         </ol>
       </section>
-      <section>
-        <h2 className="font-medium">Body</h2>
+      <section className="flex flex-col gap-2">
+        <h2 className="text-lg font-medium">Body</h2>
         {/* Customer content: show text only, never render e.html. */}
-        <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded border p-3 text-sm">{e.text ?? "(HTML only)"}</pre>
+        <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border p-3 text-sm">{e.text ?? "(HTML only)"}</pre>
       </section>
     </article>
   );

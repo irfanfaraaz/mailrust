@@ -9,13 +9,13 @@ export function AddDomain({ account }: { account: string }) {
   return (
     <form action={action} className="flex flex-col gap-3 text-sm">
       <label className="flex flex-col gap-1">Domain
-        <Input name="name" required placeholder="news.example.com" />
+        <Input id="domain-name" name="name" required placeholder="news.example.com" />
       </label>
       <label className="flex flex-col gap-1">Tracking subdomain (optional)
         <Input name="tracking_subdomain" placeholder="track" />
       </label>
-      <label className="flex items-center gap-1.5"><input type="checkbox" name="open_tracking" />Track opens</label>
-      <label className="flex items-center gap-1.5"><input type="checkbox" name="click_tracking" />Track clicks</label>
+      <label className="flex items-center gap-1.5 max-md:min-h-11"><input type="checkbox" name="open_tracking" />Track opens</label>
+      <label className="flex items-center gap-1.5 max-md:min-h-11"><input type="checkbox" name="click_tracking" />Track clicks</label>
       <Button type="submit" className="self-start" disabled={pending}>Add domain</Button>
       {state.error && <p role="alert" className="text-destructive">{state.error}</p>}
     </form>

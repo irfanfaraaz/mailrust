@@ -6,11 +6,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import type { Schemas } from "@/lib/engine";
 
 const item = "flex cursor-default items-center rounded-md px-1.5 py-1 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground";
-const trigger = "flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted";
+const trigger = "flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted max-md:min-h-11";
 
 export function AccountMenu({ me, current }: { me: Schemas["MeResponse"]; current: Schemas["MyAccount"] }) {
   return (
-    <div className="flex flex-col gap-1 border-b p-3">
+    <div className="flex flex-col gap-1 border-b p-3 max-md:border-b-0">
       <DropdownMenu>
         <DropdownMenuTrigger aria-label="Switch account" className={`${trigger} font-medium`}>
           <span className="truncate">{current.name}</span>

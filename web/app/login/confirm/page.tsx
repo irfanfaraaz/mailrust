@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import { ConfirmForm } from "./confirm-form";
 
+export const metadata = { title: "Log in" };
+
 type Search = Promise<{ token?: string; next?: string }>;
 
 export default function Confirm({ searchParams }: { searchParams: Search }) {

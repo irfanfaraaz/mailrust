@@ -1,9 +1,15 @@
 import { Suspense } from "react";
+import { EmptyState } from "@/components/empty-state";
+import { Loading } from "@/components/loading";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { buttonVariants } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { engine, type Schemas } from "@/lib/engine";
+import { utc } from "@/lib/format";
 import { CreateWebhook } from "./create-webhook";
 import { deleteWebhook } from "./actions";
+
+export const metadata = { title: "Webhooks" };
 
 type Props = { params: Promise<{ account: string }> };
 
@@ -12,7 +18,7 @@ export default function Webhooks(props: Props) {
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-semibold">Webhooks</h1>
       {/* params and the engine call are request data: read them inside Suspense (cacheComponents). */}
-      <Suspense>
+      <Suspense fallback={<Loading />}>
         <List {...props} />
       </Suspense>
     </div>
@@ -25,17 +31,32 @@ async function List({ params }: Props) {
   return (
     <>
       <CreateWebhook account={account} />
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead><tr><th className="text-left">URL</th><th className="text-left">Events</th><th className="text-left">Enabled</th><th className="text-right">Created</th><th /></tr></thead>
-          <tbody>
+      {hooks.data.length === 0 ? (
+        <EmptyState
+          title="No webhooks yet"
+          hint="Mailrust can POST each delivery, bounce or complaint to your app as it happens, so you do not have to poll."
+          action="Add your first webhook"
+          href="#webhook-url"
+        />
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>URL</TableHead>
+              <TableHead>Events</TableHead>
+              <TableHead>Enabled</TableHead>
+              <TableHead className="text-right">Created</TableHead>
+              <TableHead><span className="sr-only">Actions</span></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {hooks.data.map((h) => (
-              <tr key={h.id}>
-                <td className="max-w-64 truncate">{h.url}</td>
-                <td>{h.events.join(", ")}</td>
-                <td>{h.enabled ? "yes" : "no"}</td>
-                <td className="text-right tabular-nums">{new Date(h.created_at).toLocaleString()}</td>
-                <td className="text-right">
+              <TableRow key={h.id}>
+                <TableCell className="max-w-64 truncate font-medium">{h.url}</TableCell>
+                <TableCell className="min-w-64 whitespace-normal text-muted-foreground">{h.events.join(", ")}</TableCell>
+                <TableCell>{h.enabled ? "yes" : "no"}</TableCell>
+                <TableCell className="text-right tabular-nums text-muted-foreground">{utc(h.created_at)}</TableCell>
+                <TableCell className="text-right">
                   <Dialog>
                     <DialogTrigger className={buttonVariants({ variant: "outline", size: "sm" })}>Delete</DialogTrigger>
                     <DialogContent>
@@ -51,13 +72,12 @@ async function List({ params }: Props) {
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
-      </div>
-      {hooks.data.length === 0 && <p className="text-muted-foreground">No webhooks yet.</p>}
+          </TableBody>
+        </Table>
+      )}
     </>
   );
 }

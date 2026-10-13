@@ -1,3 +1,5 @@
+export const metadata = { title: "Check your email" };
+
 export default function CheckEmail() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-3 px-4">

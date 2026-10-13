@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import { InviteForm } from "./invite-form";
 
+export const metadata = { title: "Accept invite" };
+
 type Search = Promise<{ token?: string }>;
 
 export default function Invite({ searchParams }: { searchParams: Search }) {

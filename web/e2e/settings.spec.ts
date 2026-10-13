@@ -45,5 +45,6 @@ test("suppressions can be added, searched and removed", async ({ page }) => {
   const row = page.getByRole("row", { name: new RegExp(addr) });
   await expect(row).toBeVisible();
   await row.getByRole("button", { name: "Unblock" }).click();
+  await page.getByRole("button", { name: "Unblock address" }).click();
   await expect(page.getByRole("row", { name: new RegExp(addr) })).toHaveCount(0);
 });

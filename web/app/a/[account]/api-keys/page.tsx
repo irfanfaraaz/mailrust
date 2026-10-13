@@ -1,9 +1,15 @@
 import { Suspense } from "react";
+import { EmptyState } from "@/components/empty-state";
+import { Loading } from "@/components/loading";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { buttonVariants } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { engine, type Schemas } from "@/lib/engine";
+import { utc } from "@/lib/format";
 import { CreateKey } from "./create-key";
 import { deleteKey } from "./actions";
+
+export const metadata = { title: "API keys" };
 
 type Props = { params: Promise<{ account: string }> };
 
@@ -12,7 +18,7 @@ export default function ApiKeys(props: Props) {
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-semibold">API keys</h1>
       {/* params and the engine call are request data: read them inside Suspense (cacheComponents). */}
-      <Suspense>
+      <Suspense fallback={<Loading />}>
         <Keys {...props} />
       </Suspense>
     </div>
@@ -25,18 +31,34 @@ async function Keys({ params }: Props) {
   return (
     <>
       <CreateKey account={account} />
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead><tr><th className="text-left">Name</th><th className="text-left">Key</th><th className="text-left">Access</th><th className="text-left">Last used</th><th className="text-right">Created</th><th /></tr></thead>
-          <tbody>
+      {keys.data.length === 0 ? (
+        <EmptyState
+          title="No API keys yet"
+          hint="Your app sends email by calling the API with a key. Create one, then pass it as a Bearer token."
+          action="Create your first key"
+          href="#key-name"
+        />
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Key</TableHead>
+              <TableHead>Access</TableHead>
+              <TableHead>Last used</TableHead>
+              <TableHead className="text-right">Created</TableHead>
+              <TableHead><span className="sr-only">Actions</span></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {keys.data.map((k) => (
-              <tr key={k.id}>
-                <td>{k.name}</td>
-                <td className="font-mono">{k.prefix}…</td>
-                <td>{k.access}</td>
-                <td>{k.last_used_at ? new Date(k.last_used_at).toLocaleString() : "never"}</td>
-                <td className="text-right tabular-nums">{new Date(k.created_at).toLocaleString()}</td>
-                <td className="text-right">
+              <TableRow key={k.id}>
+                <TableCell className="font-medium">{k.name}</TableCell>
+                <TableCell className="font-mono">{k.prefix}…</TableCell>
+                <TableCell>{k.access}</TableCell>
+                <TableCell className="tabular-nums text-muted-foreground">{k.last_used_at ? utc(k.last_used_at) : "never"}</TableCell>
+                <TableCell className="text-right tabular-nums text-muted-foreground">{utc(k.created_at)}</TableCell>
+                <TableCell className="text-right">
                   <Dialog>
                     <DialogTrigger className={buttonVariants({ variant: "outline", size: "sm" })}>Delete</DialogTrigger>
                     <DialogContent>
@@ -52,13 +74,12 @@ async function Keys({ params }: Props) {
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
-      </div>
-      {keys.data.length === 0 && <p className="text-muted-foreground">No API keys yet.</p>}
+          </TableBody>
+        </Table>
+      )}
     </>
   );
 }
