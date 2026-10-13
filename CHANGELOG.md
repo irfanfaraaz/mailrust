@@ -6,6 +6,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+- Dashboard (`web/`) with magic-link login, teams and invites (owner/member), and the door 1 pages.
+- `GET /stats/overview`, `/emails` filters (`priority`, `since`, `until`, `q`) and `/suppressions?q=`.
+- CLI `user invite` and `openapi`.
+- `mailrust-web` Docker image, a `web` service in `docker-compose.prod.yml` and `app.<domain>` in the Caddyfile.
+
+### Changed
+
+- Each CI check runs once per PR.
+
 ## [0.1.0] - 2026-10-13
 
 First release: the sending API and the engine behind it.

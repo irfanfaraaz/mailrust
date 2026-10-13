@@ -1,5 +1,6 @@
 # Run from deploy/: docker compose -f docker-compose.prod.yml --env-file ../.env up -d
-# .env must set POSTGRES_PASSWORD plus the Mailrust settings (PUBLIC_URL, TRACKING_SECRET, MAILRUST_SENDER, SES ...).
+# .env must set POSTGRES_PASSWORD plus the Mailrust settings (PUBLIC_URL, TRACKING_SECRET, MAILRUST_SENDER, SES ...)
+# and the dashboard settings (MAILRUST_DOMAIN, WEB_URL=https://app.<domain>, WEB_SECRET, SYSTEM_ACCOUNT_ID, SYSTEM_FROM).
 x-mailrust-env: &mailrust-env
   DATABASE_URL: postgres://mailrust:${POSTGRES_PASSWORD}@postgres:5432/mailrust
   BIND_ADDR: 0.0.0.0:8080
@@ -37,14 +38,24 @@ services:
       migrate: { condition: service_completed_successfully }
     restart: unless-stopped
 
+  web:
+    build: { context: ../web, dockerfile: Dockerfile }
+    restart: unless-stopped
+    environment:
+      ENGINE_URL: http://mailrust:8080
+      WEB_SECRET: ${WEB_SECRET}
+    depends_on: [mailrust]
+
   caddy:
     image: caddy:2
     restart: unless-stopped
+    environment:
+      MAILRUST_DOMAIN: ${MAILRUST_DOMAIN}
     ports: ["80:80", "443:443"]
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
-    depends_on: [mailrust]
+    depends_on: [mailrust, web]
 
   backup:
     image: postgres:17
