@@ -1,0 +1,52 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { NextRequest, NextResponse } from "next/server";
+import { refreshSessionCookie, SESSION_COOKIE, sessionCookieOptions } from "./session-cookie";
+
+const DAY = 24 * 60 * 60 * 1000;
+
+describe("refreshSessionCookie", () => {
+  it("pushes the session cookie out to 30 days, keeping its value", () => {
+    const req = new NextRequest("http://app.test/a/1/emails", { headers: { cookie: `${SESSION_COOKIE}=mr_sess_abc` } });
+    const res = refreshSessionCookie(req, NextResponse.next());
+    const c = res.cookies.get(SESSION_COOKIE)!;
+    expect(c.value).toBe("mr_sess_abc");
+    expect(c.httpOnly).toBe(true);
+    expect(c.sameSite).toBe("lax");
+    expect(c.path).toBe("/");
+    const left = (c.expires as Date).getTime() - Date.now();
+    expect(left).toBeGreaterThan(29 * DAY);
+    expect(left).toBeLessThanOrEqual(30 * DAY);
+  });
+
+  it("sets nothing without a session", () => {
+    const res = refreshSessionCookie(new NextRequest("http://app.test/login"), NextResponse.next());
+    expect(res.cookies.get(SESSION_COOKIE)).toBeUndefined();
+  });
+
+  it("leaves POSTs alone so login and logout actions own the cookie", () => {
+    const req = new NextRequest("http://app.test/login", { method: "POST", headers: { cookie: `${SESSION_COOKIE}=mr_sess_old` } });
+    expect(refreshSessionCookie(req, NextResponse.next()).cookies.get(SESSION_COOKIE)).toBeUndefined();
+  });
+});
+
+describe("sessionCookieOptions secure flag", () => {
+  afterEach(() => vi.unstubAllEnvs());
+  const secure = () => sessionCookieOptions(new Date()).secure;
+
+  it("is secure in production, whatever the engine URL", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("ENGINE_URL", "http://127.0.0.1:8080");
+    expect(secure()).toBe(true);
+  });
+
+  it("can be turned off in production with COOKIE_SECURE=false", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("COOKIE_SECURE", "false");
+    expect(secure()).toBe(false);
+  });
+
+  it("is not secure outside production (http://localhost dev)", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    expect(secure()).toBe(false);
+  });
+});

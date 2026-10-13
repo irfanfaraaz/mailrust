@@ -23,3 +23,13 @@ updates:
     schedule: { interval: monthly }
     groups:
       docker: { patterns: ["*"] }
+  - package-ecosystem: npm
+    directory: /web
+    schedule: { interval: monthly }
+    groups:
+      web:
+        patterns: ["*"]
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]

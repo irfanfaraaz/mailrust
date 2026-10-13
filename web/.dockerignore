@@ -1,0 +1,9 @@
+node_modules
+.next
+e2e/*
+# playwright.config.ts imports it, and next build type-checks that file
+!e2e/env.ts
+test-results
+playwright-report
+.env*
+!.env.example

@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT count(*) AS \"n!\" FROM login_requests WHERE ip = $1 AND at > now() - interval '1 hour'",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "n!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Inet"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "773d326fb8a0336f0e8e22c28ad87259113ca2d77d57cfc33d715509034c5a0b"
+}

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT address, reason AS \"reason: SuppressionReason\", created_at FROM suppressions\n           WHERE account_id = $1 AND ($2::text IS NULL OR address > $2)\n           ORDER BY address LIMIT $3",
+  "query": "SELECT address, reason AS \"reason: SuppressionReason\", created_at FROM suppressions\n           WHERE account_id = $1 AND ($2::text IS NULL OR address > $2)\n             AND ($4::text IS NULL OR address ILIKE $4)\n           ORDER BY address LIMIT $3",
   "describe": {
     "columns": [
       {
@@ -34,7 +34,8 @@
       "Left": [
         "Uuid",
         "Text",
-        "Int8"
+        "Int8",
+        "Text"
       ]
     },
     "nullable": [
@@ -43,5 +44,5 @@
       false
     ]
   },
-  "hash": "123c068dba7d808802ff674c23d6e60f48265e67f24ea1364d26826910c9c4b2"
+  "hash": "5b7de427c9dcd21193ebb7a1842d27fa2afd361d026668a9da1fa12bec27109a"
 }

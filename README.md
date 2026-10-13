@@ -8,19 +8,29 @@ Self-hosted email platform with two doors: a sending API (like Resend) and a new
 - **Sending API** — `POST /emails`, batch, scheduled send, idempotency keys, attachments, webhooks, open/click tracking.
 - **Safe for many accounts** — each account is its own SES tenant with its own block list, and Mailrust pauses an account itself when bounces go over 2% or complaints over 0.08%.
 - **Smart sending** — `"priority": "urgent" | "normal" | "bulk"` puts login codes ahead of newsletters. The send rate follows your SES limits, a hit on the SES daily cap pauses sending instead of failing emails, and the last 10% of the daily quota is kept for urgent mail.
+- **Dashboard** — magic-link login, teams and invites (owner/member), emails log, API keys, webhooks, domains and suppressions in a Next.js app.
 - **No extra services** — Postgres is the queue (`FOR UPDATE SKIP LOCKED`). No Redis.
 
 ## Quick start (no AWS needed)
 
 ```bash
 docker compose up -d postgres
-cp .env.example .env
+cp .env.example .env                                   # dev: also uncomment DEV_LOG_LINKS=true
 cargo run -- migrate
 cargo run -- account create --name "My app"              # prints the account id
 cargo run -- key create --account <account-id> --name dev # prints the API key once
 cargo run -- domain add --account <account-id> example.com
 cargo run -- serve
 ```
+
+```bash
+# Dashboard
+cargo run -- user invite you@example.com --account <account-id> --role owner
+# in .env: SYSTEM_ACCOUNT_ID=<account-id>  SYSTEM_FROM=login@example.com  (a verified domain of that account)
+pnpm --dir web install && pnpm --dir web dev   # http://localhost:3000
+```
+
+With `MAILRUST_SENDER=fake` the login link lands in `./outbox`. Uncomment `DEV_LOG_LINKS=true` in `.env` (dev only, never in production) to also print it to the server log.
 
 ```bash
 curl -s localhost:8080/emails \
@@ -45,7 +55,7 @@ API reference: `GET /openapi.json`.
 
 ## Deploy
 
-One small server runs everything: `deploy/docker-compose.prod.yml` starts Postgres, Mailrust, Caddy (automatic HTTPS, including customers' tracking subdomains) and a nightly `pg_dump` backup.
+One small server runs everything: `deploy/docker-compose.prod.yml` starts Postgres, Mailrust, the `web` dashboard (served at `app.<domain>`, set `MAILRUST_DOMAIN`, `WEB_URL` and `WEB_SECRET` in `.env`), Caddy (automatic HTTPS, including customers' tracking subdomains) and a nightly `pg_dump` backup.
 
 ```bash
 cd deploy
@@ -57,6 +67,8 @@ docker compose -f docker-compose.prod.yml --env-file ../.env up -d
 ```bash
 cargo test                       # needs the dev Postgres from docker compose
 cargo sqlx prepare -- --all-targets   # after changing SQL; commit .sqlx/
+pnpm --dir web test              # dashboard unit tests
+pnpm --dir web e2e               # dashboard end-to-end tests
 ```
 
 ## Contributing

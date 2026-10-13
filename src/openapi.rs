@@ -14,7 +14,10 @@ use crate::{
         domains::{CreateDomainRequest, DomainList, UpdateDomainRequest},
         emails::{BatchResponse, EmailList},
         keys::{CreateKeyRequest, CreatedKey, KeyList},
+        login::{LoginRequest, SessionResponse, TokenRequest},
+        me::MeResponse,
         suppressions::{AddSuppressionRequest, SuppressionList, SuppressionView},
+        team::{InviteRequest, RoleRequest},
         webhooks::{CreateWebhookRequest, WebhookList},
     },
     domains::{Domain, DomainStatus},
@@ -25,6 +28,9 @@ use crate::{
     keys::{KeyAccess, KeySummary},
     safety::SuppressionReason,
     sender::DnsRecord,
+    stats::{Counts, Overview},
+    team::{InviteView, MemberView, TeamView},
+    users::{MemberRole, MyAccount, User},
     webhooks::WebhookView,
 };
 
@@ -50,7 +56,7 @@ impl Modify for BearerAuth {
             SecurityScheme::Http(
                 HttpBuilder::new()
                     .scheme(HttpAuthScheme::Bearer)
-                    .bearer_format("mr_live_…")
+                    .bearer_format("mr_live_… or mr_sess_…")
                     .build(),
             ),
         );
@@ -68,7 +74,9 @@ fn send_email() {}
 fn send_batch() {}
 
 #[utoipa::path(get, path = "/emails", tag = "emails",
-    params(("status" = Option<EmailStatus>, Query), ("limit" = Option<i64>, Query), ("after" = Option<uuid::Uuid>, Query)),
+    params(("status" = Option<EmailStatus>, Query), ("priority" = Option<Priority>, Query),
+        ("since" = Option<chrono::DateTime<chrono::Utc>>, Query), ("until" = Option<chrono::DateTime<chrono::Utc>>, Query),
+        ("q" = Option<String>, Query), ("limit" = Option<i64>, Query), ("after" = Option<uuid::Uuid>, Query)),
     responses((status = 200, body = EmailList)))]
 fn list_emails() {}
 
@@ -125,7 +133,8 @@ fn list_webhooks() {}
 fn delete_webhook() {}
 
 #[utoipa::path(get, path = "/suppressions", tag = "suppressions",
-    params(("limit" = Option<i64>, Query), ("after" = Option<String>, Query)), responses((status = 200, body = SuppressionList)))]
+    params(("limit" = Option<i64>, Query), ("after" = Option<String>, Query), ("q" = Option<String>, Query)),
+    responses((status = 200, body = SuppressionList)))]
 fn list_suppressions() {}
 
 #[utoipa::path(post, path = "/suppressions", tag = "suppressions", request_body = AddSuppressionRequest,
@@ -139,16 +148,63 @@ fn delete_suppression() {}
 #[utoipa::path(get, path = "/health", tag = "system", security(), responses((status = 200), (status = 503)))]
 fn health() {}
 
+#[utoipa::path(post, path = "/auth/login", tag = "dashboard", security(), request_body = LoginRequest,
+    responses((status = 202), (status = 400, body = ErrorBody)))]
+fn auth_login() {}
+
+#[utoipa::path(post, path = "/auth/verify", tag = "dashboard", security(), request_body = TokenRequest,
+    responses((status = 200, body = SessionResponse), (status = 401, body = ErrorBody)))]
+fn auth_verify() {}
+
+#[utoipa::path(get, path = "/me", tag = "dashboard",
+    responses((status = 200, body = MeResponse), (status = 401, body = ErrorBody)))]
+fn me() {}
+
+#[utoipa::path(post, path = "/auth/logout", tag = "dashboard", responses((status = 204), (status = 401, body = ErrorBody)))]
+fn auth_logout() {}
+
+#[utoipa::path(post, path = "/auth/logout-all", tag = "dashboard", responses((status = 204), (status = 401, body = ErrorBody)))]
+fn auth_logout_all() {}
+
+#[utoipa::path(get, path = "/team", tag = "dashboard",
+    responses((status = 200, body = TeamView), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody)))]
+fn team_list() {}
+
+#[utoipa::path(post, path = "/team/invites", tag = "dashboard", request_body = InviteRequest,
+    responses((status = 201, body = InviteView), (status = 400, body = ErrorBody), (status = 403, body = ErrorBody), (status = 409, body = ErrorBody)))]
+fn team_invite() {}
+
+#[utoipa::path(delete, path = "/team/invites/{id}", tag = "dashboard", params(("id" = uuid::Uuid, Path)),
+    responses((status = 204), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody)))]
+fn team_cancel_invite() {}
+
+#[utoipa::path(patch, path = "/team/members/{user_id}", tag = "dashboard", params(("user_id" = uuid::Uuid, Path)), request_body = RoleRequest,
+    responses((status = 200, body = MemberView), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+fn team_set_role() {}
+
+#[utoipa::path(delete, path = "/team/members/{user_id}", tag = "dashboard", params(("user_id" = uuid::Uuid, Path)),
+    responses((status = 204), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+fn team_remove() {}
+
+#[utoipa::path(post, path = "/invites/accept", tag = "dashboard", security(), request_body = TokenRequest,
+    responses((status = 200, body = SessionResponse), (status = 401, body = ErrorBody)))]
+fn invites_accept() {}
+
+#[utoipa::path(get, path = "/stats/overview", tag = "stats", responses((status = 200, body = Overview)))]
+fn stats_overview() {}
+
 #[derive(OpenApi)]
 #[openapi(
-    info(title = "Mailrust API", version = "0.1.0", description = "Send transactional email through your own Amazon SES. Auth: `Authorization: Bearer mr_live_…`."),
+    info(title = "Mailrust API", version = "0.1.0", description = "Send transactional email through your own Amazon SES. Auth: `Authorization: Bearer mr_live_…` (API key), or `Bearer mr_sess_…` (dashboard session) plus `X-Mailrust-Account: <account id>`."),
     paths(send_email, send_batch, list_emails, get_email, cancel_email, create_domain, list_domains, get_domain, update_domain,
           delete_domain, verify_domain, create_key, list_keys, delete_key, create_webhook, list_webhooks, delete_webhook,
-          list_suppressions, add_suppression, delete_suppression, health),
+          list_suppressions, add_suppression, delete_suppression, health, auth_login, auth_verify, me, auth_logout, auth_logout_all,
+          team_list, team_invite, team_cancel_invite, team_set_role, team_remove, invites_accept, stats_overview),
     components(schemas(SendEmailRequest, AttachmentInput, SendResponse, BatchResponse, EmailView, EmailSummary, EmailList,
         EventView, EmailStatus, Priority, Domain, DomainStatus, DnsRecord, DomainList, CreateDomainRequest, UpdateDomainRequest,
         KeySummary, KeyAccess, CreateKeyRequest, CreatedKey, KeyList, CreateWebhookRequest, WebhookView, WebhookList,
-        SuppressionView, SuppressionList, AddSuppressionRequest, SuppressionReason, AccountStatus, ErrorBody, ErrorDetail)),
+        SuppressionView, SuppressionList, AddSuppressionRequest, SuppressionReason, AccountStatus, LoginRequest, TokenRequest, SessionResponse,
+        MeResponse, MyAccount, User, MemberRole, TeamView, MemberView, InviteView, InviteRequest, RoleRequest, Overview, Counts, ErrorBody, ErrorDetail)),
     modifiers(&BearerAuth),
     security(("bearer" = []))
 )]
@@ -156,4 +212,25 @@ pub struct ApiDoc;
 
 pub fn routes() -> Router<AppState> {
     Router::new().route("/openapi.json", get(|| async { Json(ApiDoc::openapi()) }))
+}
+
+#[cfg(test)]
+mod tests {
+    use utoipa::OpenApi;
+
+    #[test]
+    fn the_document_lists_the_dashboard_routes() {
+        let doc = serde_json::to_value(super::ApiDoc::openapi()).unwrap();
+        for p in [
+            "/auth/login",
+            "/auth/verify",
+            "/me",
+            "/team",
+            "/team/invites",
+            "/invites/accept",
+            "/stats/overview",
+        ] {
+            assert!(doc["paths"][p].is_object(), "missing {p}");
+        }
+    }
 }

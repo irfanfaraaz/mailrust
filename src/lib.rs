@@ -1,6 +1,7 @@
 // src/lib.rs
 pub mod accounts;
 pub mod api;
+pub mod auth_tokens;
 pub mod background;
 pub mod cli;
 pub mod config;
@@ -19,8 +20,13 @@ pub mod quota;
 pub mod render;
 pub mod safety;
 pub mod sender;
+pub mod sessions;
+pub mod stats;
+pub mod system_mail;
+pub mod team;
 pub mod telemetry;
 pub mod tokens;
 pub mod tracking;
+pub mod users;
 pub mod webhooks;
 pub mod worker;

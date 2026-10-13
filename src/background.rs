@@ -22,7 +22,8 @@ pub fn spawn_all(
     tasks.spawn(maintenance_loop(state, shutdown));
 }
 
-/// Hourly cleanup: attachments of finished emails after 7 days, SNS dedupe ids after 30 days.
+/// Hourly cleanup: attachments of finished emails after 7 days, SNS dedupe ids after 30 days,
+/// and dead login data (see `cleanup_auth`).
 pub async fn maintenance_loop(state: AppState, shutdown: CancellationToken) -> anyhow::Result<()> {
     every(Duration::from_secs(3600), &shutdown, || async {
         let a = sqlx::query!(
@@ -39,8 +40,31 @@ pub async fn maintenance_loop(state: AppState, shutdown: CancellationToken) -> a
         if let Err(e) = a.and(s) {
             tracing::error!(error = ?e, "maintenance failed");
         }
+        if let Err(e) = cleanup_auth(&state.pool).await {
+            tracing::error!(error = ?e, "auth cleanup failed");
+        }
     })
     .await;
+    Ok(())
+}
+
+/// Expired sessions, old login tokens, login requests past the 1 h limit window, finished invites after 30 days.
+pub async fn cleanup_auth(pool: &sqlx::PgPool) -> sqlx::Result<()> {
+    sqlx::query!("DELETE FROM sessions WHERE expires_at < now()")
+        .execute(pool)
+        .await?;
+    sqlx::query!("DELETE FROM login_tokens WHERE expires_at < now() - interval '1 day'")
+        .execute(pool)
+        .await?;
+    sqlx::query!("DELETE FROM login_requests WHERE at < now() - interval '1 hour'")
+        .execute(pool)
+        .await?;
+    sqlx::query!(
+        "DELETE FROM invites WHERE created_at < now() - interval '30 days'
+           AND (accepted_at IS NOT NULL OR revoked_at IS NOT NULL OR expires_at < now())"
+    )
+    .execute(pool)
+    .await?;
     Ok(())
 }
 

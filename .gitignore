@@ -8,3 +8,8 @@ docs/learning/
 .impeccable/
 .scratch/
 deploy/backups/
+web/node_modules
+web/.next
+web/test-results
+web/playwright-report
+web/e2e/.seed.json

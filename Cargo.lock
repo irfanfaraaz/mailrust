@@ -2065,6 +2065,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ipnetwork"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf466541e9d546596ee94f9f69590f89473455f88372423e0008fc1a7daf100e"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "is_terminal_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2281,6 +2290,7 @@ dependencies = [
  "sha1",
  "sha2 0.10.9",
  "sqlx",
+ "subtle",
  "thiserror 2.0.21",
  "tokio",
  "tokio-util",
@@ -3483,6 +3493,7 @@ dependencies = [
  "hashbrown 0.15.5",
  "hashlink",
  "indexmap",
+ "ipnetwork",
  "log",
  "memchr",
  "once_cell",
@@ -3604,6 +3615,7 @@ dependencies = [
  "hkdf",
  "hmac 0.12.1",
  "home",
+ "ipnetwork",
  "itoa",
  "log",
  "md-5",

@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM login_requests WHERE at < now() - interval '1 hour'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "4bc4c1f9befac0f61f420da72b695c1c42d606af50081555af1080714752fc89"
+}

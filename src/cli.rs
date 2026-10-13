@@ -38,6 +38,11 @@ enum Command {
     /// Manage sending domains
     #[command(subcommand)]
     Domain(DomainCmd),
+    /// Manage dashboard users
+    #[command(subcommand)]
+    User(UserCmd),
+    /// Print the OpenAPI document (JSON)
+    Openapi,
     /// Run the API and/or the background workers
     Serve {
         #[arg(long, value_enum, default_value_t = Role::All)]
@@ -82,6 +87,18 @@ enum DomainCmd {
 }
 
 #[derive(Subcommand)]
+enum UserCmd {
+    /// Give someone dashboard access to an account (no email is sent). Safe to run again.
+    Invite {
+        email: String,
+        #[arg(long)]
+        account: Uuid,
+        #[arg(long, value_enum, default_value_t = crate::users::MemberRole::Member)]
+        role: crate::users::MemberRole,
+    },
+}
+
+#[derive(Subcommand)]
 enum KeyCmd {
     /// Create a key. It is printed once and never shown again.
     Create {
@@ -99,6 +116,14 @@ enum KeyCmd {
 
 pub async fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
+    if let Command::Openapi = cli.command {
+        use utoipa::OpenApi;
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&crate::openapi::ApiDoc::openapi())?
+        );
+        return Ok(());
+    }
     let config = Config::from_env()?;
     telemetry::init(config.log_json);
     let pool = db::connect(&config.database_url).await?;
@@ -110,6 +135,22 @@ pub async fn run() -> anyhow::Result<()> {
         }
         Command::Account(cmd) => account_cmd(&pool, &config, cmd).await?,
         Command::Key(cmd) => key_cmd(&pool, cmd).await?,
+        Command::User(UserCmd::Invite {
+            email,
+            account,
+            role,
+        }) => {
+            accounts::get(&pool, account)
+                .await?
+                .ok_or_else(|| anyhow::anyhow!("no account {account}"))?;
+            let (user, role) = crate::users::invite_direct(&pool, &email, account, role).await?;
+            println!(
+                "{} is {:?} of {account}. Log in at {}/login",
+                user.email,
+                role,
+                config.web_base()
+            );
+        }
         Command::Domain(DomainCmd::Add {
             account,
             name,
@@ -143,6 +184,14 @@ pub async fn run() -> anyhow::Result<()> {
         Command::Serve { role } => {
             let sender = sender::from_config(&config).await?;
             let state = crate::api::AppState::new(pool, config, sender);
+            if let Some(problem) = crate::system_mail::setup_problem(&state).await? {
+                tracing::warn!(%problem, "dashboard login emails will not be sent until this is fixed");
+            }
+            if state.config.web_secret.is_none() {
+                tracing::warn!(
+                    "WEB_SECRET is not set: dashboard logins are rate-limited by the web server's IP, shared by every user"
+                );
+            }
             let shutdown = tokio_util::sync::CancellationToken::new();
             let mut tasks = tokio::task::JoinSet::new();
             if role != Role::Worker {
@@ -160,6 +209,7 @@ pub async fn run() -> anyhow::Result<()> {
             shutdown.cancel();
             while tasks.join_next().await.is_some() {}
         }
+        Command::Openapi => unreachable!("handled before connecting to the database"),
     }
     Ok(())
 }
@@ -261,4 +311,17 @@ async fn key_cmd(pool: &sqlx::PgPool, cmd: KeyCmd) -> anyhow::Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use clap::Parser;
+
+    use super::{Cli, Command};
+
+    #[test]
+    fn openapi_is_a_command() {
+        let cli = Cli::try_parse_from(["mailrust", "openapi"]).unwrap();
+        assert!(matches!(cli.command, Command::Openapi));
+    }
 }

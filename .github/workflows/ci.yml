@@ -1,5 +1,8 @@
 name: ci
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -18,6 +21,8 @@ jobs:
     env:
       DATABASE_URL: postgres://mailrust:mailrust@localhost:5432/mailrust
       SQLX_OFFLINE: "true"
+      # Many test binaries link at once; without debug info they fit on the runner (ld bus error).
+      CARGO_PROFILE_DEV_DEBUG: "0"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -44,3 +49,65 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: EmbarkStudios/cargo-deny-action@v2
+  web:
+    runs-on: ubuntu-latest
+    env:
+      SQLX_OFFLINE: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - run: pnpm --dir web install --frozen-lockfile
+      - name: OpenAPI types are up to date
+        run: pnpm --dir web gen:types && git diff --exit-code -- web/lib/engine-types.ts web/openapi.json
+      - run: pnpm --dir web typecheck
+      - run: pnpm --dir web lint
+      - run: pnpm --dir web test
+      - run: pnpm --dir web build
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: mailrust
+          POSTGRES_PASSWORD: mailrust
+          POSTGRES_DB: mailrust
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U mailrust"
+          --health-interval 2s
+          --health-retries 30
+    env:
+      DATABASE_URL: postgres://mailrust:mailrust@localhost:5432/mailrust
+      SQLX_OFFLINE: "true"
+      CI: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - run: cargo build
+      - run: pnpm --dir web install --frozen-lockfile
+      - run: pnpm --dir web exec playwright install --with-deps chromium
+      - run: pnpm --dir web e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: web/playwright-report

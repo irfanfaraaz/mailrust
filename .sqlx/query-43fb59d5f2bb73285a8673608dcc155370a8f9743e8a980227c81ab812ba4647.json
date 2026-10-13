@@ -1,0 +1,55 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT m.role AS \"role: MemberRole\", a.status AS \"status: AccountStatus\", a.paused_reason\n           FROM account_members m JOIN accounts a ON a.id = m.account_id\n           WHERE m.user_id = $1 AND m.account_id = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "role: MemberRole",
+        "type_info": {
+          "Custom": {
+            "name": "member_role",
+            "kind": {
+              "Enum": [
+                "member",
+                "owner"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "status: AccountStatus",
+        "type_info": {
+          "Custom": {
+            "name": "account_status",
+            "kind": {
+              "Enum": [
+                "active",
+                "paused"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "paused_reason",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "43fb59d5f2bb73285a8673608dcc155370a8f9743e8a980227c81ab812ba4647"
+}

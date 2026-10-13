@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE sessions SET last_used_at = now(), expires_at = now() + make_interval(days => $2)\n             WHERE id = $1 AND last_used_at < now() - interval '1 hour'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a8740a968cf230db31eb9fb0545fbf6ce2bc804b2e5fe77fe7ae0ba961c6304a"
+}

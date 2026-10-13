@@ -12,3 +12,7 @@ https:// {
 	respond @internal 404
 	reverse_proxy mailrust:8080
 }
+
+app.{$MAILRUST_DOMAIN} {
+	reverse_proxy web:3000
+}
