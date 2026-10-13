@@ -3,6 +3,7 @@ mod common;
 use axum::http::StatusCode;
 use chrono::{Duration, Utc};
 use mailrust::campaigns::send;
+use mailrust::{limiter::SendLimiter, tokens, worker};
 use serde_json::{Value, json};
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -417,4 +418,158 @@ async fn tag_filters_pick_the_readers(pool: PgPool) {
     .unwrap();
     assert!(from.contains("<news@news.shop.com>"));
     assert_eq!((priority.as_str(), html), ("bulk", None));
+}
+
+/// Runs the worker until nothing is left to claim.
+async fn drain(t: &common::TestApp) {
+    let limiter = SendLimiter::new(10_000, 1);
+    while worker::tick(&t.state, &limiter).await.unwrap() > 0 {}
+}
+
+fn greeting_doc() -> Value {
+    json!({"type": "doc", "content": [{"type": "paragraph", "content": [
+        {"type": "text", "text": "Hi "}, {"type": "mergeTag", "attrs": {"key": "first_name", "fallback": "there"}},
+        {"type": "text", "text": ", read "},
+        {"type": "text", "text": "this", "marks": [{"type": "link", "attrs": {"href": "https://shop.com/post"}}]}
+    ]}]})
+}
+
+fn raw_of(sent: &[mailrust::sender::OutgoingEmail], to: &str) -> String {
+    let e = sent
+        .iter()
+        .find(|e| e.recipients == vec![to.to_string()])
+        .unwrap_or_else(|| panic!("nothing sent to {to}"));
+    String::from_utf8_lossy(&e.raw).to_string()
+}
+
+#[sqlx::test]
+async fn each_reader_gets_their_own_copy_with_one_click_headers(pool: PgPool) {
+    let rec = common::RecordingSender::ok();
+    let t = common::app_with_sender(pool.clone(), rec.clone()).await;
+    ready(&t).await;
+    sqlx::query(
+        "UPDATE domains SET click_tracking = true, open_tracking = true WHERE account_id = $1",
+    )
+    .bind(t.account.id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    api(
+        &t,
+        "POST",
+        "/contacts",
+        Some(json!({"email": "ann@x.com", "first_name": "Ann"})),
+    )
+    .await;
+    api(&t, "POST", "/contacts", Some(json!({"email": "bob@x.com"}))).await;
+    let id = new_campaign(&t, json!({"subject": "Hello", "blocks": greeting_doc()})).await;
+    send_now(&t, id).await;
+    send::tick(&t.state, Utc::now()).await.unwrap();
+    drain(&t).await;
+
+    let sent = rec.sent();
+    assert_eq!(sent.len(), 2);
+    let ann = raw_of(&sent, "ann@x.com");
+    // lettre sends the text part quoted-printable; a short ASCII line stays verbatim. The "(url)" form is only in the text part.
+    assert!(
+        ann.contains("Hi Ann, read this (https://shop.com/post)"),
+        "merge value in the text part"
+    );
+    assert!(raw_of(&sent, "bob@x.com").contains("Hi there, read this (https://shop.com/post)"));
+    assert!(ann.contains("List-Unsubscribe-Post: List-Unsubscribe=One-Click\r\n"));
+    let token = ann
+        .split("List-Unsubscribe: <http://localhost:3000/u/")
+        .nth(1)
+        .unwrap()
+        .split('>')
+        .next()
+        .unwrap();
+    let ann_id: Uuid = sqlx::query_scalar("SELECT id FROM contacts WHERE email = 'ann@x.com'")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        tokens::verify_unsubscribe_any(&t.state.config.tracking_secret, token),
+        Some((ann_id, Some(id)))
+    );
+
+    // The body link is click-tracked; the unsubscribe link is not.
+    let links: Vec<Value> = sqlx::query_scalar("SELECT links FROM emails WHERE campaign_id = $1")
+        .bind(id)
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+    for l in links {
+        assert_eq!(l, json!(["https://shop.com/post"]));
+    }
+    let statuses: Vec<String> =
+        sqlx::query_scalar("SELECT status::text FROM emails WHERE campaign_id = $1")
+            .bind(id)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert!(
+        statuses.iter().all(|s| s == "sent" || s == "delivered"),
+        "{statuses:?}"
+    );
+    send::tick(&t.state, Utc::now()).await.unwrap();
+    assert_eq!(status(&pool, id).await, "sent");
+}
+
+#[sqlx::test]
+async fn readers_who_left_after_the_snapshot_are_skipped_and_the_issue_finishes(pool: PgPool) {
+    let rec = common::RecordingSender::ok();
+    let t = common::app_with_sender(pool.clone(), rec.clone()).await;
+    ready(&t).await;
+    readers(&pool, t.account.id, 4).await;
+    let id = new_campaign(&t, json!({"subject": "Hello"})).await;
+    send_now(&t, id).await; // snapshot taken
+    sqlx::query("UPDATE contacts SET status = 'unsubscribed', unsubscribed_at = now() WHERE email = 'r1@readers.test'").execute(&pool).await.unwrap();
+    send::tick(&t.state, Utc::now()).await.unwrap(); // queued for all 4
+    sqlx::query("DELETE FROM contacts WHERE email = 'r2@readers.test'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    api(
+        &t,
+        "POST",
+        "/suppressions",
+        Some(json!({"address": "r3@readers.test"})),
+    )
+    .await;
+    drain(&t).await;
+
+    let to: Vec<Vec<String>> = rec.sent().into_iter().map(|e| e.recipients).collect();
+    assert_eq!(to, vec![vec!["r4@readers.test".to_string()]]);
+    let rows: Vec<(Option<Uuid>, String)> = sqlx::query_as("SELECT contact_id, status::text FROM emails WHERE campaign_id = $1 ORDER BY to_addresses[1]")
+        .bind(id).fetch_all(&pool).await.unwrap();
+    assert_eq!(rows.len(), 4, "the deleted reader's email row stays");
+    assert_eq!(rows[1].0, None, "r2: contact_id set to null");
+    assert_eq!(rows.iter().filter(|r| r.1 == "suppressed").count(), 3);
+    let reason: Value = sqlx::query_scalar(
+        "SELECT v.data FROM email_events v JOIN emails e ON e.id = v.email_id WHERE e.campaign_id = $1 AND e.to_addresses[1] = 'r1@readers.test' AND v.type = 'suppressed'",
+    )
+    .bind(id).fetch_one(&pool).await.unwrap();
+    assert_eq!(reason["reason"], "unsubscribed");
+    send::tick(&t.state, Utc::now()).await.unwrap();
+    assert_eq!(status(&pool, id).await, "sent");
+}
+
+#[sqlx::test]
+async fn campaign_rows_stay_out_of_the_email_log(pool: PgPool) {
+    let t = common::app(pool.clone()).await;
+    ready(&t).await;
+    readers(&pool, t.account.id, 2).await;
+    let id = new_campaign(&t, json!({"subject": "Hello"})).await;
+    send_now(&t, id).await;
+    send::tick(&t.state, Utc::now()).await.unwrap();
+    let (_, l) = api(&t, "GET", "/emails", None).await;
+    assert_eq!(l["data"], json!([]));
+    let one: Uuid = sqlx::query_scalar("SELECT id FROM emails WHERE campaign_id = $1 LIMIT 1")
+        .bind(id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let (s, _) = api(&t, "GET", &format!("/emails/{one}"), None).await;
+    assert_eq!(s, StatusCode::OK, "still readable by id");
 }

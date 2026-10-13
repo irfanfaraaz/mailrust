@@ -133,6 +133,22 @@ async fn process(
         return Ok(());
     };
 
+    // Campaign rows carry no body: render this reader's copy now, or skip / take it back.
+    let campaign = match email.campaign_id {
+        None => None,
+        Some(_) => match crate::campaigns::mail::prepare(state, &email).await? {
+            crate::campaigns::mail::Prepared::Send(parts) => Some(parts),
+            crate::campaigns::mail::Prepared::Skip => {
+                queue::mark_skipped(pool, &email, "unsubscribed").await?;
+                return Ok(());
+            }
+            crate::campaigns::mail::Prepared::TakeBack => {
+                crate::campaigns::send::take_back_one(pool, email.id).await?;
+                return Ok(());
+            }
+        },
+    };
+
     // Envelope: everyone, as bare lowercase addresses, each once, minus the block list.
     let mut seen = HashSet::new();
     let everyone: Vec<String> = email
@@ -181,9 +197,13 @@ async fn process(
         cc: &email.cc_addresses,
         reply_to: &email.reply_to,
         subject: &email.subject,
-        html: email.html.as_deref(),
-        text: email.text_body.as_deref(),
-        headers: &email.headers.0,
+        html: campaign
+            .as_ref()
+            .map_or(email.html.as_deref(), |p| Some(p.html.as_str())),
+        text: campaign
+            .as_ref()
+            .map_or(email.text_body.as_deref(), |p| Some(p.text.as_str())),
+        headers: campaign.as_ref().map_or(&email.headers.0, |p| &p.headers),
         attachments: &attachments,
         tracking: tracking_for(&state.config, &domain),
     };

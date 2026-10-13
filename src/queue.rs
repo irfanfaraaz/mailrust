@@ -33,6 +33,8 @@ pub struct ClaimedEmail {
     pub headers: Json<BTreeMap<String, String>>,
     pub tags: Json<BTreeMap<String, String>>,
     pub attempts: i32,
+    pub campaign_id: Option<Uuid>,
+    pub contact_id: Option<Uuid>,
 }
 
 /// Takes up to `limit` due emails: urgent first, then normal, then bulk; oldest first inside a lane.
@@ -66,7 +68,7 @@ pub async fn claim_through(
                      subject, html, text_body,
                      headers AS "headers: Json<BTreeMap<String, String>>",
                      tags AS "tags: Json<BTreeMap<String, String>>",
-                     attempts"#,
+                     attempts, campaign_id, contact_id"#,
         limit,
         LEASE_SECS as f64,
         gate.only_urgent
@@ -225,6 +227,30 @@ pub async fn mark_suppressed(
             kind: EventKind::Suppressed,
             recipient: None,
             data: json!({ "recipients": removed }),
+            likely_bot: false,
+        },
+    )
+    .await?;
+    tx.commit().await
+}
+
+/// A campaign email whose reader left (unsubscribed or deleted) before it went out.
+pub async fn mark_skipped(pool: &PgPool, email: &ClaimedEmail, reason: &str) -> sqlx::Result<()> {
+    let mut tx = pool.begin().await?;
+    sqlx::query!(
+        "UPDATE emails SET status = 'suppressed', lease_until = NULL, updated_at = now() WHERE id = $1 AND status IN ('sending', 'unknown')",
+        email.id
+    )
+    .execute(&mut *tx)
+    .await?;
+    email_events::record(
+        &mut tx,
+        NewEvent {
+            account_id: email.account_id,
+            email_id: email.id,
+            kind: EventKind::Suppressed,
+            recipient: None,
+            data: json!({ "reason": reason }),
             likely_bot: false,
         },
     )

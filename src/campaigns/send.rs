@@ -210,6 +210,28 @@ pub async fn take_back(conn: &mut PgConnection, campaign_id: Uuid) -> sqlx::Resu
     Ok(ids.len() as u64)
 }
 
+/// The worker claimed an email of an issue that is no longer sending (paused or cancelled after the
+/// wave was queued): delete it and free the reader, so Resume queues them again.
+pub async fn take_back_one(pool: &sqlx::PgPool, email_id: Uuid) -> sqlx::Result<()> {
+    let mut tx = pool.begin().await?;
+    let gone = sqlx::query_scalar!(
+        "DELETE FROM emails WHERE id = $1 AND status = 'sending' AND campaign_id IS NOT NULL RETURNING campaign_id",
+        email_id
+    )
+    .fetch_optional(&mut *tx)
+    .await?;
+    if let Some(Some(campaign_id)) = gone {
+        sqlx::query!(
+            "UPDATE campaign_recipients SET email_id = NULL WHERE campaign_id = $1 AND email_id = $2",
+            campaign_id,
+            email_id
+        )
+        .execute(&mut *tx)
+        .await?;
+    }
+    tx.commit().await
+}
+
 pub async fn pause_in_tx(conn: &mut PgConnection, id: Uuid, reason: &str) -> sqlx::Result<()> {
     take_back(conn, id).await?;
     sqlx::query!(

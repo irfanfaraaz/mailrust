@@ -53,6 +53,7 @@ pub struct AppState {
     pub ip_limiter: Arc<IpLimiter>,
     pub sns_certs: Arc<crate::events::sns::CertCache>,
     pub images: Arc<dyn crate::images::ImageStore>,
+    pub campaign_cache: Arc<crate::campaigns::mail::CampaignCache>,
 }
 
 impl AppState {
@@ -69,6 +70,7 @@ impl AppState {
             ip_limiter: Arc::new(RateLimiter::keyed(Quota::per_second(per_ip))),
             sns_certs: Arc::new(crate::events::sns::CertCache::new()),
             images,
+            campaign_cache: Arc::default(),
         }
     }
 }

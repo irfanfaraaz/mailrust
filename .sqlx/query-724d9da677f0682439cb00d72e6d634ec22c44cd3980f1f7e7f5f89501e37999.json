@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, from_address, to_addresses, subject, status AS \"status: EmailStatus\", priority AS \"priority: Priority\", send_at, created_at\n           FROM emails\n           WHERE account_id = $1\n             AND ($2::email_status IS NULL OR status = $2)\n             AND ($3::uuid IS NULL OR id < $3)\n             AND ($5::email_priority IS NULL OR priority = $5)\n             AND ($6::timestamptz IS NULL OR created_at >= $6)\n             AND ($7::timestamptz IS NULL OR created_at < $7)\n             AND ($8::text IS NULL OR subject ILIKE $8\n                  OR EXISTS (SELECT 1 FROM unnest(to_addresses) AS a WHERE a ILIKE $8))\n           ORDER BY id DESC LIMIT $4",
+  "query": "SELECT id, from_address, to_addresses, subject, status AS \"status: EmailStatus\", priority AS \"priority: Priority\", send_at, created_at\n           FROM emails\n           WHERE account_id = $1 AND campaign_id IS NULL -- the sending-API log; issues have their own report\n             AND ($2::email_status IS NULL OR status = $2)\n             AND ($3::uuid IS NULL OR id < $3)\n             AND ($5::email_priority IS NULL OR priority = $5)\n             AND ($6::timestamptz IS NULL OR created_at >= $6)\n             AND ($7::timestamptz IS NULL OR created_at < $7)\n             AND ($8::text IS NULL OR subject ILIKE $8\n                  OR EXISTS (SELECT 1 FROM unnest(to_addresses) AS a WHERE a ILIKE $8))\n           ORDER BY id DESC LIMIT $4",
   "describe": {
     "columns": [
       {
@@ -127,5 +127,5 @@
       false
     ]
   },
-  "hash": "cfde2e0ac7f0eb500d2ee6b3aec30cc7c92b0e7405ebe25f0983602091c53c5f"
+  "hash": "724d9da677f0682439cb00d72e6d634ec22c44cd3980f1f7e7f5f89501e37999"
 }

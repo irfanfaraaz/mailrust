@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE emails\n           SET status = 'sending', lease_until = now() + make_interval(secs => $2), attempts = attempts + 1, updated_at = now()\n           WHERE id IN (\n               SELECT e.id FROM emails e JOIN accounts a ON a.id = e.account_id\n               WHERE e.status = 'queued' AND e.send_at <= now() AND a.status = 'active'\n                 AND ($3 = false OR e.priority = 'urgent')\n               ORDER BY e.priority, e.send_at\n               LIMIT $1\n               FOR UPDATE OF e SKIP LOCKED)\n           RETURNING id, account_id, domain_id, from_address, to_addresses, cc_addresses, bcc_addresses, reply_to,\n                     subject, html, text_body,\n                     headers AS \"headers: Json<BTreeMap<String, String>>\",\n                     tags AS \"tags: Json<BTreeMap<String, String>>\",\n                     attempts",
+  "query": "UPDATE emails\n           SET status = 'sending', lease_until = now() + make_interval(secs => $2), attempts = attempts + 1, updated_at = now()\n           WHERE id IN (\n               SELECT e.id FROM emails e JOIN accounts a ON a.id = e.account_id\n               WHERE e.status = 'queued' AND e.send_at <= now() AND a.status = 'active'\n                 AND ($3 = false OR e.priority = 'urgent')\n               ORDER BY e.priority, e.send_at\n               LIMIT $1\n               FOR UPDATE OF e SKIP LOCKED)\n           RETURNING id, account_id, domain_id, from_address, to_addresses, cc_addresses, bcc_addresses, reply_to,\n                     subject, html, text_body,\n                     headers AS \"headers: Json<BTreeMap<String, String>>\",\n                     tags AS \"tags: Json<BTreeMap<String, String>>\",\n                     attempts, campaign_id, contact_id",
   "describe": {
     "columns": [
       {
@@ -72,6 +72,16 @@
         "ordinal": 13,
         "name": "attempts",
         "type_info": "Int4"
+      },
+      {
+        "ordinal": 14,
+        "name": "campaign_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 15,
+        "name": "contact_id",
+        "type_info": "Uuid"
       }
     ],
     "parameters": {
@@ -95,8 +105,10 @@
       true,
       false,
       false,
-      false
+      false,
+      true,
+      true
     ]
   },
-  "hash": "7dee762d6a59672a94a15948ea5ae4a207cd4df1f3cc4c5fb2efe6c0bd5fdbcb"
+  "hash": "084d87f3f0e3479adfbdf99cac33424fcd155ddd128c0e9e90942cd9ac2f4785"
 }
