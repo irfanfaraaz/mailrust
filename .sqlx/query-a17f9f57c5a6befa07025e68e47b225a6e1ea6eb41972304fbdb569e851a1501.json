@@ -1,0 +1,82 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT lower(split_part(e.to_addresses[1], '@', 2)) AS \"domain!\",\n                  count(*) AS \"recipients!\",\n                  count(*) FILTER (WHERE e.status NOT IN ('queued', 'sending', 'unknown', 'failed', 'suppressed', 'canceled')) AS \"sent!\",\n                  count(*) FILTER (WHERE e.status = 'failed') AS \"failed!\",\n                  count(*) FILTER (WHERE e.status = 'suppressed') AS \"skipped!\",\n                  count(*) FILTER (WHERE ev.delivered) AS \"delivered!\",\n                  count(*) FILTER (WHERE ev.bounced) AS \"bounced!\",\n                  count(*) FILTER (WHERE ev.complained) AS \"complained!\",\n                  count(*) FILTER (WHERE ev.opened) AS \"opened!\",\n                  count(*) FILTER (WHERE ev.clicked) AS \"clicked!\",\n                  count(*) FILTER (WHERE ev.unsubscribed) AS \"unsubscribed!\"\n           FROM emails e\n           LEFT JOIN LATERAL (\n             SELECT bool_or(v.type = 'delivered') AS delivered, bool_or(v.type = 'bounced') AS bounced,\n                    bool_or(v.type = 'complained') AS complained,\n                    bool_or(v.type = 'opened' AND NOT v.likely_bot) AS opened,\n                    bool_or(v.type = 'clicked' AND NOT v.likely_bot) AS clicked,\n                    bool_or(v.type = 'unsubscribed') AS unsubscribed\n             FROM email_events v WHERE v.email_id = e.id) ev ON true\n           WHERE e.campaign_id = $1\n           GROUP BY 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "domain!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "recipients!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "sent!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "failed!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "skipped!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "delivered!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 6,
+        "name": "bounced!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 7,
+        "name": "complained!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 8,
+        "name": "opened!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 9,
+        "name": "clicked!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 10,
+        "name": "unsubscribed!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "a17f9f57c5a6befa07025e68e47b225a6e1ea6eb41972304fbdb569e851a1501"
+}

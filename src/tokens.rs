@@ -77,17 +77,46 @@ pub fn sign_unsubscribe(secret: &[u8], contact_id: Uuid) -> String {
     URL_SAFE_NO_PAD.encode(out)
 }
 
-pub fn verify_unsubscribe(secret: &[u8], token: &str) -> Option<Uuid> {
-    let raw = URL_SAFE_NO_PAD.decode(token.trim()).ok()?;
-    if raw.len() != UNSUB_LEN {
-        return None;
-    }
-    let (id, tag) = raw.split_at(16);
+const UNSUB_CAMPAIGN_LEN: usize = 16 + 16 + 32;
+
+/// The unsubscribe token in a campaign email: contact id, campaign id and a full HMAC over
+/// "unsub:" + both, so the report can count the unsubscribe for that issue.
+pub fn sign_campaign_unsubscribe(secret: &[u8], contact_id: Uuid, campaign_id: Uuid) -> String {
     let mut m = mac(secret);
     m.update(UNSUB_PREFIX);
-    m.update(id);
+    m.update(contact_id.as_bytes());
+    m.update(campaign_id.as_bytes());
+    let mut out = Vec::with_capacity(UNSUB_CAMPAIGN_LEN);
+    out.extend_from_slice(contact_id.as_bytes());
+    out.extend_from_slice(campaign_id.as_bytes());
+    out.extend_from_slice(&m.finalize().into_bytes());
+    URL_SAFE_NO_PAD.encode(out)
+}
+
+/// Both token forms: `(contact_id, Some(campaign_id))` for a campaign link, `(contact_id, None)` for the old form.
+pub fn verify_unsubscribe_any(secret: &[u8], token: &str) -> Option<(Uuid, Option<Uuid>)> {
+    let raw = URL_SAFE_NO_PAD.decode(token.trim()).ok()?;
+    let ids_len = match raw.len() {
+        UNSUB_LEN => 16,
+        UNSUB_CAMPAIGN_LEN => 32,
+        _ => return None,
+    };
+    let (ids, tag) = raw.split_at(ids_len);
+    let mut m = mac(secret);
+    m.update(UNSUB_PREFIX);
+    m.update(ids);
     m.verify_slice(tag).ok()?; // constant-time compare
-    Uuid::from_slice(id).ok()
+    let contact = Uuid::from_slice(&ids[..16]).ok()?;
+    let campaign = if ids_len == 32 {
+        Some(Uuid::from_slice(&ids[16..]).ok()?)
+    } else {
+        None
+    };
+    Some((contact, campaign))
+}
+
+pub fn verify_unsubscribe(secret: &[u8], token: &str) -> Option<Uuid> {
+    verify_unsubscribe_any(secret, token).map(|(contact, _)| contact)
 }
 
 #[cfg(test)]
@@ -156,5 +185,47 @@ mod tests {
         );
         assert_eq!(verify(S, &t), None, "and the other way round");
         assert_eq!(verify_unsubscribe(S, "not a token"), None);
+    }
+
+    #[test]
+    fn campaign_unsubscribe_tokens_carry_the_campaign() {
+        let (contact, campaign) = (Uuid::now_v7(), Uuid::now_v7());
+        let t = sign_campaign_unsubscribe(S, contact, campaign);
+        assert_eq!(t.len(), 86, "64 bytes as base64url");
+        assert_eq!(
+            verify_unsubscribe_any(S, &t),
+            Some((contact, Some(campaign)))
+        );
+        assert_eq!(verify_unsubscribe(S, &t), Some(contact));
+        let old = sign_unsubscribe(S, contact);
+        assert_eq!(
+            verify_unsubscribe_any(S, &old),
+            Some((contact, None)),
+            "Part 2.2 links still work"
+        );
+
+        let raw = URL_SAFE_NO_PAD.decode(&t).unwrap();
+        let mut other_campaign = raw.clone();
+        other_campaign[16..32].copy_from_slice(Uuid::now_v7().as_bytes());
+        assert_eq!(
+            verify_unsubscribe_any(S, &URL_SAFE_NO_PAD.encode(&other_campaign)),
+            None
+        );
+        let mut flipped = raw.clone();
+        flipped[40] ^= 1;
+        assert_eq!(
+            verify_unsubscribe_any(S, &URL_SAFE_NO_PAD.encode(&flipped)),
+            None
+        );
+        assert_eq!(
+            verify_unsubscribe_any(b"another-secret-another-secret-xx", &t),
+            None
+        );
+        assert_eq!(
+            verify_unsubscribe_any(S, &t[..t.len() - 3]),
+            None,
+            "truncated"
+        );
+        assert_eq!(verify(S, &t), None, "not a tracking token");
     }
 }

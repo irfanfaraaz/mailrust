@@ -1,0 +1,78 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT c.status AS \"status: CampaignStatus\", ct.first_name AS \"first_name?\", ct.last_name AS \"last_name?\",\n                  ct.email AS \"email?\", ct.fields AS \"fields?: Json<Fields>\", ct.status AS \"contact_status?: ContactStatus\"\n           FROM campaigns c LEFT JOIN contacts ct ON ct.id = $2 WHERE c.id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "status: CampaignStatus",
+        "type_info": {
+          "Custom": {
+            "name": "campaign_status",
+            "kind": {
+              "Enum": [
+                "draft",
+                "scheduled",
+                "sending",
+                "paused",
+                "sent",
+                "cancelled"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "first_name?",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "last_name?",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "email?",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "fields?: Json<Fields>",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 5,
+        "name": "contact_status?: ContactStatus",
+        "type_info": {
+          "Custom": {
+            "name": "contact_status",
+            "kind": {
+              "Enum": [
+                "pending",
+                "subscribed",
+                "unsubscribed"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "222e2368b206c37f10da60163bc0c52a48934bb9eef11b9d3d68ca2fd5661cb2"
+}

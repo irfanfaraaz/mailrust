@@ -6,6 +6,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+- Campaigns: write an issue in a block editor (headings, lists, quotes, images, buttons, dividers, merge tags with fallbacks) with a `/` menu, autosave, preview and test sends to team members.
+- Sending in growing waves (100, 200, 400, … up to 10,000, 10 minutes apart), most engaged readers first, to everyone subscribed or to chosen tags; send now or schedule. One issue sends at a time per account.
+- Hard checks before a send: verified from address, subject, postal address, size under Gmail's 100 KB clip, active account, at least one reader, valid blocks.
+- Pause, resume and cancel; an auto-paused account stops its issue and nobody gets it twice, also across a restart.
+- `List-Unsubscribe` and one-click `List-Unsubscribe-Post` headers on every issue; unsubscribes count per issue.
+- Per-issue report: totals, unique open and click rates (mail scanners left out), clicks per link, a split per mailbox provider and wave progress.
+- Public archive at `/p/<slug>` with a strict CSP, and image uploads (PNG, JPEG, GIF, WebP up to 5 MB) served from `/img/<id>`.
+- Postal address and an "Ask for first name" switch in the newsletter settings; the confirm page names the newsletter; the contacts list shows the total.
+- Endpoints for `/campaigns`, `/images` and `/public/archive`, all in OpenAPI.
+
 ## [0.2.0] - 2026-10-13
 
 The dashboard and the subscriber side of the newsletter.

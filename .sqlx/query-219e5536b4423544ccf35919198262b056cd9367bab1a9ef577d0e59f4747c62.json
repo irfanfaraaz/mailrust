@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM emails WHERE id = $1 AND status = 'sending' AND campaign_id IS NOT NULL RETURNING campaign_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "campaign_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "219e5536b4423544ccf35919198262b056cd9367bab1a9ef577d0e59f4747c62"
+}

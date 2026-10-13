@@ -28,6 +28,8 @@ pub fn routes() -> Router<AppState> {
 pub struct ContactList {
     pub data: Vec<ContactView>,
     pub next_cursor: Option<Uuid>,
+    /// Contacts matching the filters, on every page.
+    pub total: i64,
 }
 
 #[derive(Deserialize, utoipa::ToSchema)]
@@ -81,7 +83,12 @@ pub(crate) async fn list(
     } else {
         None
     };
-    Ok(Json(ContactList { data, next_cursor }))
+    let total = contacts::count(&state.pool, auth.account_id(), &f).await?;
+    Ok(Json(ContactList {
+        data,
+        next_cursor,
+        total,
+    }))
 }
 
 pub(crate) async fn create(

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isOneClick, noJsUnsubState, publicPostTarget, seeOther, unsubscribeIntent } from "./public-routes";
+import { ARCHIVE_CSP, archiveHeaders, isOneClick, noJsUnsubState, publicPostTarget, seeOther, unsubscribeIntent } from "./public-routes";
 
 describe("seeOther", () => {
   it("redirects with a relative Location, so the scheme behind a TLS proxy stays right", () => {
@@ -65,5 +65,15 @@ describe("noJsUnsubState", () => {
     expect(noJsUnsubState("resubscribed")).toEqual({ step: "resubscribed" });
     expect(noJsUnsubState("resubscribe_failed")).toMatchObject({ step: "unsubscribed", error: expect.any(String) });
     expect(noJsUnsubState("junk")).toEqual({ step: "ask" });
+  });
+});
+
+describe("archive headers", () => {
+  it("allow no script and only same-site images", () => {
+    expect(ARCHIVE_CSP).toBe("default-src 'none'; img-src 'self'; style-src 'unsafe-inline'");
+    const h = archiveHeaders();
+    expect(h["content-security-policy"]).toBe(ARCHIVE_CSP);
+    expect(h["x-content-type-options"]).toBe("nosniff");
+    expect(h["content-type"]).toBe("text/html; charset=utf-8");
   });
 });

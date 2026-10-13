@@ -16,6 +16,8 @@ export async function saveNewsletter(account: string, _: SaveState, form: FormDa
         // Absent: the engine keeps the saved address.
         newsletter_from: changedFrom(form),
         signup_enabled: form.get("signup_enabled") === "on",
+        postal_address: String(form.get("postal_address") ?? ""),
+        signup_ask_name: form.get("signup_ask_name") === "on",
       },
     });
   } catch (e) {

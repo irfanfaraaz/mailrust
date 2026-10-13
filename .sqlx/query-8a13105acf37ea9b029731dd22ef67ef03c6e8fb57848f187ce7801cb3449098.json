@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT r.contact_id, ct.email FROM campaign_recipients r JOIN contacts ct ON ct.id = r.contact_id\n         WHERE r.campaign_id = $1 AND r.wave <= $2 AND r.email_id IS NULL ORDER BY r.position",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "contact_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "email",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "8a13105acf37ea9b029731dd22ef67ef03c6e8fb57848f187ce7801cb3449098"
+}

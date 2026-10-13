@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE campaign_recipients SET email_id = NULL WHERE campaign_id = $1 AND email_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "eee51fce8d499e1e7f25604dd2d8dbd37a625c2ae4e0817e4a17e106a7b1010a"
+}

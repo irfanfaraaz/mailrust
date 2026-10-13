@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT COALESCE(max(wave), 0) AS \"last!\", count(*) FILTER (WHERE email_id IS NULL) AS \"left!\"\n                       FROM campaign_recipients WHERE campaign_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "last!",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "left!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "18d2c9c13fdcf0a3d0134136d97946d19c97d77a84958e531dfbf5e0379fb2a2"
+}

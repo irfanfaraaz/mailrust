@@ -139,7 +139,7 @@ async fn public_routes_answer_only_the_web_app(pool: sqlx::PgPool) {
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{b}");
-    assert_eq!(b, json!({"name": "Test", "open": false}));
+    assert_eq!(b, json!({"name": "Test", "open": false, "ask_name": true}));
     let (s, _) = common::call(
         &t.router,
         common::web_req("GET", "/public/newsletter/nobody", "1.2.3.4", None),
@@ -898,4 +898,89 @@ async fn request_logs_never_hold_a_public_token(pool: sqlx::PgPool) {
     let log = String::from_utf8(buf.0.lock().unwrap().clone()).unwrap();
     assert!(log.contains("/public/unsubscribe/{token}"), "{log}");
     assert!(!log.contains(&token), "{log}");
+}
+
+#[sqlx::test]
+async fn postal_address_and_ask_name_are_saved(pool: sqlx::PgPool) {
+    let t = common::app(pool).await;
+    let (s, b) = settings(&t, &t.key, None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(b["postal_address"].is_null());
+    assert_eq!(b["signup_ask_name"], true);
+    let (s, b) = settings(
+        &t,
+        &t.key,
+        Some(json!({"postal_address": " Shop Ltd\n1 Main St ", "signup_ask_name": false})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    assert_eq!(b["postal_address"], "Shop Ltd\n1 Main St");
+    assert_eq!(b["signup_ask_name"], false);
+    let (s, _) = settings(&t, &t.key, Some(json!({"postal_address": "x".repeat(301)}))).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (_, b) = settings(&t, &t.key, Some(json!({"postal_address": ""}))).await;
+    assert!(b["postal_address"].is_null(), "an empty string clears it");
+    assert_eq!(b["signup_ask_name"], false, "absent fields stay");
+}
+
+#[sqlx::test]
+async fn the_public_form_says_whether_to_ask_for_a_name(pool: sqlx::PgPool) {
+    let mut t = common::app(pool).await;
+    common::with_web_secret(&mut t);
+    common::verified_domain(&t, "news.shop.com").await;
+    settings(&t, &t.key, Some(json!({"public_slug": "asks", "newsletter_from": "hi@news.shop.com", "signup_enabled": true, "signup_ask_name": false}))).await;
+    let (s, b) = common::call(
+        &t.router,
+        common::web_req("GET", "/public/newsletter/asks", "10.0.0.1", None),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(b["ask_name"], false);
+}
+
+#[sqlx::test]
+async fn the_confirm_page_can_name_the_newsletter_without_confirming(pool: sqlx::PgPool) {
+    let mut t = common::app(pool.clone()).await;
+    common::with_web_secret(&mut t);
+    settings(
+        &t,
+        &t.key,
+        Some(json!({"public_slug": "named", "newsletter_name": "Shop Weekly"})),
+    )
+    .await;
+    let contact = uuid::Uuid::now_v7();
+    sqlx::query("INSERT INTO contacts (id, account_id, email, status, source) VALUES ($1, $2, 'p@x.com', 'pending', 'form')")
+        .bind(contact).bind(t.account.id).execute(&pool).await.unwrap();
+    let token = mailrust::auth_tokens::generate(mailrust::auth_tokens::CONFIRM_PREFIX);
+    sqlx::query("INSERT INTO contact_confirmations (token_hash, contact_id, expires_at) VALUES ($1, $2, now() + interval '1 day')")
+        .bind(mailrust::keys::hash_token(&token)).bind(contact).execute(&pool).await.unwrap();
+
+    let (s, b) = common::call(
+        &t.router,
+        common::web_req("GET", &format!("/public/confirm/{token}"), "10.0.0.2", None),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(b["newsletter_name"], "Shop Weekly");
+    assert_eq!(b["signup_slug"], "named");
+    let status: String = sqlx::query_scalar("SELECT status::text FROM contacts WHERE id = $1")
+        .bind(contact)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(status, "pending", "a GET never confirms");
+
+    let (s, b) = common::call(
+        &t.router,
+        common::web_req("GET", "/public/confirm/mr_conf_nope", "10.0.0.2", None),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(b["newsletter_name"].is_null() && b["signup_slug"].is_null());
+    let (s, _) = common::call(
+        &t.router,
+        common::req("GET", &format!("/public/confirm/{token}"), None, None),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "web secret required");
 }

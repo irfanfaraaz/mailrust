@@ -95,16 +95,20 @@ async fn after_batch(state: &AppState, accounts: HashSet<Uuid>) {
     }
 }
 
+/// Where tracked links and the open pixel of this domain's emails point.
+pub fn tracking_base(config: &Config, domain: &Domain) -> String {
+    match (&domain.tracking_subdomain, domain.tracking_verified) {
+        (Some(host), true) => format!("https://{host}"),
+        _ => config.public_base(),
+    }
+}
+
 fn tracking_for<'a>(config: &'a Config, domain: &Domain) -> Option<Tracking<'a>> {
     if !domain.open_tracking && !domain.click_tracking {
         return None;
     }
-    let base_url = match (&domain.tracking_subdomain, domain.tracking_verified) {
-        (Some(host), true) => format!("https://{host}"),
-        _ => config.public_base(),
-    };
     Some(Tracking {
-        base_url,
+        base_url: tracking_base(config, domain),
         secret: &config.tracking_secret,
         opens: domain.open_tracking,
         clicks: domain.click_tracking,
@@ -131,6 +135,22 @@ async fn process(
     let Some(domain) = domain else {
         queue::mark_failed(pool, &email, "sending domain was removed").await?;
         return Ok(());
+    };
+
+    // Campaign rows carry no body: render this reader's copy now, or skip / take it back.
+    let campaign = match email.campaign_id {
+        None => None,
+        Some(_) => match crate::campaigns::mail::prepare(state, &email).await? {
+            crate::campaigns::mail::Prepared::Send(parts) => Some(parts),
+            crate::campaigns::mail::Prepared::Skip(reason) => {
+                queue::mark_skipped(pool, &email, reason).await?;
+                return Ok(());
+            }
+            crate::campaigns::mail::Prepared::TakeBack => {
+                crate::campaigns::send::take_back_one(pool, email.id).await?;
+                return Ok(());
+            }
+        },
     };
 
     // Envelope: everyone, as bare lowercase addresses, each once, minus the block list.
@@ -181,9 +201,13 @@ async fn process(
         cc: &email.cc_addresses,
         reply_to: &email.reply_to,
         subject: &email.subject,
-        html: email.html.as_deref(),
-        text: email.text_body.as_deref(),
-        headers: &email.headers.0,
+        html: campaign
+            .as_ref()
+            .map_or(email.html.as_deref(), |p| Some(p.html.as_str())),
+        text: campaign
+            .as_ref()
+            .map_or(email.text_body.as_deref(), |p| Some(p.text.as_str())),
+        headers: campaign.as_ref().map_or(&email.headers.0, |p| &p.headers),
         attachments: &attachments,
         tracking: tracking_for(&state.config, &domain),
     };

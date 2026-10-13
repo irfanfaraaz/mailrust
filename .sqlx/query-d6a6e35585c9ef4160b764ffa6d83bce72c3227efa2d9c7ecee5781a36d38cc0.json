@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH eng AS (\n             SELECT a.addr, count(*) FILTER (WHERE ev.type = 'clicked') AS clicks,\n                    count(*) FILTER (WHERE ev.type = 'opened') AS opens\n             FROM email_events ev\n             JOIN emails e ON e.id = ev.email_id\n             CROSS JOIN LATERAL unnest(e.to_addresses) AS a(addr)\n             WHERE ev.account_id = $1 AND ev.type IN ('opened', 'clicked') AND NOT ev.likely_bot\n               AND ev.created_at > $5::timestamptz - interval '90 days'\n             GROUP BY a.addr\n           ), readers AS (\n             SELECT c.id,\n                    CASE WHEN eng.addr IS NOT NULL THEN 1\n                         WHEN c.subscribed_at > $5::timestamptz - interval '30 days'\n                              AND NOT EXISTS (SELECT 1 FROM emails e2 WHERE e2.contact_id = c.id) THEN 2\n                         ELSE 3 END AS tier,\n                    COALESCE(eng.clicks, 0) AS clicks, COALESCE(eng.opens, 0) AS opens\n             FROM contacts c LEFT JOIN eng ON eng.addr = c.email\n             WHERE c.account_id = $1 AND c.status = 'subscribed'\n               AND (cardinality($2::uuid[]) = 0\n                    OR EXISTS (SELECT 1 FROM contact_tags x WHERE x.contact_id = c.id AND x.tag_id = ANY($2)))\n               AND NOT EXISTS (SELECT 1 FROM contact_tags x WHERE x.contact_id = c.id AND x.tag_id = ANY($3))\n               AND NOT EXISTS (SELECT 1 FROM suppressions s WHERE s.account_id = c.account_id AND s.address = c.email)\n           ), ordered AS (\n             SELECT id, tier, (row_number() OVER (ORDER BY tier, clicks DESC, opens DESC, random()))::int AS pos\n             FROM readers\n           )\n           INSERT INTO campaign_recipients (campaign_id, contact_id, tier, position, wave)\n           SELECT $4, id, tier::smallint, pos, 1 + (SELECT count(*) FROM unnest($6::int[]) AS b(e) WHERE b.e < pos)::int\n           FROM ordered",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray",
+        "UuidArray",
+        "Uuid",
+        "Timestamptz",
+        "Int4Array"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d6a6e35585c9ef4160b764ffa6d83bce72c3227efa2d9c7ecee5781a36d38cc0"
+}

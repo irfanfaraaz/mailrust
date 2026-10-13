@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id FROM campaigns WHERE status = 'sending' ORDER BY next_wave_at NULLS FIRST LIMIT 100",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "fe9be06ed86427c45e335788c2bc84801c820d9466c15d786768933f5dd78dc0"
+}

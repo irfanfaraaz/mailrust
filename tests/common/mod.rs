@@ -105,7 +105,11 @@ pub async fn call_raw(
     let res = router.clone().oneshot(req).await.unwrap();
     let (status, headers) = (res.status(), res.headers().clone());
     let bytes = res.into_body().collect().await.unwrap().to_bytes();
-    (status, headers, String::from_utf8(bytes.to_vec()).unwrap())
+    (
+        status,
+        headers,
+        String::from_utf8_lossy(&bytes).into_owned(),
+    )
 }
 
 pub async fn verified_domain(t: &TestApp, name: &str) -> mailrust::domains::Domain {
@@ -302,4 +306,35 @@ where
         tokio::time::sleep(std::time::Duration::from_millis(20)).await;
     }
     panic!("condition not met within 5 s");
+}
+
+/// A 1x1 PNG.
+pub const PNG_1X1: &str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+
+pub fn png_1x1() -> Vec<u8> {
+    use base64::Engine;
+    base64::engine::general_purpose::STANDARD
+        .decode(PNG_1X1)
+        .unwrap()
+}
+
+/// `POST uri` with one multipart field `file` holding `bytes`, declared as `declared_type`.
+pub fn multipart_file(uri: &str, key: &str, bytes: &[u8], declared_type: &str) -> Request<Body> {
+    let boundary = "mailrust-test-boundary";
+    let mut body = format!(
+        "--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"upload\"\r\nContent-Type: {declared_type}\r\n\r\n"
+    )
+    .into_bytes();
+    body.extend_from_slice(bytes);
+    body.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
+    Request::builder()
+        .method("POST")
+        .uri(uri)
+        .header("authorization", format!("Bearer {key}"))
+        .header(
+            "content-type",
+            format!("multipart/form-data; boundary={boundary}"),
+        )
+        .body(Body::from(body))
+        .unwrap()
 }

@@ -10,5 +10,6 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // /img/ is public and cacheable: it must never carry a refreshed session cookie.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|img/).*)"],
 };

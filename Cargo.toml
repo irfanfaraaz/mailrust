@@ -30,6 +30,7 @@ futures = "0.3"
 governor = "0.8"
 hickory-resolver = "0.26"
 hmac = "0.12"
+imagesize = { version = "0.15", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
 lettre = { version = "0.11", default-features = false, features = ["builder"] }
 lol_html = "2"
 rand = "0.8"

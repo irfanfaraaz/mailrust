@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { engine, type Schemas } from "@/lib/engine";
 import { ConfirmForm } from "./confirm-form";
 
 export const metadata = { title: "Confirm your subscription" };
@@ -18,5 +19,7 @@ export default function Confirm({ params }: Props) {
 
 async function Form({ params }: Props) {
   const { token } = await params;
-  return <ConfirmForm token={token} />;
+  // The name is a nicety: if the lookup fails (429, outage), still show the Confirm button.
+  const info = await engine<Schemas["ConfirmInfo"]>(`/public/confirm/${encodeURIComponent(token)}`, { auth: false }).catch(() => null);
+  return <ConfirmForm token={token} name={info?.newsletter_name ?? null} slug={info?.signup_slug ?? null} />;
 }

@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT subject, preview_text, blocks AS \"blocks: SqlJson<serde_json::Value>\",\n                  COALESCE(finished_at, started_at, updated_at) AS \"sent_at!\"\n           FROM campaigns\n           WHERE account_id = $1 AND archive_slug = $2 AND status = 'sent' AND NOT archive_hidden",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "subject",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "preview_text",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "blocks: SqlJson<serde_json::Value>",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 3,
+        "name": "sent_at!",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      null
+    ]
+  },
+  "hash": "971c14d3edf2232b75bbd7243fbf68e6bb779e11503c088f6cc7ba475ad71b08"
+}

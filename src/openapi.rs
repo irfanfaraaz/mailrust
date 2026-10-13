@@ -11,19 +11,32 @@ use crate::{
     accounts::AccountStatus,
     api::{
         AppState,
+        campaigns::{
+            CampaignList, CampaignPreview, CampaignRequest, CampaignSummary, SendRequest,
+            TestSendRequest, TestSendResult,
+        },
         contacts::{ContactList, CreateContactRequest, UpdateContactRequest},
         domains::{CreateDomainRequest, DomainList, UpdateDomainRequest},
         emails::{BatchResponse, EmailList},
+        images::{ImageUpload, ImageUploaded},
         imports::{ImportList, ImportUpload},
         keys::{CreateKeyRequest, CreatedKey, KeyList},
         login::{LoginRequest, SessionResponse, TokenRequest},
         me::MeResponse,
         newsletter::UpdateNewsletterRequest,
-        public::{ConfirmView, PublicJoinRequest, PublicNewsletter, UnsubscribeView},
+        public::{
+            ArchiveIndex, ArchiveIssue, ConfirmInfo, ConfirmView, PublicJoinRequest,
+            PublicNewsletter, UnsubscribeView,
+        },
         suppressions::{AddSuppressionRequest, SuppressionList, SuppressionView},
         tags::{TagList, TagRequest, TagView},
         team::{InviteRequest, RoleRequest},
         webhooks::{CreateWebhookRequest, WebhookList},
+    },
+    campaigns::{
+        Campaign, CampaignStatus,
+        checks::Check,
+        report::{CampaignReport, LinkStat, ProviderStat, ReportRates, ReportTotals, WaveStat},
     },
     contacts::{ContactSource, ContactStatus, ContactView, TagRef},
     domains::{Domain, DomainStatus},
@@ -282,6 +295,22 @@ fn public_join() {}
     responses((status = 200, body = ConfirmView), (status = 401, body = ErrorBody)))]
 fn public_confirm() {}
 
+#[utoipa::path(get, path = "/public/confirm/{token}", tag = "public", security(),
+    params(("token" = String, Path), ("X-Mailrust-Web" = String, Header)),
+    responses((status = 200, body = ConfirmInfo)))]
+fn public_confirm_info() {}
+
+#[utoipa::path(get, path = "/public/archive/{slug}", tag = "public", security(),
+    params(("slug" = String, Path), ("X-Mailrust-Web" = String, Header)),
+    responses((status = 200, body = ArchiveIndex), (status = 404, body = ErrorBody), (status = 429, body = ErrorBody)))]
+fn public_archive() {}
+
+#[utoipa::path(get, path = "/public/archive/{slug}/{issue}", tag = "public", security(),
+    params(("slug" = String, Path), ("issue" = String, Path), ("X-Mailrust-Web" = String, Header)),
+    responses((status = 200, content_type = "text/html", body = String, description = "The archive page, served with a strict CSP"),
+               (status = 404, body = ErrorBody)))]
+fn public_archive_issue() {}
+
 #[utoipa::path(post, path = "/contacts/imports", tag = "audience",
     request_body(content = ImportUpload, content_type = "multipart/form-data"),
     responses((status = 201, body = ImportView), (status = 400, body = ErrorBody), (status = 413, body = ErrorBody),
@@ -295,6 +324,69 @@ fn list_imports() {}
     responses((status = 200, body = ImportView), (status = 404, body = ErrorBody)))]
 fn get_import() {}
 
+#[utoipa::path(post, path = "/images", tag = "campaigns",
+    request_body(content = ImageUpload, content_type = "multipart/form-data"),
+    responses((status = 201, body = ImageUploaded), (status = 400, body = ErrorBody), (status = 413, body = ErrorBody),
+               (status = 415, body = ErrorBody), (status = 422, body = ErrorBody)))]
+fn upload_image() {}
+
+#[utoipa::path(get, path = "/public/img/{id}", tag = "public", security(),
+    params(("id" = uuid::Uuid, Path), ("X-Mailrust-Web" = String, Header)),
+    responses((status = 200, content_type = "image/*", body = String, description = "The image bytes"), (status = 404, body = ErrorBody)))]
+fn public_image() {}
+
+#[utoipa::path(get, path = "/campaigns", tag = "campaigns",
+    params(("limit" = Option<i64>, Query), ("after" = Option<uuid::Uuid>, Query)),
+    responses((status = 200, body = CampaignList)))]
+fn list_campaigns() {}
+
+#[utoipa::path(post, path = "/campaigns", tag = "campaigns", request_body = CampaignRequest,
+    responses((status = 201, body = Campaign), (status = 400, body = ErrorBody), (status = 422, body = ErrorBody)))]
+fn create_campaign() {}
+
+#[utoipa::path(get, path = "/campaigns/{id}", tag = "campaigns", params(("id" = uuid::Uuid, Path)),
+    responses((status = 200, body = Campaign), (status = 404, body = ErrorBody)))]
+fn get_campaign() {}
+
+#[utoipa::path(patch, path = "/campaigns/{id}", tag = "campaigns", params(("id" = uuid::Uuid, Path)), request_body = CampaignRequest,
+    responses((status = 200, body = Campaign), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody),
+               (status = 409, body = ErrorBody), (status = 422, body = ErrorBody)))]
+fn update_campaign() {}
+
+#[utoipa::path(delete, path = "/campaigns/{id}", tag = "campaigns", params(("id" = uuid::Uuid, Path)),
+    responses((status = 204), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+fn delete_campaign() {}
+
+#[utoipa::path(post, path = "/campaigns/{id}/preview", tag = "campaigns", params(("id" = uuid::Uuid, Path)),
+    responses((status = 200, body = CampaignPreview), (status = 404, body = ErrorBody)))]
+fn preview_campaign() {}
+
+#[utoipa::path(post, path = "/campaigns/{id}/test", tag = "campaigns", params(("id" = uuid::Uuid, Path)), request_body = TestSendRequest,
+    responses((status = 202, body = TestSendResult), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody),
+               (status = 422, body = ErrorBody), (status = 429, body = ErrorBody)))]
+fn test_campaign() {}
+
+#[utoipa::path(post, path = "/campaigns/{id}/send", tag = "campaigns", params(("id" = uuid::Uuid, Path)), request_body = SendRequest,
+    responses((status = 200, body = Campaign), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody),
+               (status = 409, body = ErrorBody), (status = 422, body = ErrorBody, description = "Named by the first failed check")))]
+fn send_campaign() {}
+
+#[utoipa::path(get, path = "/campaigns/{id}/report", tag = "campaigns", params(("id" = uuid::Uuid, Path)),
+    responses((status = 200, body = CampaignReport), (status = 404, body = ErrorBody)))]
+fn campaign_report() {}
+
+#[utoipa::path(post, path = "/campaigns/{id}/pause", tag = "campaigns", params(("id" = uuid::Uuid, Path)),
+    responses((status = 200, body = Campaign), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+fn pause_campaign() {}
+
+#[utoipa::path(post, path = "/campaigns/{id}/resume", tag = "campaigns", params(("id" = uuid::Uuid, Path)),
+    responses((status = 200, body = Campaign), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody), (status = 422, body = ErrorBody)))]
+fn resume_campaign() {}
+
+#[utoipa::path(post, path = "/campaigns/{id}/cancel", tag = "campaigns", params(("id" = uuid::Uuid, Path)),
+    responses((status = 200, body = Campaign), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+fn cancel_campaign() {}
+
 #[derive(OpenApi)]
 #[openapi(
     info(title = "Mailrust API", version = "0.1.0", description = "Send transactional email through your own Amazon SES. Auth: `Authorization: Bearer mr_live_…` (API key), or `Bearer mr_sess_…` (dashboard session) plus `X-Mailrust-Account: <account id>`."),
@@ -305,7 +397,10 @@ fn get_import() {}
           list_contacts, export_contacts, create_contact, get_contact, update_contact, delete_contact,
           list_tags, create_tag, rename_tag, delete_tag, get_newsletter, update_newsletter,
           public_newsletter, public_unsubscribe_info, public_unsubscribe, public_resubscribe,
-          public_join, public_confirm, upload_import, list_imports, get_import),
+          public_join, public_confirm, public_confirm_info, public_archive, public_archive_issue, upload_import, list_imports, get_import,
+          upload_image, public_image,
+          list_campaigns, create_campaign, get_campaign, update_campaign, delete_campaign, preview_campaign, test_campaign, send_campaign,
+          campaign_report, pause_campaign, resume_campaign, cancel_campaign),
     components(schemas(SendEmailRequest, AttachmentInput, SendResponse, BatchResponse, EmailView, EmailSummary, EmailList,
         EventView, EmailStatus, Priority, Domain, DomainStatus, DnsRecord, DomainList, CreateDomainRequest, UpdateDomainRequest,
         KeySummary, KeyAccess, CreateKeyRequest, CreatedKey, KeyList, CreateWebhookRequest, WebhookView, WebhookList,
@@ -313,8 +408,11 @@ fn get_import() {}
         MeResponse, MyAccount, User, MemberRole, TeamView, MemberView, InviteView, InviteRequest, RoleRequest, Overview, Counts, ErrorBody, ErrorDetail,
         ContactView, ContactList, ContactStatus, ContactSource, TagRef, CreateContactRequest, UpdateContactRequest,
         TagView, TagList, TagRequest, NewsletterSettings, UpdateNewsletterRequest,
-        PublicNewsletter, UnsubscribeView, PublicJoinRequest, ConfirmView,
-        ImportView, ImportList, ImportStatus, ImportRowError, ImportUpload)),
+        PublicNewsletter, UnsubscribeView, PublicJoinRequest, ConfirmView, ConfirmInfo, ArchiveIndex, ArchiveIssue,
+        ImportView, ImportList, ImportStatus, ImportRowError, ImportUpload, ImageUpload, ImageUploaded,
+        Campaign, CampaignStatus, CampaignRequest, CampaignSummary, CampaignList, CampaignPreview, Check,
+        CampaignReport, ReportTotals, ReportRates, LinkStat, ProviderStat, WaveStat,
+        TestSendRequest, TestSendResult, SendRequest)),
     modifiers(&BearerAuth),
     security(("bearer" = []))
 )]

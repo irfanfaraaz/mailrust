@@ -4,10 +4,13 @@ use std::net::IpAddr;
 use axum::{
     Json, Router,
     extract::{FromRequestParts, Path, State},
-    http::{StatusCode, request::Parts},
+    http::{StatusCode, header, request::Parts},
+    response::{IntoResponse, Response},
     routing::{get, post},
 };
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use sqlx::types::Json as SqlJson;
 use uuid::Uuid;
 
 use super::{
@@ -20,15 +23,19 @@ use crate::{
     error::ApiError,
     keys::hash_token,
     newsletter::{self, JOIN_PER_IP_PER_HOUR},
+    render::{blocks, campaign},
     tokens, users,
 };
 
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/public/newsletter/{slug}", get(show_newsletter))
+        .route("/public/confirm/{token}", get(confirm_info))
         .route("/public/unsubscribe/{token}", get(unsubscribe_info))
         .route("/public/unsubscribe", post(unsubscribe))
         .route("/public/resubscribe", post(resubscribe))
+        .route("/public/archive/{slug}", get(archive_index))
+        .route("/public/archive/{slug}/{issue}", get(archive_issue))
         .route("/public/join", post(join))
         .route("/public/confirm", post(confirm))
 }
@@ -65,11 +72,29 @@ impl FromRequestParts<AppState> for WebCaller {
     }
 }
 
+/// Extractor: only the Next.js app (404 otherwise), with no per-IP limit. For image bytes:
+/// mail providers fetch images through a few proxy IPs, which a per-IP limit would starve.
+pub struct WebOnly;
+
+impl FromRequestParts<AppState> for WebOnly {
+    type Rejection = ApiError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, ApiError> {
+        if from_web(parts, state) {
+            Ok(WebOnly)
+        } else {
+            Err(ApiError::NotFound)
+        }
+    }
+}
+
 #[derive(Serialize, utoipa::ToSchema)]
 pub struct PublicNewsletter {
     pub name: String,
     /// False: show "This newsletter is not taking signups right now."
     pub open: bool,
+    /// False: hide the first-name field.
+    pub ask_name: bool,
 }
 
 #[derive(Serialize, utoipa::ToSchema)]
@@ -110,6 +135,35 @@ pub(crate) async fn show_newsletter(
     Ok(Json(PublicNewsletter {
         name: n.display_name().to_string(),
         open,
+        ask_name: n.signup_ask_name,
+    }))
+}
+
+#[derive(Serialize, utoipa::ToSchema)]
+pub struct ConfirmInfo {
+    /// None when the link is unknown; a used or expired link still names the newsletter.
+    pub newsletter_name: Option<String>,
+    /// The signup form's slug, for a "sign up again" link.
+    pub signup_slug: Option<String>,
+}
+
+/// Read-only: names the newsletter on the confirm page before the reader presses Confirm.
+pub(crate) async fn confirm_info(
+    State(state): State<AppState>,
+    _: WebCaller,
+    Path(token): Path<String>,
+) -> Result<Json<ConfirmInfo>, ApiError> {
+    let r = sqlx::query!(
+        r#"SELECT COALESCE(a.newsletter_name, a.name) AS "name!", a.public_slug
+           FROM contact_confirmations cc JOIN contacts c ON c.id = cc.contact_id JOIN accounts a ON a.id = c.account_id
+           WHERE cc.token_hash = $1"#,
+        hash_token(token.trim())
+    )
+    .fetch_optional(&state.pool)
+    .await?;
+    Ok(Json(ConfirmInfo {
+        newsletter_name: r.as_ref().map(|r| r.name.clone()),
+        signup_slug: r.and_then(|r| r.public_slug),
     }))
 }
 
@@ -131,24 +185,65 @@ pub(crate) async fn unsubscribe(
     _: WebCaller,
     ApiJson(body): ApiJson<TokenRequest>,
 ) -> Result<Json<UnsubscribeView>, ApiError> {
-    let Some(id) = tokens::verify_unsubscribe(&state.config.tracking_secret, &body.token) else {
+    let Some((id, campaign)) =
+        tokens::verify_unsubscribe_any(&state.config.tracking_secret, &body.token)
+    else {
         return Ok(Json(UnsubscribeView {
             newsletter_name: None,
         }));
     };
+    // One transaction: the report event never fails after the contact already changed.
+    let mut tx = state.pool.begin().await?;
     let r = sqlx::query!(
         "UPDATE contacts SET status = 'unsubscribed', unsubscribed_at = now(), unsubscribed_via_link = true, updated_at = now()
          WHERE id = $1 AND status <> 'unsubscribed'",
         id
     )
-    .execute(&state.pool)
+    .execute(&mut *tx)
     .await?;
+    if r.rows_affected() == 1
+        && let Some(campaign_id) = campaign
+    {
+        record_unsubscribe(&mut tx, id, campaign_id).await?;
+    }
+    tx.commit().await?;
     if r.rows_affected() == 1 {
         tracing::info!(contact_id = %id, "unsubscribed by link");
     }
     Ok(Json(UnsubscribeView {
         newsletter_name: name_of(&state, id).await?,
     }))
+}
+
+/// The report counts it for the issue the link came from (only when the click changed the contact).
+async fn record_unsubscribe(
+    conn: &mut sqlx::PgConnection,
+    contact_id: Uuid,
+    campaign_id: Uuid,
+) -> sqlx::Result<()> {
+    let Some(e) = sqlx::query!(
+        "SELECT id, account_id FROM emails WHERE campaign_id = $1 AND contact_id = $2",
+        campaign_id,
+        contact_id
+    )
+    .fetch_optional(&mut *conn)
+    .await?
+    else {
+        return Ok(());
+    };
+    crate::email_events::record(
+        conn,
+        crate::email_events::NewEvent {
+            account_id: e.account_id,
+            email_id: e.id,
+            kind: crate::email_events::EventKind::Unsubscribed,
+            recipient: None,
+            data: serde_json::json!({}),
+            likely_bot: false,
+        },
+    )
+    .await?;
+    Ok(())
 }
 
 /// Works only for a contact that left through this same link and had confirmed once
@@ -279,4 +374,95 @@ pub(crate) async fn confirm(
         .await?
         .ok_or(ApiError::BadToken)?;
     Ok(Json(ConfirmView { newsletter_name }))
+}
+
+#[derive(Serialize, utoipa::ToSchema)]
+pub struct ArchiveIssue {
+    pub title: String,
+    pub slug: String,
+    pub sent_at: DateTime<Utc>,
+}
+
+#[derive(Serialize, utoipa::ToSchema)]
+pub struct ArchiveIndex {
+    pub newsletter_name: String,
+    /// Show a Subscribe link to `/join/<slug>`.
+    pub signup_open: bool,
+    pub issues: Vec<ArchiveIssue>,
+}
+
+async fn newsletter_for(state: &AppState, slug: &str) -> Result<newsletter::Newsletter, ApiError> {
+    let slug = newsletter::normalize_slug(slug)
+        .ok()
+        .flatten()
+        .ok_or(ApiError::NotFound)?;
+    newsletter::by_slug(&state.pool, &slug)
+        .await?
+        .ok_or(ApiError::NotFound)
+}
+
+pub(crate) async fn archive_index(
+    State(state): State<AppState>,
+    _: WebCaller,
+    Path(slug): Path<String>,
+) -> Result<Json<ArchiveIndex>, ApiError> {
+    let n = newsletter_for(&state, &slug).await?;
+    let issues = sqlx::query_as!(
+        ArchiveIssue,
+        r#"SELECT subject AS title, archive_slug AS "slug!", COALESCE(finished_at, started_at, updated_at) AS "sent_at!"
+           FROM campaigns
+           WHERE account_id = $1 AND status = 'sent' AND NOT archive_hidden AND archive_slug IS NOT NULL
+           ORDER BY finished_at DESC NULLS LAST LIMIT 500"#,
+        n.account_id
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    Ok(Json(ArchiveIndex {
+        newsletter_name: n.display_name().to_string(),
+        signup_open: n.closed_reason(&state.pool).await?.is_none(),
+        issues,
+    }))
+}
+
+/// The whole page, built by the engine (no raw HTML anywhere), under a CSP with no scripts.
+pub(crate) async fn archive_issue(
+    State(state): State<AppState>,
+    _: WebCaller,
+    Path((slug, issue)): Path<(String, String)>,
+) -> Result<Response, ApiError> {
+    let n = newsletter_for(&state, &slug).await?;
+    let r = sqlx::query!(
+        r#"SELECT subject, preview_text, blocks AS "blocks: SqlJson<serde_json::Value>",
+                  COALESCE(finished_at, started_at, updated_at) AS "sent_at!"
+           FROM campaigns
+           WHERE account_id = $1 AND archive_slug = $2 AND status = 'sent' AND NOT archive_hidden"#,
+        n.account_id,
+        issue
+    )
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or(ApiError::NotFound)?;
+    let doc = blocks::parse(&r.blocks.0).map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
+    let page = campaign::archive_page(
+        &campaign::Issue {
+            subject: &r.subject,
+            preview_text: r.preview_text.as_deref(),
+            newsletter_name: n.display_name(),
+            postal_address: "",
+            doc: &doc,
+        },
+        r.sent_at,
+        n.public_slug.as_deref().unwrap_or_default(),
+        n.closed_reason(&state.pool).await?.is_none(),
+    );
+    Ok((
+        [
+            (header::CONTENT_TYPE, "text/html; charset=utf-8"),
+            (header::CONTENT_SECURITY_POLICY, campaign::ARCHIVE_CSP),
+            (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
+            (header::REFERRER_POLICY, "no-referrer"),
+        ],
+        page,
+    )
+        .into_response())
 }

@@ -600,7 +600,7 @@ pub async fn list(
     let rows = sqlx::query!(
         r#"SELECT id, from_address, to_addresses, subject, status AS "status: EmailStatus", priority AS "priority: Priority", send_at, created_at
            FROM emails
-           WHERE account_id = $1
+           WHERE account_id = $1 AND campaign_id IS NULL -- the sending-API log; issues have their own report
              AND ($2::email_status IS NULL OR status = $2)
              AND ($3::uuid IS NULL OR id < $3)
              AND ($5::email_priority IS NULL OR priority = $5)

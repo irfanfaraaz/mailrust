@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE campaigns SET status = 'scheduled', send_at = $2, paused_reason = NULL, updated_at = now()\n         WHERE id = $1 AND status IN ('draft', 'scheduled')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3ebee864f899f3ba57267862b16fed725fd6ddbfa59e7d63df7485def139c222"
+}

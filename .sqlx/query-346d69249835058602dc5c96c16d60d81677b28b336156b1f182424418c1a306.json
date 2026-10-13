@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT COALESCE(a.newsletter_name, a.name) AS \"name!\", a.public_slug\n           FROM contact_confirmations cc JOIN contacts c ON c.id = cc.contact_id JOIN accounts a ON a.id = c.account_id\n           WHERE cc.token_hash = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "public_slug",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea"
+      ]
+    },
+    "nullable": [
+      null,
+      true
+    ]
+  },
+  "hash": "346d69249835058602dc5c96c16d60d81677b28b336156b1f182424418c1a306"
+}
