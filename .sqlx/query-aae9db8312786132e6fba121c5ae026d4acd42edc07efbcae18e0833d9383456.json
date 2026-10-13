@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO tags (id, account_id, name) VALUES ($1, $2, $3)\n             ON CONFLICT (account_id, lower(name)) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "aae9db8312786132e6fba121c5ae026d4acd42edc07efbcae18e0833d9383456"
+}

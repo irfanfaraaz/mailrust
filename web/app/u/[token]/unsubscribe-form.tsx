@@ -3,10 +3,9 @@ import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { unsubscribeAction, type UnsubState } from "./actions";
 
-const ask: UnsubState = { step: "ask" };
-
-export function UnsubscribeForm({ token, name }: { token: string; name: string }) {
-  const [state, action, pending] = useActionState(unsubscribeAction.bind(null, token), ask);
+/** `initial`: where a no-JavaScript submit left off (see noJsUnsubState). */
+export function UnsubscribeForm({ token, name, initial }: { token: string; name: string; initial: UnsubState }) {
+  const [state, action, pending] = useActionState(unsubscribeAction.bind(null, token), initial);
   if (state.step === "resubscribed") return <p role="status" className="text-lg">You&apos;re subscribed to {name} again.</p>;
   if (state.step === "unsubscribed") {
     return (

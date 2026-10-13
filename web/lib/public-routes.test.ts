@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isOneClick, publicPostTarget } from "./public-routes";
+import { isOneClick, noJsUnsubState, publicPostTarget, unsubscribeIntent } from "./public-routes";
 
 describe("publicPostTarget", () => {
   it("sends plain form posts to the route handlers", () => {
@@ -30,5 +30,32 @@ describe("isOneClick", () => {
     expect(isOneClick(form({ "List-Unsubscribe": "one-click" }))).toBe(false);
     expect(isOneClick(form({ "list-unsubscribe": "One-Click" }))).toBe(false);
     expect(isOneClick(form({}))).toBe(false);
+  });
+});
+
+describe("unsubscribeIntent", () => {
+  const form = (entries: Record<string, string>) => {
+    const f = new FormData();
+    for (const [k, v] of Object.entries(entries)) f.set(k, v);
+    return f;
+  };
+  it("tells a mail client's one-click from the page's own form posted without JavaScript", () => {
+    expect(unsubscribeIntent(form({ "List-Unsubscribe": "One-Click" }))).toBe("one-click");
+    expect(unsubscribeIntent(form({ do: "unsubscribe", $ACTION_KEY: "k" }))).toBe("unsubscribe");
+    expect(unsubscribeIntent(form({ do: "resubscribe" }))).toBe("resubscribe");
+  });
+  it("refuses anything else", () => {
+    expect(unsubscribeIntent(form({}))).toBeNull();
+    expect(unsubscribeIntent(form({ do: "delete" }))).toBeNull();
+  });
+});
+
+describe("noJsUnsubState", () => {
+  it("turns the redirect's ?done= back into the form's state", () => {
+    expect(noJsUnsubState(undefined)).toEqual({ step: "ask" });
+    expect(noJsUnsubState("unsubscribed")).toEqual({ step: "unsubscribed" });
+    expect(noJsUnsubState("resubscribed")).toEqual({ step: "resubscribed" });
+    expect(noJsUnsubState("resubscribe_failed")).toMatchObject({ step: "unsubscribed", error: expect.any(String) });
+    expect(noJsUnsubState("junk")).toEqual({ step: "ask" });
   });
 });

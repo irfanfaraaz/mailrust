@@ -1,12 +1,11 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { engine, EngineError } from "@/lib/engine";
+import { changedFrom } from "@/lib/newsletter-from";
 
 export type SaveState = { error?: string };
 
 export async function saveNewsletter(account: string, _: SaveState, form: FormData): Promise<SaveState> {
-  const local = String(form.get("from_local") ?? "").trim();
-  const domain = String(form.get("from_domain") ?? "");
   try {
     await engine("/newsletter", {
       method: "PATCH",
@@ -14,7 +13,8 @@ export async function saveNewsletter(account: string, _: SaveState, form: FormDa
       body: {
         public_slug: String(form.get("public_slug") ?? ""),
         newsletter_name: String(form.get("newsletter_name") ?? ""),
-        newsletter_from: local && domain ? `${local}@${domain}` : "",
+        // Absent: the engine keeps the saved address.
+        newsletter_from: changedFrom(form),
         signup_enabled: form.get("signup_enabled") === "on",
       },
     });

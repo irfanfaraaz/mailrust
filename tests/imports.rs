@@ -281,3 +281,72 @@ async fn ten_thousand_rows_import_and_resume_after_a_crash(pool: sqlx::PgPool) {
 async fn nothing_to_do_is_not_an_error(pool: sqlx::PgPool) {
     assert!(!imports::run_once(&pool).await.unwrap());
 }
+
+#[sqlx::test]
+async fn a_nul_byte_row_is_skipped_and_the_rest_imports(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    let csv = b"email,first_name,plan\na@x.com,A\0na,free\nb@x.com,Bo,pro\0\nc@x.com,Cy,free\n";
+    let (s, b) = common::call(
+        &t.router,
+        upload(&t.key, &[("file", &csv[..]), ("consent", TRUE)]),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{b}");
+    let id = b["id"].as_str().unwrap().to_string();
+    assert!(imports::run_once(&pool).await.unwrap());
+    let (_, v) = common::call(
+        &t.router,
+        common::req(
+            "GET",
+            &format!("/contacts/imports/{id}"),
+            Some(&t.key),
+            None,
+        ),
+    )
+    .await;
+    assert_eq!(v["status"], "done", "{v}");
+    assert_eq!(
+        (v["added"].as_i64(), v["skipped"].as_i64()),
+        (Some(1), Some(2)),
+        "{v}"
+    );
+    assert_eq!(v["errors"][0]["line"], 2);
+    assert_eq!(v["errors"][1]["line"], 3);
+}
+
+#[sqlx::test]
+async fn a_job_that_keeps_failing_is_given_up(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    let (s, b) = common::call(
+        &t.router,
+        upload(
+            &t.key,
+            &[("file", &b"email\na@x.com\n"[..]), ("consent", TRUE)],
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{b}");
+    // Every try so far died mid-batch: the lease ran out each time.
+    for _ in 0..imports::MAX_ATTEMPTS {
+        imports::claim(&pool).await.unwrap().expect("claimed");
+        sqlx::query("UPDATE contact_imports SET lease_until = now() - interval '1 second'")
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+    assert!(imports::run_once(&pool).await.unwrap());
+    let (status, error, file_gone, finished): (String, Option<String>, bool, bool) = sqlx::query_as(
+        "SELECT status::text, error, file IS NULL, finished_at IS NOT NULL FROM contact_imports",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(status, "failed");
+    assert!(error.is_some());
+    assert!(file_gone && finished);
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM contacts")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(n, 0, "a given-up job does not run again");
+}

@@ -42,7 +42,8 @@ async function JoinForm({ params, searchParams }: Props) {
     );
   }
   const bad = error === "email";
-  const draft = bad ? readDraft((await cookies()).get(DRAFT_COOKIE)?.value) : { email: "", first_name: "" };
+  const badName = error === "name";
+  const draft = bad || badName ? readDraft((await cookies()).get(DRAFT_COOKIE)?.value) : { email: "", first_name: "" };
   return (
     <>
       <h1 className="text-2xl font-semibold">Subscribe to {n.name}</h1>
@@ -64,7 +65,16 @@ async function JoinForm({ params, searchParams }: Props) {
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="first_name">First name (optional)</Label>
-          <Input id="first_name" name="first_name" autoComplete="given-name" defaultValue={draft.first_name} />
+          <Input
+            id="first_name"
+            name="first_name"
+            autoComplete="given-name"
+            maxLength={100}
+            defaultValue={draft.first_name}
+            aria-invalid={badName || undefined}
+            aria-describedby={badName ? "first-name-error" : undefined}
+          />
+          {badName && <p id="first-name-error" role="alert" className="text-sm text-destructive">Use a first name of at most 100 characters, on one line.</p>}
         </div>
         {/* Honeypot: hidden from people and screen readers; bots fill it in. */}
         <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" className="absolute -left-[9999px] size-px" />

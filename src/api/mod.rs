@@ -32,7 +32,7 @@ pub mod tags;
 pub mod team;
 pub mod webhooks;
 
-// shortcut: in-memory, per process; keys never expire from the map. Fine for one API process.
+// shortcut: in-memory, per process; idle keys are pruned every minute (see `serve`). Fine for one API process.
 pub type KeyLimiter = governor::DefaultKeyedRateLimiter<Uuid>;
 
 pub const REQUESTS_PER_SECOND_PER_KEY: u32 = 10;
@@ -92,7 +92,26 @@ pub fn router(state: AppState) -> Router {
         .with_state(state)
 }
 
+/// Drops keys whose limit has fully refilled, so the maps do not grow with every IP and key ever seen.
+pub fn prune_limiters(keys: &KeyLimiter, ips: &IpLimiter) {
+    keys.retain_recent();
+    keys.shrink_to_fit();
+    ips.retain_recent();
+    ips.shrink_to_fit();
+}
+
 pub async fn serve(state: AppState, shutdown: CancellationToken) -> anyhow::Result<()> {
+    let (keys, ips, stop) = (
+        state.key_limiter.clone(),
+        state.ip_limiter.clone(),
+        shutdown.clone(),
+    );
+    tokio::spawn(async move {
+        crate::background::every(std::time::Duration::from_secs(60), &stop, || async {
+            prune_limiters(&keys, &ips)
+        })
+        .await
+    });
     let addr = state.config.bind_addr;
     let listener = tokio::net::TcpListener::bind(addr).await?;
     tracing::info!(%addr, "api listening");
@@ -103,4 +122,21 @@ pub async fn serve(state: AppState, shutdown: CancellationToken) -> anyhow::Resu
     .with_graceful_shutdown(shutdown.cancelled_owned())
     .await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn idle_limiter_entries_are_pruned() {
+        let q = Quota::per_second(NonZeroU32::new(10).unwrap_or(NonZeroU32::MIN));
+        let keys: KeyLimiter = RateLimiter::keyed(q);
+        let ips: IpLimiter = RateLimiter::keyed(q);
+        keys.check_key(&Uuid::nil()).ok();
+        ips.check_key(&IpAddr::from([10, 0, 0, 1])).ok();
+        std::thread::sleep(std::time::Duration::from_millis(250));
+        prune_limiters(&keys, &ips);
+        assert_eq!((keys.len(), ips.len()), (0, 0));
+    }
 }

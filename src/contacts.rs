@@ -65,6 +65,25 @@ pub struct ContactView {
     pub updated_at: DateTime<Utc>,
 }
 
+/// Fixed export columns: a custom field may not use these names.
+pub const RESERVED_KEYS: [&str; 6] = [
+    "email",
+    "first_name",
+    "last_name",
+    "status",
+    "tags",
+    "created_at",
+];
+
+/// Postgres cannot store NUL and the rest breaks headers and CSVs. Field values may keep line breaks and tabs.
+fn no_control(s: &str, allow_breaks: bool) -> Result<(), String> {
+    let bad = |c: char| c.is_control() && !(allow_breaks && matches!(c, '\n' | '\r' | '\t'));
+    if s.chars().any(bad) {
+        return Err("text cannot hold control characters".into());
+    }
+    Ok(())
+}
+
 pub fn valid_field_key(k: &str) -> bool {
     (1..=MAX_FIELD_KEY).contains(&k.len())
         && k.bytes()
@@ -87,6 +106,10 @@ pub fn clean_fields(fields: Fields) -> Result<Fields, String> {
                 "field name {k:?} must be 1-{MAX_FIELD_KEY} characters of a-z, 0-9 and _"
             ));
         }
+        if RESERVED_KEYS.contains(&k.as_str()) {
+            return Err(format!("field name {k} is taken by a fixed column"));
+        }
+        no_control(v, true).map_err(|e| format!("field {k}: {e}"))?;
         if v.chars().count() > MAX_FIELD_VALUE {
             return Err(format!(
                 "field {k} is longer than {MAX_FIELD_VALUE} characters"
@@ -96,10 +119,13 @@ pub fn clean_fields(fields: Fields) -> Result<Fields, String> {
     Ok(fields)
 }
 
-/// Trimmed; empty becomes None.
+/// Trimmed; empty becomes None. No control characters, line breaks included.
 pub fn clean_name(name: Option<&str>) -> Result<Option<String>, String> {
     match name.map(str::trim).filter(|s| !s.is_empty()) {
         None => Ok(None),
+        Some(n) if no_control(n, false).is_err() => {
+            Err("names cannot hold line breaks or control characters".into())
+        }
         Some(n) if n.chars().count() > MAX_NAME => {
             Err(format!("names are at most {MAX_NAME} characters"))
         }
@@ -115,6 +141,7 @@ pub fn clean_tags(names: &[String]) -> Result<Vec<String>, String> {
         if t.is_empty() || t.chars().count() > MAX_TAG {
             return Err(format!("tag names are 1-{MAX_TAG} characters"));
         }
+        no_control(t, false).map_err(|e| format!("tag names: {e}"))?;
         if !out.iter().any(|x| x.to_lowercase() == t.to_lowercase()) {
             out.push(t.to_string());
         }
@@ -144,24 +171,38 @@ impl ContactInput {
 }
 
 /// Finds or creates each tag by name (ignoring case). Ids come back in the order of `names`.
+/// Inserts in sorted order with DO NOTHING: existing tags are never locked, so concurrent writers cannot deadlock.
 pub async fn ensure_tags(
     conn: &mut PgConnection,
     account_id: Uuid,
     names: &[String],
 ) -> sqlx::Result<Vec<Uuid>> {
-    let mut ids = Vec::with_capacity(names.len());
-    for name in names {
-        let id = sqlx::query_scalar!(
+    let mut sorted: Vec<&String> = names.iter().collect();
+    sorted.sort_by_key(|n| n.to_lowercase());
+    sorted.dedup_by_key(|n| n.to_lowercase());
+    for name in &sorted {
+        sqlx::query!(
             "INSERT INTO tags (id, account_id, name) VALUES ($1, $2, $3)
-             ON CONFLICT (account_id, lower(name)) DO UPDATE SET name = tags.name
-             RETURNING id",
+             ON CONFLICT (account_id, lower(name)) DO NOTHING",
             Uuid::now_v7(),
             account_id,
-            name
+            name.as_str()
         )
-        .fetch_one(&mut *conn)
+        .execute(&mut *conn)
         .await?;
-        ids.push(id);
+    }
+    // Matched in Postgres (its lower(), not Rust's) and returned in input order.
+    let ids = sqlx::query_scalar!(
+        r#"SELECT t.id FROM unnest($2::text[]) WITH ORDINALITY AS n(name, ord)
+           JOIN tags t ON t.account_id = $1 AND lower(t.name) = lower(n.name)
+           ORDER BY n.ord"#,
+        account_id,
+        names
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    if ids.len() != names.len() {
+        return Err(sqlx::Error::RowNotFound);
     }
     Ok(ids)
 }
@@ -372,6 +413,15 @@ pub async fn export_page(
     .await
 }
 
+/// OWASP CSV injection: a cell a spreadsheet would run as a formula gets a leading `'`.
+fn defuse(cell: String) -> String {
+    if cell.starts_with(['=', '+', '-', '@', '\t', '\r']) {
+        format!("'{cell}")
+    } else {
+        cell
+    }
+}
+
 pub fn export_csv(
     keys: &[String],
     rows: &[ExportRow],
@@ -403,7 +453,7 @@ pub fn export_csv(
             keys.iter()
                 .map(|k| r.fields.0.get(k).cloned().unwrap_or_default()),
         );
-        w.write_record(&rec)?;
+        w.write_record(rec.into_iter().map(defuse))?;
     }
     w.into_inner().map_err(|e| e.into_error().into())
 }
@@ -432,6 +482,34 @@ mod tests {
             out,
             "email,first_name,last_name,status,tags,created_at,y,z\n\
              a@x.com,\"Lopez, \"\"Ana\"\"\",,unsubscribed,a;b,2026-10-13T10:00:00+00:00,,\"line\nbreak\"\n"
+        );
+    }
+
+    #[test]
+    fn export_csv_defuses_formulas() {
+        let row = ExportRow {
+            id: Uuid::nil(),
+            email: "a@x.com".into(),
+            first_name: Some("=HYPERLINK(\"http://evil\")".into()),
+            last_name: Some("+1".into()),
+            status: ContactStatus::Subscribed,
+            tags: vec!["@vip".into()],
+            fields: Json(
+                [
+                    ("z".to_string(), "-2".to_string()),
+                    ("t".to_string(), "\tx".to_string()),
+                ]
+                .into(),
+            ),
+            created_at: DateTime::parse_from_rfc3339("2026-10-13T10:00:00Z")
+                .unwrap()
+                .with_timezone(&Utc),
+        };
+        let out = String::from_utf8(export_csv(&["t".into(), "z".into()], &[row], false).unwrap())
+            .unwrap();
+        assert_eq!(
+            out,
+            "a@x.com,\"'=HYPERLINK(\"\"http://evil\"\")\",'+1,subscribed,'@vip,2026-10-13T10:00:00+00:00,'\tx,'-2\n"
         );
     }
 

@@ -17,9 +17,14 @@ export function SettingsForm({ account, settings, domains, origin }: Props) {
   useEffect(() => {
     if (state !== none && !state.error) toast.success("Signup form saved");
   }, [state]);
-  const [local = "", domain = ""] = (settings.newsletter_from ?? "").split("@");
+  const current = settings.newsletter_from ?? "";
+  const [local = "", domain = ""] = current.split("@");
+  // The saved domain lost its verification: keep showing it (and keep it on save) instead of swapping in another.
+  const unverified = domain !== "" && !domains.includes(domain);
+  const domainOptions = unverified ? [domain, ...domains] : domains;
   return (
     <form action={action} className="flex max-w-xl flex-col gap-4 text-sm">
+      <input type="hidden" name="from_current" value={current} />
       <label className="flex flex-col gap-1">Public address
         {/* On a phone the long origin sits above the field instead of squeezing it. */}
         <span className="flex flex-col gap-1 sm:flex-row sm:items-center">
@@ -32,6 +37,7 @@ export function SettingsForm({ account, settings, domains, origin }: Props) {
       </label>
       {domains.length === 0 ? (
         <p className="text-muted-foreground">
+          {current && <>Confirm emails come from {current}, but {domain} is not verified any more. </>}
           Confirm emails go out from one of your verified domains. <Link className="underline underline-offset-2" href={`/a/${account}/domains`}>Verify a domain</Link> first.
         </p>
       ) : (
@@ -40,10 +46,15 @@ export function SettingsForm({ account, settings, domains, origin }: Props) {
           <span className="flex items-center gap-1">
             <Input aria-label="From address" name="from_local" defaultValue={local} placeholder="hello" />
             <span aria-hidden>@</span>
-            <NativeSelect aria-label="From domain" name="from_domain" defaultValue={domains.includes(domain) ? domain : domains[0]}>
-              {domains.map((d) => <option key={d} value={d}>{d}</option>)}
+            <NativeSelect aria-label="From domain" name="from_domain" defaultValue={domain || domains[0]}>
+              {domainOptions.map((d) => <option key={d} value={d}>{d === domain && unverified ? `${d} (not verified)` : d}</option>)}
             </NativeSelect>
           </span>
+          {unverified && (
+            <p className="text-muted-foreground">
+              {domain} is not verified any more, so the form takes no signups. <Link className="underline underline-offset-2" href={`/a/${account}/domains`}>Verify it again</Link> or pick another domain.
+            </p>
+          )}
         </div>
       )}
       <label className="flex items-center gap-2">

@@ -1,7 +1,8 @@
 "use server";
 import { engine, EngineError } from "@/lib/engine";
+import { RESUBSCRIBE_REFUSED, type UnsubStep } from "@/lib/public-routes";
 
-export type UnsubState = { step: "ask" | "unsubscribed" | "resubscribed"; error?: string };
+export type UnsubState = UnsubStep;
 
 export async function unsubscribeAction(token: string, _: UnsubState, form: FormData): Promise<UnsubState> {
   if (form.get("do") === "resubscribe") {
@@ -10,7 +11,7 @@ export async function unsubscribeAction(token: string, _: UnsubState, form: Form
       return { step: "resubscribed" };
     } catch (e) {
       if (e instanceof EngineError && e.status === 409) {
-        return { step: "unsubscribed", error: "This link cannot subscribe you again. Use the newsletter's signup form." };
+        return { step: "unsubscribed", error: RESUBSCRIBE_REFUSED };
       }
       throw e;
     }

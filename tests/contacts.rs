@@ -483,3 +483,139 @@ async fn export_walks_past_one_page(pool: sqlx::PgPool) {
     assert_eq!(s, StatusCode::OK);
     assert_eq!(body.lines().count(), 1002);
 }
+
+#[sqlx::test]
+async fn patch_cannot_subscribe_a_pending_contact(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    let (_, a) = add(&t, json!({"email": "ana@x.com"})).await;
+    sqlx::query("UPDATE contacts SET status = 'pending', subscribed_at = NULL")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let uri = format!("/contacts/{}", a["id"].as_str().unwrap());
+    let (s, b) = common::call(
+        &t.router,
+        common::req(
+            "PATCH",
+            &uri,
+            Some(&t.key),
+            Some(json!({"status": "subscribed"})),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{b}");
+    assert_eq!(b["error"]["code"], "resubscribe_not_allowed");
+    let (s, b) = common::call(
+        &t.router,
+        common::req(
+            "PATCH",
+            &uri,
+            Some(&t.key),
+            Some(json!({"status": "unsubscribed"})),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+}
+
+#[sqlx::test]
+async fn control_characters_are_refused_not_a_500(pool: sqlx::PgPool) {
+    let t = common::app(pool).await;
+    for body in [
+        json!({"email": "a@b.com", "first_name": "A\u{0}na"}),
+        json!({"email": "a@b.com", "last_name": "Lo\u{7}pez"}),
+        json!({"email": "a@b.com", "fields": {"k": "v\u{0}"}}),
+        json!({"email": "a@b.com", "tags": ["V\u{0}IP"]}),
+        json!({"email": "a\u{0}@b.com"}),
+    ] {
+        let (s, b) = add(&t, body.clone()).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{body} -> {b}");
+    }
+    let (s, b) = add(
+        &t,
+        json!({"email": "a@b.com", "fields": {"note": "line one\nline two\ttab"}}),
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::CREATED,
+        "line breaks and tabs are fine in field values: {b}"
+    );
+}
+
+#[sqlx::test]
+async fn reserved_field_keys_are_refused(pool: sqlx::PgPool) {
+    let t = common::app(pool).await;
+    for key in [
+        "email",
+        "first_name",
+        "last_name",
+        "status",
+        "tags",
+        "created_at",
+    ] {
+        let (s, b) = add(&t, json!({"email": "a@b.com", "fields": {key: "v"}})).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{key}: {b}");
+    }
+    let (_, a) = add(&t, json!({"email": "a@b.com"})).await;
+    let uri = format!("/contacts/{}", a["id"].as_str().unwrap());
+    let (s, _) = common::call(
+        &t.router,
+        common::req(
+            "PATCH",
+            &uri,
+            Some(&t.key),
+            Some(json!({"fields": {"status": "x"}})),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+}
+
+/// Two writers that name the same existing tags in opposite order must not lock each other out.
+#[sqlx::test]
+async fn tag_upserts_in_opposite_order_do_not_deadlock(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    let acc = t.account.id;
+    let (a, b) = ("Alpha".to_string(), "Beta".to_string());
+    {
+        let mut c = pool.acquire().await.unwrap();
+        contacts::ensure_tags(&mut c, acc, &[a.clone(), b.clone()])
+            .await
+            .unwrap();
+    }
+    let mut t1 = pool.begin().await.unwrap();
+    let mut t2 = pool.begin().await.unwrap();
+    contacts::ensure_tags(&mut t1, acc, std::slice::from_ref(&a))
+        .await
+        .unwrap();
+    contacts::ensure_tags(&mut t2, acc, std::slice::from_ref(&b))
+        .await
+        .unwrap();
+    let r = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        let one = contacts::ensure_tags(&mut t1, acc, std::slice::from_ref(&b));
+        let two = contacts::ensure_tags(&mut t2, acc, std::slice::from_ref(&a));
+        tokio::join!(one, two)
+    })
+    .await
+    .expect("the two transactions wait on each other");
+    r.0.unwrap();
+    r.1.unwrap();
+}
+
+#[sqlx::test]
+async fn ensure_tags_dedupes_and_keeps_input_order(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    let mut c = pool.acquire().await.unwrap();
+    let ids = contacts::ensure_tags(&mut c, t.account.id, &["b".into(), "A".into(), "B".into()])
+        .await
+        .unwrap();
+    assert_eq!(ids.len(), 3);
+    assert_eq!(ids[0], ids[2], "same tag, ignoring case");
+    assert_ne!(ids[0], ids[1]);
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM tags")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(n, 2);
+}

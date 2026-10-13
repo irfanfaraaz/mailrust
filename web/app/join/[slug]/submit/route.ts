@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { engine, EngineError } from "@/lib/engine";
-import { DRAFT_COOKIE } from "@/lib/join-draft";
+import { DRAFT_COOKIE, draftCookieOptions, joinErrorField } from "@/lib/join-draft";
 
 /** Takes the join form, from our page or from a form embedded on any site (proxy.ts rewrites POST /join/<slug> here). */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
@@ -20,8 +20,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     if (!(e instanceof EngineError)) throw e;
     if (e.status === 400) {
       // Keep what they typed for the retry: a short-lived cookie scoped to this form, never the URL.
-      const res = go(`${page}?error=email`);
-      res.cookies.set(DRAFT_COOKIE, JSON.stringify({ email, first_name: firstName }), { path: page, maxAge: 300, httpOnly: true, sameSite: "lax" });
+      const res = go(`${page}?error=${joinErrorField(e.message)}`);
+      res.cookies.set(DRAFT_COOKIE, JSON.stringify({ email, first_name: firstName }), draftCookieOptions(page));
       return res;
     }
     if (e.status === 409) return go(page);

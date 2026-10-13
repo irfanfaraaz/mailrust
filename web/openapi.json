@@ -3792,7 +3792,7 @@
               },
               {
                 "$ref": "#/components/schemas/ContactStatus",
-                "description": "`subscribed` or `unsubscribed`. An unsubscribed contact cannot be set back to `subscribed`."
+                "description": "`unsubscribed`, or `subscribed` for a contact that already is. Pending and unsubscribed contacts cannot be set to `subscribed`."
               }
             ]
           },

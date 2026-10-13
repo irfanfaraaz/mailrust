@@ -99,6 +99,8 @@ pub fn columns(headers: &csv::StringRecord) -> Result<Columns, String> {
         let Some(k) = field_key(h) else { continue };
         match k.as_str() {
             "email" if email.is_none() => email = Some(i),
+            // Fixed export columns Mailrust sets itself (and a second email column): skipped, never a field.
+            "email" | "status" | "created_at" => {}
             "first_name" => c.first_name = Some(i),
             "last_name" => c.last_name = Some(i),
             "name" => c.name = Some(i),
@@ -322,9 +324,9 @@ mod tests {
                 .unwrap_err()
                 .contains("not a valid email")
         );
-        assert_eq!(
-            rows[2].input.as_ref().unwrap().first_name.as_deref(),
-            Some("Bo\nBo")
+        assert!(
+            rows[2].input.as_ref().unwrap_err().contains("line breaks"),
+            "a name cannot hold a line break"
         );
         assert_eq!(rows[3].input.as_ref().unwrap().email, "cy@x.com");
     }
@@ -369,6 +371,16 @@ mod tests {
     }
 
     #[test]
+    fn reserved_headers_never_become_fields() {
+        let rows =
+            parse_all(b"email,status,created_at,EMAIL,tags\na@x.com,vip,2024,b@x.com,t\n").unwrap();
+        let a = rows[0].input.as_ref().unwrap();
+        assert_eq!(a.email, "a@x.com");
+        assert!(a.fields.is_empty(), "{:?}", a.fields);
+        assert_eq!(a.tags, ["t"]);
+    }
+
+    #[test]
     fn uploads_are_checked() {
         assert_eq!(check_file(b"name\nAna\n").unwrap_err().0, "no_email_column");
         assert_eq!(
@@ -388,6 +400,8 @@ mod tests {
 
 pub const BATCH: usize = 1_000;
 pub const LEASE_SECS: i32 = 300;
+/// Claims a job gets before it is marked failed: each claim after the first means the last run died.
+pub const MAX_ATTEMPTS: i32 = 3;
 
 #[derive(Debug, Clone)]
 pub struct ClaimedImport {
@@ -396,6 +410,7 @@ pub struct ClaimedImport {
     pub tag_id: Option<Uuid>,
     pub file: Vec<u8>,
     pub rows_done: i32,
+    pub attempts: i32,
 }
 
 /// The oldest queued job, or a running one whose worker stopped renewing its lease.
@@ -403,11 +418,11 @@ pub struct ClaimedImport {
 pub async fn claim(pool: &PgPool) -> sqlx::Result<Option<ClaimedImport>> {
     sqlx::query_as!(
         ClaimedImport,
-        r#"UPDATE contact_imports SET status = 'running', lease_until = now() + make_interval(secs => $1)
+        r#"UPDATE contact_imports SET status = 'running', attempts = attempts + 1, lease_until = now() + make_interval(secs => $1)
            WHERE id = (SELECT id FROM contact_imports
                        WHERE status = 'queued' OR (status = 'running' AND lease_until < now())
                        ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED)
-           RETURNING id, account_id, tag_id, file AS "file!", rows_done"#,
+           RETURNING id, account_id, tag_id, file AS "file!", rows_done, attempts"#,
         LEASE_SECS as f64
     )
     .fetch_optional(pool)
@@ -417,7 +432,16 @@ pub async fn claim(pool: &PgPool) -> sqlx::Result<Option<ClaimedImport>> {
 /// Processes up to `max_batches` batches from `rows_done`. Each batch is one transaction: the counters and
 /// `rows_done` move with the contacts, so a crash never applies a batch twice.
 pub async fn run_job(pool: &PgPool, job: ClaimedImport, max_batches: usize) -> anyhow::Result<()> {
-    let rows = match parse_all(&job.file) {
+    let parsed = if job.attempts > MAX_ATTEMPTS {
+        tracing::warn!(import_id = %job.id, account_id = %job.account_id, "import given up");
+        Err(format!(
+            "the import stopped {MAX_ATTEMPTS} times without finishing; the first {} rows were imported",
+            job.rows_done
+        ))
+    } else {
+        parse_all(&job.file)
+    };
+    let rows = match parsed {
         Ok(rows) => rows,
         Err(e) => {
             sqlx::query!(

@@ -711,3 +711,12 @@ async fn cleanup_forgets_old_pending_but_remembers_who_left(pool: sqlx::PgPool) 
         .unwrap();
     assert_eq!((conf, reqs), (0, 1));
 }
+
+#[sqlx::test]
+async fn a_newsletter_name_cannot_hold_line_breaks(pool: sqlx::PgPool) {
+    let t = common::app(pool).await;
+    for name in ["Shop\nWeekly", "Shop\r\nWeekly", "Shop\u{0}"] {
+        let (s, b) = settings(&t, &t.key, Some(json!({"newsletter_name": name}))).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{name:?}: {b}");
+    }
+}

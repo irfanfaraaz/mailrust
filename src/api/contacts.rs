@@ -49,7 +49,7 @@ pub struct UpdateContactRequest {
     pub last_name: Option<String>,
     pub fields: Option<Fields>,
     pub tags: Option<Vec<String>>,
-    /// `subscribed` or `unsubscribed`. An unsubscribed contact cannot be set back to `subscribed`.
+    /// `unsubscribed`, or `subscribed` for a contact that already is. Pending and unsubscribed contacts cannot be set to `subscribed`.
     pub status: Option<ContactStatus>,
 }
 
@@ -180,10 +180,15 @@ pub(crate) async fn update(
     .fetch_optional(&mut *tx)
     .await?
     .ok_or(ApiError::NotFound)?;
-    if body.status == Some(ContactStatus::Subscribed) && current == ContactStatus::Unsubscribed {
+    // Only the person can subscribe: a pending contact confirms by email, an unsubscribed one uses the form or their link.
+    if body.status == Some(ContactStatus::Subscribed) && current != ContactStatus::Subscribed {
         return Err(ApiError::Conflict(
             "resubscribe_not_allowed",
-            "this contact unsubscribed; only they can subscribe again, through the signup form or their unsubscribe link".into(),
+            if current == ContactStatus::Pending {
+                "this contact has not confirmed yet; they subscribe by clicking the link in their confirmation email".into()
+            } else {
+                "this contact unsubscribed; only they can subscribe again, through the signup form or their unsubscribe link".into()
+            },
         ));
     }
     sqlx::query!(

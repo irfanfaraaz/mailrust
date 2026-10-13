@@ -14,3 +14,24 @@ export function publicPostTarget(method: string, pathname: string, isAction: boo
 export function isOneClick(form: FormData): boolean {
   return form.get("List-Unsubscribe") === "One-Click";
 }
+
+/**
+ * What a POST that reached /u/<token>/one-click asks for: a mail client's RFC 8058 one-click, or the
+ * page's own form submitted without JavaScript (its server action cannot run, so it lands here too).
+ */
+export function unsubscribeIntent(form: FormData): "one-click" | "unsubscribe" | "resubscribe" | null {
+  if (isOneClick(form)) return "one-click";
+  const d = form.get("do");
+  return d === "unsubscribe" || d === "resubscribe" ? d : null;
+}
+
+export type UnsubStep = { step: "ask" | "unsubscribed" | "resubscribed"; error?: string };
+
+export const RESUBSCRIBE_REFUSED = "This link cannot subscribe you again. Use the newsletter's signup form.";
+
+/** The /u/<token> page state after a no-JavaScript submit redirected back with ?done=. */
+export function noJsUnsubState(done: string | undefined): UnsubStep {
+  if (done === "unsubscribed" || done === "resubscribed") return { step: done };
+  if (done === "resubscribe_failed") return { step: "unsubscribed", error: RESUBSCRIBE_REFUSED };
+  return { step: "ask" };
+}
