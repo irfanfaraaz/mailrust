@@ -1,10 +1,16 @@
 //! CSV contact imports: checked on upload, then processed in the background (Task 10).
+use std::time::Duration;
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, types::Json};
+use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-use crate::contacts::{ContactInput, Fields, MAX_FIELD_KEY};
+use crate::{
+    api::AppState,
+    contacts::{self, ContactInput, ContactSource, Fields, MAX_FIELD_KEY},
+};
 
 pub const MAX_FILE_BYTES: usize = 20 * 1024 * 1024;
 pub const MAX_ROWS: usize = 100_000;
@@ -277,4 +283,137 @@ mod tests {
         let many = format!("email\n{}", "a@x.com\n".repeat(MAX_ROWS + 1));
         assert_eq!(check_file(many.as_bytes()).unwrap_err().0, "too_many_rows");
     }
+}
+
+pub const BATCH: usize = 1_000;
+pub const LEASE_SECS: i32 = 300;
+
+#[derive(Debug, Clone)]
+pub struct ClaimedImport {
+    pub id: Uuid,
+    pub account_id: Uuid,
+    pub tag_id: Option<Uuid>,
+    pub file: Vec<u8>,
+    pub rows_done: i32,
+}
+
+/// The oldest queued job, or a running one whose worker stopped renewing its lease.
+/// SKIP LOCKED: two workers never take the same job.
+pub async fn claim(pool: &PgPool) -> sqlx::Result<Option<ClaimedImport>> {
+    sqlx::query_as!(
+        ClaimedImport,
+        r#"UPDATE contact_imports SET status = 'running', lease_until = now() + make_interval(secs => $1)
+           WHERE id = (SELECT id FROM contact_imports
+                       WHERE status = 'queued' OR (status = 'running' AND lease_until < now())
+                       ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED)
+           RETURNING id, account_id, tag_id, file AS "file!", rows_done"#,
+        LEASE_SECS as f64
+    )
+    .fetch_optional(pool)
+    .await
+}
+
+/// Processes up to `max_batches` batches from `rows_done`. Each batch is one transaction: the counters and
+/// `rows_done` move with the contacts, so a crash never applies a batch twice.
+pub async fn run_job(pool: &PgPool, job: ClaimedImport, max_batches: usize) -> anyhow::Result<()> {
+    let rows = match parse_all(&job.file) {
+        Ok(rows) => rows,
+        Err(e) => {
+            sqlx::query!(
+                "UPDATE contact_imports SET status = 'failed', error = $2, file = NULL, lease_until = NULL, finished_at = now() WHERE id = $1",
+                job.id,
+                e
+            )
+            .execute(pool)
+            .await?;
+            return Ok(());
+        }
+    };
+    let mut done = job.rows_done as usize;
+    for _ in 0..max_batches {
+        if done >= rows.len() {
+            break;
+        }
+        let batch = &rows[done..(done + BATCH).min(rows.len())];
+        let mut tx = pool.begin().await?;
+        // Still ours and still where we left it? A worker that lost its lease stops here.
+        let Some(listed) = sqlx::query_scalar!(
+            r#"UPDATE contact_imports SET lease_until = now() + make_interval(secs => $3)
+               WHERE id = $1 AND status = 'running' AND rows_done = $2
+               RETURNING jsonb_array_length(errors) AS "n!""#,
+            job.id,
+            done as i32,
+            LEASE_SECS as f64
+        )
+        .fetch_optional(&mut *tx)
+        .await?
+        else {
+            return Ok(());
+        };
+        let (mut added, mut updated, mut errors) = (0i32, 0i32, Vec::<ImportRowError>::new());
+        for row in batch {
+            match &row.input {
+                Ok(input) => {
+                    let (_, new) = contacts::save(&mut tx, job.account_id, input, ContactSource::Import, job.tag_id).await?;
+                    if new { added += 1 } else { updated += 1 }
+                }
+                Err(reason) => errors.push(ImportRowError { line: row.line, reason: reason.clone() }),
+            }
+        }
+        let skipped = errors.len() as i32;
+        errors.truncate(MAX_ERRORS.saturating_sub(listed as usize));
+        sqlx::query!(
+            "UPDATE contact_imports SET rows_done = rows_done + $2, added = added + $3, updated = updated + $4,
+                    skipped = skipped + $5, errors = errors || $6
+             WHERE id = $1",
+            job.id,
+            batch.len() as i32,
+            added,
+            updated,
+            skipped,
+            Json(&errors) as _
+        )
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        done += batch.len();
+    }
+    if done >= rows.len() {
+        sqlx::query!(
+            "UPDATE contact_imports SET status = 'done', file = NULL, lease_until = NULL, finished_at = now()
+             WHERE id = $1 AND status = 'running' AND rows_done = $2",
+            job.id,
+            done as i32
+        )
+        .execute(pool)
+        .await?;
+        tracing::info!(import_id = %job.id, account_id = %job.account_id, "import done");
+    }
+    Ok(())
+}
+
+/// Claims and finishes one job. False when there was nothing to do.
+pub async fn run_once(pool: &PgPool) -> anyhow::Result<bool> {
+    let Some(job) = claim(pool).await? else {
+        return Ok(false);
+    };
+    run_job(pool, job, usize::MAX).await?;
+    Ok(true)
+}
+
+pub async fn worker_loop(state: AppState, shutdown: CancellationToken) -> anyhow::Result<()> {
+    crate::background::every(Duration::from_secs(2), &shutdown, || async {
+        loop {
+            match run_once(&state.pool).await {
+                Ok(true) => continue,
+                Ok(false) => break,
+                Err(e) => {
+                    tracing::error!(error = ?e, "import batch failed; the job resumes when its lease runs out");
+                    break;
+                }
+            }
+        }
+    })
+    .await;
+    Ok(())
 }

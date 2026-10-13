@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE contact_imports SET rows_done = rows_done + $2, added = added + $3, updated = updated + $4,\n                    skipped = skipped + $5, errors = errors || $6\n             WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4",
+        "Int4",
+        "Int4",
+        "Int4",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b45f7936dfe616ddbb56c6e92fe40c3ad6f91316d4acfe0501bdb0bbe127fec8"
+}
