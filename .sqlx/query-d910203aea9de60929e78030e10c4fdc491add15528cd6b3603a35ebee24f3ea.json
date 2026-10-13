@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO tags (id, account_id, name) VALUES ($1, $2, $3)\n             ON CONFLICT (account_id, lower(name)) DO UPDATE SET name = tags.name\n             RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d910203aea9de60929e78030e10c4fdc491add15528cd6b3603a35ebee24f3ea"
+}

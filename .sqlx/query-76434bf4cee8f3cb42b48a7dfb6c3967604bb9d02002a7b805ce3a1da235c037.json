@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO contact_tags (contact_id, tag_id)\n         SELECT c.id, t.id FROM contacts c JOIN tags t ON t.account_id = c.account_id\n         WHERE c.id = $1 AND t.id = ANY($2)\n         ON CONFLICT DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "76434bf4cee8f3cb42b48a7dfb6c3967604bb9d02002a7b805ce3a1da235c037"
+}

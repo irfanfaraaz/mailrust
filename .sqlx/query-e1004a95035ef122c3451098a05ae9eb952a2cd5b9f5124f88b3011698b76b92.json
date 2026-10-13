@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM contact_tags WHERE contact_id = $1 AND tag_id <> ALL($2)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e1004a95035ef122c3451098a05ae9eb952a2cd5b9f5124f88b3011698b76b92"
+}

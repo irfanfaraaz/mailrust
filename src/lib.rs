@@ -5,6 +5,7 @@ pub mod auth_tokens;
 pub mod background;
 pub mod cli;
 pub mod config;
+pub mod contacts;
 pub mod db;
 pub mod dns;
 pub mod domains;
