@@ -208,6 +208,11 @@ fn list_contacts() {}
                (status = 400, body = ErrorBody)))]
 fn create_contact() {}
 
+#[utoipa::path(get, path = "/contacts/export", tag = "audience",
+    responses((status = 200, content_type = "text/csv", body = String,
+               description = "email,first_name,last_name,status,tags,created_at, then one column per field name")))]
+fn export_contacts() {}
+
 #[utoipa::path(get, path = "/contacts/{id}", tag = "audience", params(("id" = uuid::Uuid, Path)),
     responses((status = 200, body = ContactView), (status = 404, body = ErrorBody)))]
 fn get_contact() {}
@@ -242,7 +247,7 @@ fn delete_tag() {}
           delete_domain, verify_domain, create_key, list_keys, delete_key, create_webhook, list_webhooks, delete_webhook,
           list_suppressions, add_suppression, delete_suppression, health, auth_login, auth_verify, me, auth_logout, auth_logout_all,
           team_list, team_invite, team_cancel_invite, team_set_role, team_remove, invites_accept, stats_overview,
-          list_contacts, create_contact, get_contact, update_contact, delete_contact,
+          list_contacts, export_contacts, create_contact, get_contact, update_contact, delete_contact,
           list_tags, create_tag, rename_tag, delete_tag),
     components(schemas(SendEmailRequest, AttachmentInput, SendResponse, BatchResponse, EmailView, EmailSummary, EmailList,
         EventView, EmailStatus, Priority, Domain, DomainStatus, DnsRecord, DomainList, CreateDomainRequest, UpdateDomainRequest,
@@ -283,7 +288,7 @@ mod tests {
     #[test]
     fn the_document_lists_the_audience_routes() {
         let doc = serde_json::to_value(super::ApiDoc::openapi()).unwrap();
-        for p in ["/contacts", "/contacts/{id}", "/tags", "/tags/{id}"] {
+        for p in ["/contacts", "/contacts/export", "/contacts/{id}", "/tags", "/tags/{id}"] {
             assert!(doc["paths"][p].is_object(), "missing {p}");
         }
     }

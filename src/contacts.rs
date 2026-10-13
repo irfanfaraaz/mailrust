@@ -290,9 +290,101 @@ pub async fn list(
     .await
 }
 
+impl ContactStatus {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ContactStatus::Pending => "pending",
+            ContactStatus::Subscribed => "subscribed",
+            ContactStatus::Unsubscribed => "unsubscribed",
+        }
+    }
+}
+
+pub struct ExportRow {
+    pub id: Uuid,
+    pub email: String,
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
+    pub status: ContactStatus,
+    pub tags: Vec<String>,
+    pub fields: Json<Fields>,
+    pub created_at: DateTime<Utc>,
+}
+
+/// Every field name used by any contact of the account, sorted: one CSV column each.
+pub async fn field_keys(pool: &PgPool, account_id: Uuid) -> sqlx::Result<Vec<String>> {
+    sqlx::query_scalar!(
+        r#"SELECT DISTINCT k AS "k!" FROM contacts, jsonb_object_keys(fields) AS k WHERE account_id = $1 ORDER BY 1"#,
+        account_id
+    )
+    .fetch_all(pool)
+    .await
+}
+
+/// One export page, oldest first, after `after`.
+pub async fn export_page(pool: &PgPool, account_id: Uuid, after: Option<Uuid>, limit: i64) -> sqlx::Result<Vec<ExportRow>> {
+    sqlx::query_as!(
+        ExportRow,
+        r#"SELECT c.id, c.email, c.first_name, c.last_name, c.status AS "status!: ContactStatus",
+                  ARRAY(SELECT t.name FROM contact_tags ct JOIN tags t ON t.id = ct.tag_id
+                        WHERE ct.contact_id = c.id ORDER BY lower(t.name)) AS "tags!",
+                  c.fields AS "fields!: Json<Fields>", c.created_at
+           FROM contacts c
+           WHERE c.account_id = $1 AND ($2::uuid IS NULL OR c.id > $2)
+           ORDER BY c.id LIMIT $3"#,
+        account_id,
+        after,
+        limit
+    )
+    .fetch_all(pool)
+    .await
+}
+
+pub fn export_csv(keys: &[String], rows: &[ExportRow], header: bool) -> Result<Vec<u8>, csv::Error> {
+    let mut w = csv::Writer::from_writer(Vec::new());
+    if header {
+        let mut h: Vec<&str> = vec!["email", "first_name", "last_name", "status", "tags", "created_at"];
+        h.extend(keys.iter().map(String::as_str));
+        w.write_record(&h)?;
+    }
+    for r in rows {
+        let mut rec: Vec<String> = vec![
+            r.email.clone(),
+            r.first_name.clone().unwrap_or_default(),
+            r.last_name.clone().unwrap_or_default(),
+            r.status.as_str().to_string(),
+            r.tags.join(";"),
+            r.created_at.to_rfc3339(),
+        ];
+        rec.extend(keys.iter().map(|k| r.fields.0.get(k).cloned().unwrap_or_default()));
+        w.write_record(&rec)?;
+    }
+    w.into_inner().map_err(|e| e.into_error().into())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn export_csv_quotes_and_orders_columns() {
+        let row = ExportRow {
+            id: Uuid::nil(),
+            email: "a@x.com".into(),
+            first_name: Some("Lopez, \"Ana\"".into()),
+            last_name: None,
+            status: ContactStatus::Unsubscribed,
+            tags: vec!["a".into(), "b".into()],
+            fields: Json([("z".to_string(), "line\nbreak".to_string())].into()),
+            created_at: DateTime::parse_from_rfc3339("2026-10-13T10:00:00Z").unwrap().with_timezone(&Utc),
+        };
+        let out = String::from_utf8(export_csv(&["y".into(), "z".into()], &[row], true).unwrap()).unwrap();
+        assert_eq!(
+            out,
+            "email,first_name,last_name,status,tags,created_at,y,z\n\
+             a@x.com,\"Lopez, \"\"Ana\"\"\",,unsubscribed,a;b,2026-10-13T10:00:00+00:00,,\"line\nbreak\"\n"
+        );
+    }
 
     #[test]
     fn field_keys() {

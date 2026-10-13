@@ -1,9 +1,12 @@
 use axum::{
     Json, Router,
+    body::Body,
     extract::{Path, Query, State, rejection::QueryRejection},
-    http::StatusCode,
+    http::{StatusCode, header},
+    response::{IntoResponse, Response},
     routing::get,
 };
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use sqlx::types::Json as SqlJson;
 use uuid::Uuid;
@@ -17,6 +20,7 @@ use crate::{
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/contacts", get(list).post(create))
+        .route("/contacts/export", get(export))
         .route("/contacts/{id}", get(get_one).patch(update).delete(remove))
 }
 
@@ -178,4 +182,42 @@ pub(crate) async fn remove(
         .execute(&state.pool)
         .await?;
     if r.rows_affected() == 1 { Ok(StatusCode::NO_CONTENT) } else { Err(ApiError::NotFound) }
+}
+
+pub const EXPORT_PAGE: i64 = 1000;
+
+/// Streams every contact as CSV, 1,000 rows per query, so a 100k list never sits in memory.
+pub(crate) async fn export(State(state): State<AppState>, auth: Auth) -> Result<Response, ApiError> {
+    auth.require_full()?;
+    let account_id = auth.account_id();
+    let keys = contacts::field_keys(&state.pool, account_id).await?;
+    let first = contacts::export_csv(&keys, &[], true).map_err(anyhow::Error::from)?;
+    let pool = state.pool.clone();
+    let pages = futures::stream::unfold(Some((None::<Uuid>, keys)), move |cursor| {
+        let pool = pool.clone();
+        async move {
+            let (after, keys) = cursor?;
+            let page = match contacts::export_page(&pool, account_id, after, EXPORT_PAGE).await {
+                Ok(p) => p,
+                Err(e) => {
+                    tracing::error!(error = ?e, %account_id, "contact export failed");
+                    return Some((Err(std::io::Error::other("export failed")), None));
+                }
+            };
+            if page.is_empty() {
+                return None;
+            }
+            let next = (page.len() as i64 == EXPORT_PAGE).then(|| (page.last().map(|r| r.id), keys.clone()));
+            Some((contacts::export_csv(&keys, &page, false).map_err(std::io::Error::other), next))
+        }
+    });
+    let body = Body::from_stream(futures::stream::once(async { Ok::<_, std::io::Error>(first) }).chain(pages));
+    Ok((
+        [
+            (header::CONTENT_TYPE, "text/csv; charset=utf-8"),
+            (header::CONTENT_DISPOSITION, "attachment; filename=\"contacts.csv\""),
+        ],
+        body,
+    )
+        .into_response())
 }

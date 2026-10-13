@@ -280,3 +280,37 @@ async fn another_accounts_tag_is_not_found(pool: sqlx::PgPool) {
     let (s, _) = common::call(&t.router, common::req("DELETE", &uri, Some(&key), None)).await;
     assert_eq!(s, StatusCode::NOT_FOUND);
 }
+
+#[sqlx::test]
+async fn export_is_a_csv_of_every_contact(pool: sqlx::PgPool) {
+    let t = common::app(pool).await;
+    add(&t, json!({"email": "a@x.com", "first_name": "Lopez, Ana", "tags": ["VIP", "news"], "fields": {"plan": "pro"}})).await;
+    add(&t, json!({"email": "b@x.com", "fields": {"city": "Pune"}})).await;
+    let (s, h, body) = common::call_raw(&t.router, common::req("GET", "/contacts/export", Some(&t.key), None)).await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(h["content-type"].to_str().unwrap().starts_with("text/csv"));
+    assert!(h["content-disposition"].to_str().unwrap().contains("contacts.csv"));
+    let lines: Vec<&str> = body.lines().collect();
+    assert_eq!(lines.len(), 3, "{body}");
+    assert_eq!(lines[0], "email,first_name,last_name,status,tags,created_at,city,plan");
+    assert!(lines[1].starts_with("a@x.com,\"Lopez, Ana\",,subscribed,news;VIP,"), "{}", lines[1]);
+    assert!(lines[1].ends_with(",,pro"), "{}", lines[1]);
+    assert!(lines[2].starts_with("b@x.com,,,subscribed,,"), "{}", lines[2]);
+    assert!(lines[2].ends_with(",Pune,"), "{}", lines[2]);
+}
+
+#[sqlx::test]
+async fn export_walks_past_one_page(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    sqlx::query(
+        "INSERT INTO contacts (id, account_id, email, status, source)
+         SELECT gen_random_uuid(), $1, 'c' || g || '@x.com', 'subscribed', 'api' FROM generate_series(1, 1001) g",
+    )
+    .bind(t.account.id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let (s, _, body) = common::call_raw(&t.router, common::req("GET", "/contacts/export", Some(&t.key), None)).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(body.lines().count(), 1002);
+}

@@ -97,6 +97,14 @@ pub async fn call(router: &Router, req: Request<Body>) -> (StatusCode, Value) {
     (status, json)
 }
 
+/// Like `call`, for non-JSON answers (CSV): status, headers and the body as text.
+pub async fn call_raw(router: &Router, req: Request<Body>) -> (StatusCode, axum::http::HeaderMap, String) {
+    let res = router.clone().oneshot(req).await.unwrap();
+    let (status, headers) = (res.status(), res.headers().clone());
+    let bytes = res.into_body().collect().await.unwrap().to_bytes();
+    (status, headers, String::from_utf8(bytes.to_vec()).unwrap())
+}
+
 pub async fn verified_domain(t: &TestApp, name: &str) -> mailrust::domains::Domain {
     let d = mailrust::domains::add(
         &t.state,
