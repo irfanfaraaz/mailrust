@@ -18,6 +18,7 @@ use crate::{
         login::{LoginRequest, SessionResponse, TokenRequest},
         me::MeResponse,
         newsletter::UpdateNewsletterRequest,
+        public::{PublicNewsletter, UnsubscribeView},
         suppressions::{AddSuppressionRequest, SuppressionList, SuppressionView},
         tags::{TagList, TagRequest, TagView},
         team::{InviteRequest, RoleRequest},
@@ -250,6 +251,24 @@ fn rename_tag() {}
     responses((status = 204), (status = 404, body = ErrorBody)))]
 fn delete_tag() {}
 
+#[utoipa::path(get, path = "/public/newsletter/{slug}", tag = "public", security(),
+    params(("slug" = String, Path), ("X-Mailrust-Web" = String, Header)),
+    responses((status = 200, body = PublicNewsletter), (status = 404, body = ErrorBody), (status = 429, body = ErrorBody)))]
+fn public_newsletter() {}
+
+#[utoipa::path(get, path = "/public/unsubscribe/{token}", tag = "public", security(),
+    params(("token" = String, Path), ("X-Mailrust-Web" = String, Header)),
+    responses((status = 200, body = UnsubscribeView)))]
+fn public_unsubscribe_info() {}
+
+#[utoipa::path(post, path = "/public/unsubscribe", tag = "public", security(), request_body = TokenRequest,
+    params(("X-Mailrust-Web" = String, Header)), responses((status = 200, body = UnsubscribeView)))]
+fn public_unsubscribe() {}
+
+#[utoipa::path(post, path = "/public/resubscribe", tag = "public", security(), request_body = TokenRequest,
+    params(("X-Mailrust-Web" = String, Header)), responses((status = 204), (status = 409, body = ErrorBody)))]
+fn public_resubscribe() {}
+
 #[derive(OpenApi)]
 #[openapi(
     info(title = "Mailrust API", version = "0.1.0", description = "Send transactional email through your own Amazon SES. Auth: `Authorization: Bearer mr_live_…` (API key), or `Bearer mr_sess_…` (dashboard session) plus `X-Mailrust-Account: <account id>`."),
@@ -258,14 +277,16 @@ fn delete_tag() {}
           list_suppressions, add_suppression, delete_suppression, health, auth_login, auth_verify, me, auth_logout, auth_logout_all,
           team_list, team_invite, team_cancel_invite, team_set_role, team_remove, invites_accept, stats_overview,
           list_contacts, export_contacts, create_contact, get_contact, update_contact, delete_contact,
-          list_tags, create_tag, rename_tag, delete_tag, get_newsletter, update_newsletter),
+          list_tags, create_tag, rename_tag, delete_tag, get_newsletter, update_newsletter,
+          public_newsletter, public_unsubscribe_info, public_unsubscribe, public_resubscribe),
     components(schemas(SendEmailRequest, AttachmentInput, SendResponse, BatchResponse, EmailView, EmailSummary, EmailList,
         EventView, EmailStatus, Priority, Domain, DomainStatus, DnsRecord, DomainList, CreateDomainRequest, UpdateDomainRequest,
         KeySummary, KeyAccess, CreateKeyRequest, CreatedKey, KeyList, CreateWebhookRequest, WebhookView, WebhookList,
         SuppressionView, SuppressionList, AddSuppressionRequest, SuppressionReason, AccountStatus, LoginRequest, TokenRequest, SessionResponse,
         MeResponse, MyAccount, User, MemberRole, TeamView, MemberView, InviteView, InviteRequest, RoleRequest, Overview, Counts, ErrorBody, ErrorDetail,
         ContactView, ContactList, ContactStatus, ContactSource, TagRef, CreateContactRequest, UpdateContactRequest,
-        TagView, TagList, TagRequest, NewsletterSettings, UpdateNewsletterRequest)),
+        TagView, TagList, TagRequest, NewsletterSettings, UpdateNewsletterRequest,
+        PublicNewsletter, UnsubscribeView)),
     modifiers(&BearerAuth),
     security(("bearer" = []))
 )]
@@ -298,7 +319,8 @@ mod tests {
     #[test]
     fn the_document_lists_the_audience_routes() {
         let doc = serde_json::to_value(super::ApiDoc::openapi()).unwrap();
-        for p in ["/contacts", "/contacts/export", "/contacts/{id}", "/tags", "/tags/{id}", "/newsletter"] {
+        for p in ["/contacts", "/contacts/export", "/contacts/{id}", "/tags", "/tags/{id}", "/newsletter",
+            "/public/newsletter/{slug}", "/public/unsubscribe/{token}", "/public/unsubscribe", "/public/resubscribe"] {
             assert!(doc["paths"][p].is_object(), "missing {p}");
         }
     }

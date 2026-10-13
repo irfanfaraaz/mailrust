@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT COALESCE(a.newsletter_name, a.name) AS \"name!\" FROM contacts c JOIN accounts a ON a.id = c.account_id WHERE c.id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "name!",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "b59259aa5109dc20cce777d5408217d7526bc7847b33ecc45a94707a4d6eda62"
+}

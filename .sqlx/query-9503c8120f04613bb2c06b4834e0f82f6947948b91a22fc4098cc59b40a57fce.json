@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE contacts SET status = 'subscribed', subscribed_at = now(), unsubscribed_at = NULL,\n                unsubscribed_via_link = false, updated_at = now()\n         WHERE id = $1 AND status = 'unsubscribed' AND unsubscribed_via_link",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9503c8120f04613bb2c06b4834e0f82f6947948b91a22fc4098cc59b40a57fce"
+}

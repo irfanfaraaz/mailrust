@@ -265,3 +265,21 @@ pub fn sreq(
     }
     r
 }
+
+pub const WEB_SECRET: &str = "web-secret-for-tests-0123456789abcdef";
+
+/// Lets the router trust `X-Mailrust-Web` (the Next.js app) with `WEB_SECRET`.
+pub fn with_web_secret(t: &mut TestApp) {
+    let mut config = (*t.state.config).clone();
+    config.web_secret = Some(WEB_SECRET.to_string());
+    t.state.config = std::sync::Arc::new(config);
+    t.router = api::router(t.state.clone());
+}
+
+/// A request as the Next.js app sends it for a browser at `ip`.
+pub fn web_req(method: &str, uri: &str, ip: &str, body: Option<Value>) -> Request<Body> {
+    let mut r = req(method, uri, None, body);
+    r.headers_mut().insert("x-mailrust-web", WEB_SECRET.parse().unwrap());
+    r.headers_mut().insert("x-mailrust-client-ip", ip.parse().unwrap());
+    r
+}

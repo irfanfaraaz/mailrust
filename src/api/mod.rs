@@ -1,4 +1,8 @@
-use std::{net::SocketAddr, num::NonZeroU32, sync::Arc};
+use std::{
+    net::{IpAddr, SocketAddr},
+    num::NonZeroU32,
+    sync::Arc,
+};
 
 use axum::{Router, extract::DefaultBodyLimit};
 use governor::{Quota, RateLimiter};
@@ -19,6 +23,7 @@ pub mod keys;
 pub mod login;
 pub mod me;
 pub mod newsletter;
+pub mod public;
 pub mod ses;
 pub mod stats;
 pub mod suppressions;
@@ -30,6 +35,10 @@ pub mod webhooks;
 pub type KeyLimiter = governor::DefaultKeyedRateLimiter<Uuid>;
 
 pub const REQUESTS_PER_SECOND_PER_KEY: u32 = 10;
+
+// shortcut: in-memory, per process, like KeyLimiter.
+pub type IpLimiter = governor::DefaultKeyedRateLimiter<IpAddr>;
+pub const PUBLIC_REQUESTS_PER_SECOND_PER_IP: u32 = 10;
 pub const MAX_BODY_BYTES: usize = 64 * 1024 * 1024; // 40 MB of attachments is ~54 MB as base64 JSON
 
 #[derive(Clone)]
@@ -38,17 +47,20 @@ pub struct AppState {
     pub config: Arc<Config>,
     pub sender: Arc<dyn Sender>,
     pub key_limiter: Arc<KeyLimiter>,
+    pub ip_limiter: Arc<IpLimiter>,
     pub sns_certs: Arc<crate::events::sns::CertCache>,
 }
 
 impl AppState {
     pub fn new(pool: PgPool, config: Config, sender: Arc<dyn Sender>) -> Self {
         let per_second = NonZeroU32::new(REQUESTS_PER_SECOND_PER_KEY).unwrap_or(NonZeroU32::MIN);
+        let per_ip = NonZeroU32::new(PUBLIC_REQUESTS_PER_SECOND_PER_IP).unwrap_or(NonZeroU32::MIN);
         Self {
             pool,
             config: Arc::new(config),
             sender,
             key_limiter: Arc::new(RateLimiter::keyed(Quota::per_second(per_second))),
+            ip_limiter: Arc::new(RateLimiter::keyed(Quota::per_second(per_ip))),
             sns_certs: Arc::new(crate::events::sns::CertCache::new()),
         }
     }
@@ -59,6 +71,7 @@ pub fn router(state: AppState) -> Router {
         .merge(health::routes())
         .merge(contacts::routes())
         .merge(newsletter::routes())
+        .merge(public::routes())
         .merge(domains::routes())
         .merge(emails::routes())
         .merge(ses::routes())
