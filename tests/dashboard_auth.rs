@@ -188,3 +188,24 @@ async fn an_api_key_cannot_use_me(pool: sqlx::PgPool) {
     let (st, _) = common::call(&t.router, common::req("GET", "/me", Some(&t.key), None)).await;
     assert_eq!(st, StatusCode::UNAUTHORIZED);
 }
+
+#[sqlx::test]
+async fn cleanup_removes_only_dead_login_data(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    let live = common::session_for(&pool, t.account.id, "ana@shop.com", MemberRole::Owner).await;
+    let dead = common::session_for(&pool, t.account.id, "ana@shop.com", MemberRole::Owner).await;
+    sqlx::query("UPDATE sessions SET expires_at = now() - interval '1 second' WHERE token_hash = $1")
+        .bind(mailrust::keys::hash_token(&dead))
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO login_requests (email, at) VALUES ('a@x.com', now() - interval '2 hours'), ('b@x.com', now())").execute(&pool).await.unwrap();
+
+    mailrust::background::cleanup_auth(&pool).await.unwrap();
+
+    let sessions: i64 = sqlx::query_scalar("SELECT count(*) FROM sessions").fetch_one(&pool).await.unwrap();
+    let reqs: Vec<String> = sqlx::query_scalar("SELECT email FROM login_requests").fetch_all(&pool).await.unwrap();
+    assert_eq!(sessions, 1);
+    assert_eq!(reqs, vec!["b@x.com".to_string()]);
+    assert!(mailrust::sessions::find(&pool, &live).await.unwrap().is_some());
+}
