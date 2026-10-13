@@ -42,3 +42,15 @@ export function noJsUnsubState(done: string | undefined): UnsubStep {
   if (done === "resubscribe_failed") return { step: "unsubscribed", error: RESUBSCRIBE_REFUSED };
   return { step: "ask" };
 }
+
+/** Same string as src/render/campaign.rs ARCHIVE_CSP: no script, images only from this site. */
+export const ARCHIVE_CSP = "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'";
+
+export function archiveHeaders(): Record<string, string> {
+  return {
+    "content-type": "text/html; charset=utf-8",
+    "content-security-policy": ARCHIVE_CSP,
+    "x-content-type-options": "nosniff",
+    "referrer-policy": "no-referrer",
+  };
+}

@@ -98,4 +98,35 @@ test("an issue goes to one tag in a wave and the report counts it", async ({ pag
     await expect(page.getByTestId("total-sent")).toHaveText("1");
     await expect(page.getByText("Sent", { exact: true }).first()).toBeVisible();
   }).toPass({ timeout: 60_000 });
+
+  // The public archive lists the sent issue and shows it with fallbacks under a strict CSP.
+  await page.goto(`/a/${SEED.accountId}/signup-form`);
+  const newsletterSlug = await page.getByLabel("Public address").inputValue();
+  await page.goto(`/p/${newsletterSlug}`);
+  const issueLink = page.getByRole("link", { name: /^E2E send / });
+  await expect(issueLink).toBeVisible();
+  const href = (await issueLink.getAttribute("href"))!;
+  const res = await page.request.get(href);
+  expect(res.status()).toBe(200);
+  expect(res.headers()["content-security-policy"]).toBe("default-src 'none'; img-src 'self'; style-src 'unsafe-inline'");
+  expect(await res.text()).toContain("Hello there, this is for you.");
+
+  // Gmail's one-click: POST List-Unsubscribe=One-Click to the header URL; the report counts it.
+  const header = mail.match(/List-Unsubscribe: <(http:\/\/localhost:3000\/u\/[\w-]{86})>/)![1];
+  const oneClick = await page.request.post(new URL(header).pathname, { form: { "List-Unsubscribe": "One-Click" } });
+  expect(oneClick.status()).toBe(200);
+  await expect(async () => {
+    await page.goto(url);
+    await expect(page.getByTestId("total-unsubscribed")).toHaveText(/^1 · /);
+  }).toPass({ timeout: 30_000 });
+
+  // Hide it: the archive page is gone.
+  await page.getByRole("button", { name: "Hide from the public archive" }).click();
+  await expect(page.getByRole("button", { name: "Show in the public archive" })).toBeVisible();
+  expect((await page.request.get(href)).status()).toBe(404);
+
+  // A logged-in image request never refreshes the session cookie (proxy.ts skips /img/).
+  const img = await page.request.get("/img/00000000-0000-7000-8000-000000000000");
+  expect(img.status()).toBe(404);
+  expect(img.headers()["set-cookie"]).toBeUndefined();
 });
