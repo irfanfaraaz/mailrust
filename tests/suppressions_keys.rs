@@ -94,9 +94,22 @@ async fn api_keys_create_list_revoke(pool: sqlx::PgPool) {
 async fn suppressions_can_be_searched(pool: sqlx::PgPool) {
     let t = common::app(pool.clone()).await;
     for a in ["ana@shop.com", "bo@blog.com"] {
-        common::call(&t.router, common::req("POST", "/suppressions", Some(&t.key), Some(serde_json::json!({"address": a})))).await;
+        common::call(
+            &t.router,
+            common::req(
+                "POST",
+                "/suppressions",
+                Some(&t.key),
+                Some(serde_json::json!({"address": a})),
+            ),
+        )
+        .await;
     }
-    let (_, b) = common::call(&t.router, common::req("GET", "/suppressions?q=SHOP", Some(&t.key), None)).await;
+    let (_, b) = common::call(
+        &t.router,
+        common::req("GET", "/suppressions?q=SHOP", Some(&t.key), None),
+    )
+    .await;
     let data = b["data"].as_array().unwrap();
     assert_eq!(data.len(), 1);
     assert_eq!(data[0]["address"], "ana@shop.com");

@@ -144,7 +144,10 @@ mod tests {
 
     #[test]
     fn emails_are_trimmed_and_lower_cased() {
-        assert_eq!(normalize_email("  Ana@Example.COM ").unwrap(), "ana@example.com");
+        assert_eq!(
+            normalize_email("  Ana@Example.COM ").unwrap(),
+            "ana@example.com"
+        );
         assert!(normalize_email("not an email").is_err());
         assert!(normalize_email("").is_err());
     }

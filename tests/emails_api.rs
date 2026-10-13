@@ -457,15 +457,36 @@ async fn emails_can_be_filtered_by_priority_time_and_text(pool: sqlx::PgPool) {
     let urgent = common::seed_emails(&pool, t.account.id, "urgent", "sent", 1, 1.0).await;
     sqlx::query("UPDATE emails SET subject = 'Reset 100%_off', to_addresses = ARRAY['Ana@Shop.com'] WHERE id = $1")
         .bind(urgent[0]).execute(&pool).await.unwrap();
-    let get = |uri: String| { let t = &t; async move { common::call(&t.router, common::req("GET", &uri, Some(&t.key), None)).await.1["data"].as_array().unwrap().len() } };
+    let get = |uri: String| {
+        let t = &t;
+        async move {
+            common::call(&t.router, common::req("GET", &uri, Some(&t.key), None))
+                .await
+                .1["data"]
+                .as_array()
+                .unwrap()
+                .len()
+        }
+    };
 
     assert_eq!(get("/emails?priority=bulk".into()).await, 2);
     let since = (chrono::Utc::now() - chrono::Duration::hours(2)).to_rfc3339();
-    assert_eq!(get(format!("/emails?since={}", urlencoding(&since))).await, 1);
+    assert_eq!(
+        get(format!("/emails?since={}", urlencoding(&since))).await,
+        1
+    );
     assert_eq!(get("/emails?q=ana%40shop".into()).await, 1);
-    assert_eq!(get("/emails?q=100%25_off".into()).await, 1, "% and _ are literal");
+    assert_eq!(
+        get("/emails?q=100%25_off".into()).await,
+        1,
+        "% and _ are literal"
+    );
     assert_eq!(get("/emails?q=1000".into()).await, 0);
-    assert_eq!(get("/emails?q=_".into()).await, 1, "_ alone matches only a real underscore");
+    assert_eq!(
+        get("/emails?q=_".into()).await,
+        1,
+        "_ alone matches only a real underscore"
+    );
 }
 
 fn urlencoding(s: &str) -> String {

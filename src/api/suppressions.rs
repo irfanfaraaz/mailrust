@@ -63,7 +63,10 @@ pub(crate) async fn list(
         auth.account_id(),
         q.after,
         limit,
-        q.q.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(crate::emails::like_pattern)
+        q.q.as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(crate::emails::like_pattern)
     )
     .fetch_all(&state.pool)
     .await?;

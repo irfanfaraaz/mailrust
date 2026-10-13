@@ -53,10 +53,30 @@ pub async fn overview(pool: &PgPool, account_id: Uuid) -> anyhow::Result<Option<
     )
     .fetch_one(pool)
     .await?;
-    let rate = |n: i64| if r.s7 > 0 { n as f64 / r.s7 as f64 } else { 0.0 };
+    let rate = |n: i64| {
+        if r.s7 > 0 {
+            n as f64 / r.s7 as f64
+        } else {
+            0.0
+        }
+    };
     Ok(Some(Overview {
-        last_24h: Counts { sent: r.s1, delivered: r.d1, bounced: r.b1, complained: r.c1, opened: r.o1, clicked: r.k1 },
-        last_7d: Counts { sent: r.s7, delivered: r.d7, bounced: r.b7, complained: r.c7, opened: r.o7, clicked: r.k7 },
+        last_24h: Counts {
+            sent: r.s1,
+            delivered: r.d1,
+            bounced: r.b1,
+            complained: r.c1,
+            opened: r.o1,
+            clicked: r.k1,
+        },
+        last_7d: Counts {
+            sent: r.s7,
+            delivered: r.d7,
+            bounced: r.b7,
+            complained: r.c7,
+            opened: r.o7,
+            clicked: r.k7,
+        },
         bounce_rate: rate(r.b7),
         complaint_rate: rate(r.c7),
         bounce_limit: safety::BOUNCE_LIMIT,

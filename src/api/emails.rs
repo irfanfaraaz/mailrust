@@ -19,8 +19,8 @@ use super::{AppState, auth::Auth};
 use crate::{
     domains::{self, DomainStatus},
     emails::{
-        self, EmailStatus, EmailSummary, EmailView, ListFilter, MAX_BATCH, Priority, SendEmailRequest,
-        SendResponse, ValidEmail,
+        self, EmailStatus, EmailSummary, EmailView, ListFilter, MAX_BATCH, Priority,
+        SendEmailRequest, SendResponse, ValidEmail,
     },
     error::ApiError,
 };

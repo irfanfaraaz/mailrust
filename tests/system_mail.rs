@@ -35,7 +35,12 @@ async fn not_set_up_sends_nothing(pool: sqlx::PgPool) {
             .unwrap()
             .is_none()
     );
-    assert!(system_mail::setup_problem(&t.state).await.unwrap().is_some());
+    assert!(
+        system_mail::setup_problem(&t.state)
+            .await
+            .unwrap()
+            .is_some()
+    );
 }
 
 #[sqlx::test]

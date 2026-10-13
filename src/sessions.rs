@@ -32,10 +32,17 @@ pub async fn create(conn: &mut PgConnection, user_id: Uuid) -> sqlx::Result<NewS
     )
     .execute(&mut *conn)
     .await?;
-    sqlx::query!("UPDATE users SET last_login_at = now() WHERE id = $1", user_id)
-        .execute(&mut *conn)
-        .await?;
-    Ok(NewSession { id, token, expires_at })
+    sqlx::query!(
+        "UPDATE users SET last_login_at = now() WHERE id = $1",
+        user_id
+    )
+    .execute(&mut *conn)
+    .await?;
+    Ok(NewSession {
+        id,
+        token,
+        expires_at,
+    })
 }
 
 /// A live session, its expiry pushed out to 30 days (written at most once an hour).
@@ -63,11 +70,15 @@ pub async fn find(pool: &PgPool, token: &str) -> sqlx::Result<Option<SessionUser
 }
 
 pub async fn delete(pool: &PgPool, session_id: Uuid) -> sqlx::Result<()> {
-    sqlx::query!("DELETE FROM sessions WHERE id = $1", session_id).execute(pool).await?;
+    sqlx::query!("DELETE FROM sessions WHERE id = $1", session_id)
+        .execute(pool)
+        .await?;
     Ok(())
 }
 
 pub async fn delete_all(pool: &PgPool, user_id: Uuid) -> sqlx::Result<()> {
-    sqlx::query!("DELETE FROM sessions WHERE user_id = $1", user_id).execute(pool).await?;
+    sqlx::query!("DELETE FROM sessions WHERE user_id = $1", user_id)
+        .execute(pool)
+        .await?;
     Ok(())
 }

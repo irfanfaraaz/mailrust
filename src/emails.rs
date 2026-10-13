@@ -571,7 +571,10 @@ pub struct ListFilter {
 
 /// `%text%` for ILIKE, with `\`, `%` and `_` matched literally.
 pub fn like_pattern(q: &str) -> String {
-    let escaped = q.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
+    let escaped = q
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_");
     format!("%{escaped}%")
 }
 
@@ -582,7 +585,12 @@ pub async fn list(
     after: Option<Uuid>,
     limit: i64,
 ) -> sqlx::Result<Vec<EmailSummary>> {
-    let pattern = filter.q.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(like_pattern);
+    let pattern = filter
+        .q
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(like_pattern);
     let rows = sqlx::query!(
         r#"SELECT id, from_address, to_addresses, subject, status AS "status: EmailStatus", priority AS "priority: Priority", send_at, created_at
            FROM emails
