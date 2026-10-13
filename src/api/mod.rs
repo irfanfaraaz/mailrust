@@ -16,6 +16,7 @@ pub mod health;
 pub mod json;
 pub mod keys;
 pub mod login;
+pub mod me;
 pub mod ses;
 pub mod suppressions;
 pub mod webhooks;
@@ -57,6 +58,7 @@ pub fn router(state: AppState) -> Router {
         .merge(webhooks::routes())
         .merge(keys::routes())
         .merge(login::routes())
+        .merge(me::routes())
         .merge(suppressions::routes())
         .merge(crate::tracking::routes())
         .merge(crate::openapi::routes())

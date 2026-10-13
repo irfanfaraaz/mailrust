@@ -15,6 +15,7 @@ use crate::{
         emails::{BatchResponse, EmailList},
         keys::{CreateKeyRequest, CreatedKey, KeyList},
         login::{LoginRequest, SessionResponse, TokenRequest},
+        me::MeResponse,
         suppressions::{AddSuppressionRequest, SuppressionList, SuppressionView},
         webhooks::{CreateWebhookRequest, WebhookList},
     },
@@ -26,6 +27,7 @@ use crate::{
     keys::{KeyAccess, KeySummary},
     safety::SuppressionReason,
     sender::DnsRecord,
+    users::{MemberRole, MyAccount, User},
     webhooks::WebhookView,
 };
 
@@ -51,7 +53,7 @@ impl Modify for BearerAuth {
             SecurityScheme::Http(
                 HttpBuilder::new()
                     .scheme(HttpAuthScheme::Bearer)
-                    .bearer_format("mr_live_…")
+                    .bearer_format("mr_live_… or mr_sess_…")
                     .build(),
             ),
         );
@@ -148,16 +150,27 @@ fn auth_login() {}
     responses((status = 200, body = SessionResponse), (status = 401, body = ErrorBody)))]
 fn auth_verify() {}
 
+#[utoipa::path(get, path = "/me", tag = "dashboard",
+    responses((status = 200, body = MeResponse), (status = 401, body = ErrorBody)))]
+fn me() {}
+
+#[utoipa::path(post, path = "/auth/logout", tag = "dashboard", responses((status = 204), (status = 401, body = ErrorBody)))]
+fn auth_logout() {}
+
+#[utoipa::path(post, path = "/auth/logout-all", tag = "dashboard", responses((status = 204), (status = 401, body = ErrorBody)))]
+fn auth_logout_all() {}
+
 #[derive(OpenApi)]
 #[openapi(
-    info(title = "Mailrust API", version = "0.1.0", description = "Send transactional email through your own Amazon SES. Auth: `Authorization: Bearer mr_live_…`."),
+    info(title = "Mailrust API", version = "0.1.0", description = "Send transactional email through your own Amazon SES. Auth: `Authorization: Bearer mr_live_…` (API key), or `Bearer mr_sess_…` (dashboard session) plus `X-Mailrust-Account: <account id>`."),
     paths(send_email, send_batch, list_emails, get_email, cancel_email, create_domain, list_domains, get_domain, update_domain,
           delete_domain, verify_domain, create_key, list_keys, delete_key, create_webhook, list_webhooks, delete_webhook,
-          list_suppressions, add_suppression, delete_suppression, health, auth_login, auth_verify),
+          list_suppressions, add_suppression, delete_suppression, health, auth_login, auth_verify, me, auth_logout, auth_logout_all),
     components(schemas(SendEmailRequest, AttachmentInput, SendResponse, BatchResponse, EmailView, EmailSummary, EmailList,
         EventView, EmailStatus, Priority, Domain, DomainStatus, DnsRecord, DomainList, CreateDomainRequest, UpdateDomainRequest,
         KeySummary, KeyAccess, CreateKeyRequest, CreatedKey, KeyList, CreateWebhookRequest, WebhookView, WebhookList,
-        SuppressionView, SuppressionList, AddSuppressionRequest, SuppressionReason, AccountStatus, LoginRequest, TokenRequest, SessionResponse, ErrorBody, ErrorDetail)),
+        SuppressionView, SuppressionList, AddSuppressionRequest, SuppressionReason, AccountStatus, LoginRequest, TokenRequest, SessionResponse,
+        MeResponse, MyAccount, User, MemberRole, ErrorBody, ErrorDetail)),
     modifiers(&BearerAuth),
     security(("bearer" = []))
 )]

@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
+use crate::accounts::AccountStatus;
+
 #[derive(
     Debug,
     Clone,
@@ -90,6 +92,50 @@ pub async fn invite_direct(
     let role = add_member(&mut tx, account_id, user.id, role).await?;
     tx.commit().await?;
     Ok((user, role))
+}
+
+pub struct Membership {
+    pub role: MemberRole,
+    pub status: AccountStatus,
+    pub paused_reason: Option<String>,
+}
+
+pub async fn membership(
+    pool: &PgPool,
+    user_id: Uuid,
+    account_id: Uuid,
+) -> sqlx::Result<Option<Membership>> {
+    sqlx::query_as!(
+        Membership,
+        r#"SELECT m.role AS "role: MemberRole", a.status AS "status: AccountStatus", a.paused_reason
+           FROM account_members m JOIN accounts a ON a.id = m.account_id
+           WHERE m.user_id = $1 AND m.account_id = $2"#,
+        user_id,
+        account_id
+    )
+    .fetch_optional(pool)
+    .await
+}
+
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct MyAccount {
+    pub id: Uuid,
+    pub name: String,
+    pub role: MemberRole,
+    pub status: AccountStatus,
+    pub paused_reason: Option<String>,
+}
+
+pub async fn accounts_of(pool: &PgPool, user_id: Uuid) -> sqlx::Result<Vec<MyAccount>> {
+    sqlx::query_as!(
+        MyAccount,
+        r#"SELECT a.id, a.name, m.role AS "role: MemberRole", a.status AS "status: AccountStatus", a.paused_reason
+           FROM account_members m JOIN accounts a ON a.id = m.account_id
+           WHERE m.user_id = $1 ORDER BY a.name, a.id"#,
+        user_id
+    )
+    .fetch_all(pool)
+    .await
 }
 
 #[cfg(test)]

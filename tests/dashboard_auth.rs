@@ -121,3 +121,70 @@ async fn sessions_slide_when_used(pool: sqlx::PgPool) {
     assert!(mailrust::sessions::find(&pool, &s.token).await.unwrap().is_none());
     let _ = t;
 }
+
+#[sqlx::test]
+async fn a_session_works_on_existing_routes_for_its_account(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    let s = common::session_for(&pool, t.account.id, "ana@shop.com", MemberRole::Member).await;
+    let (st, b) = common::call(&t.router, common::sreq("GET", "/api-keys", &s, Some(t.account.id), None)).await;
+    assert_eq!(st, StatusCode::OK, "{b}");
+    let (st, _) = common::call(&t.router, common::sreq("POST", "/api-keys", &s, Some(t.account.id), Some(json!({"name": "web"})))).await;
+    assert_eq!(st, StatusCode::CREATED);
+}
+
+#[sqlx::test]
+async fn another_accounts_id_is_not_found(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    let other = mailrust::accounts::create(&pool, "Other").await.unwrap();
+    let s = common::session_for(&pool, t.account.id, "ana@shop.com", MemberRole::Owner).await;
+    let (st, _) = common::call(&t.router, common::sreq("GET", "/emails", &s, Some(other.id), None)).await;
+    assert_eq!(st, StatusCode::NOT_FOUND);
+}
+
+#[sqlx::test]
+async fn a_session_without_an_account_header_is_a_bad_request(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    let s = common::session_for(&pool, t.account.id, "ana@shop.com", MemberRole::Owner).await;
+    let (st, _) = common::call(&t.router, common::sreq("GET", "/emails", &s, None, None)).await;
+    assert_eq!(st, StatusCode::BAD_REQUEST);
+    let mut r = common::sreq("GET", "/emails", &s, None, None);
+    r.headers_mut().insert("x-mailrust-account", "nope".parse().unwrap());
+    assert_eq!(common::call(&t.router, r).await.0, StatusCode::BAD_REQUEST);
+}
+
+#[sqlx::test]
+async fn me_lists_my_accounts_and_roles(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    let other = mailrust::accounts::create(&pool, "Blog").await.unwrap();
+    let s = common::session_for(&pool, t.account.id, "ana@shop.com", MemberRole::Owner).await;
+    users::invite_direct(&pool, "ana@shop.com", other.id, MemberRole::Member).await.unwrap();
+    let (st, b) = common::call(&t.router, common::sreq("GET", "/me", &s, None, None)).await;
+    assert_eq!(st, StatusCode::OK, "{b}");
+    assert_eq!(b["user"]["email"], "ana@shop.com");
+    let accs = b["accounts"].as_array().unwrap();
+    assert_eq!(accs.len(), 2);
+    assert_eq!(accs[0]["name"], "Blog");
+    assert_eq!(accs[0]["role"], "member");
+    assert_eq!(accs[1]["role"], "owner");
+    assert_eq!(accs[1]["status"], "active");
+}
+
+#[sqlx::test]
+async fn logout_ends_this_session_and_logout_all_ends_every_one(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    let a = common::session_for(&pool, t.account.id, "ana@shop.com", MemberRole::Owner).await;
+    let b = common::session_for(&pool, t.account.id, "ana@shop.com", MemberRole::Owner).await;
+    let c = common::session_for(&pool, t.account.id, "ana@shop.com", MemberRole::Owner).await;
+    assert_eq!(common::call(&t.router, common::sreq("POST", "/auth/logout", &a, None, None)).await.0, StatusCode::NO_CONTENT);
+    assert_eq!(common::call(&t.router, common::sreq("GET", "/me", &a, None, None)).await.0, StatusCode::UNAUTHORIZED);
+    assert_eq!(common::call(&t.router, common::sreq("GET", "/me", &b, None, None)).await.0, StatusCode::OK);
+    assert_eq!(common::call(&t.router, common::sreq("POST", "/auth/logout-all", &b, None, None)).await.0, StatusCode::NO_CONTENT);
+    assert_eq!(common::call(&t.router, common::sreq("GET", "/me", &c, None, None)).await.0, StatusCode::UNAUTHORIZED);
+}
+
+#[sqlx::test]
+async fn an_api_key_cannot_use_me(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    let (st, _) = common::call(&t.router, common::req("GET", "/me", Some(&t.key), None)).await;
+    assert_eq!(st, StatusCode::UNAUTHORIZED);
+}

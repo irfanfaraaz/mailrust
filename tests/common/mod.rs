@@ -224,3 +224,36 @@ pub async fn with_system_sender(t: &mut TestApp, from: &str) {
     t.state.config = std::sync::Arc::new(config);
     t.router = api::router(t.state.clone());
 }
+
+/// Makes `email` a member of `account_id` with `role` and returns a fresh session token.
+pub async fn session_for(
+    pool: &PgPool,
+    account_id: Uuid,
+    email: &str,
+    role: mailrust::users::MemberRole,
+) -> String {
+    let (user, _) = mailrust::users::invite_direct(pool, email, account_id, role)
+        .await
+        .unwrap();
+    let mut conn = pool.acquire().await.unwrap();
+    mailrust::sessions::create(&mut conn, user.id)
+        .await
+        .unwrap()
+        .token
+}
+
+/// A request with a session token and, if given, the `x-mailrust-account` header.
+pub fn sreq(
+    method: &str,
+    uri: &str,
+    session: &str,
+    account: Option<Uuid>,
+    body: Option<Value>,
+) -> Request<Body> {
+    let mut r = req(method, uri, Some(session), body);
+    if let Some(a) = account {
+        r.headers_mut()
+            .insert("x-mailrust-account", a.to_string().parse().unwrap());
+    }
+    r
+}
