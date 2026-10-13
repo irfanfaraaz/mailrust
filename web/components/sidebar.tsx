@@ -6,7 +6,7 @@ import { cn } from "cn";
 const groups = [
   { label: null, items: [["Overview", "overview"]] },
   { label: "Sending API", items: [["Emails", "emails"], ["API keys", "api-keys"], ["Webhooks", "webhooks"]] },
-  // Parts 2 and 3 add: { label: "Newsletter", items: [["Audience", "audience"], ["Campaigns", "campaigns"]] }
+  { label: "Newsletter", items: [["Contacts", "contacts"], ["Tags", "tags"], ["Signup form", "signup-form"]] },
   { label: "Shared", items: [["Domains", "domains"], ["Suppressions", "suppressions"], ["Team", "team"]] },
 ] as const;
 

@@ -100,6 +100,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_contacts"];
+        put?: never;
+        post: operations["create_contact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/contacts/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["export_contacts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/contacts/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_imports"];
+        put?: never;
+        post: operations["upload_import"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/contacts/imports/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_import"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/contacts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_contact"];
+        put?: never;
+        post?: never;
+        delete: operations["delete_contact"];
+        options?: never;
+        head?: never;
+        patch: operations["update_contact"];
+        trace?: never;
+    };
     "/domains": {
         parameters: {
             query?: never;
@@ -260,6 +340,118 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/newsletter": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_newsletter"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["update_newsletter"];
+        trace?: never;
+    };
+    "/public/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["public_confirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/join": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["public_join"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/newsletter/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["public_newsletter"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/resubscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["public_resubscribe"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/unsubscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["public_unsubscribe"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/unsubscribe/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["public_unsubscribe_info"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/stats/overview": {
         parameters: {
             query?: never;
@@ -306,6 +498,38 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_tags"];
+        put?: never;
+        post: operations["create_tag"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tags/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["delete_tag"];
+        options?: never;
+        head?: never;
+        patch: operations["rename_tag"];
         trace?: never;
     };
     "/team": {
@@ -419,8 +643,46 @@ export interface components {
             content_type?: string | null;
             filename: string;
         };
+        BTreeMap: {
+            [key: string]: string;
+        };
         BatchResponse: {
             data: components["schemas"]["SendResponse"][];
+        };
+        ConfirmView: {
+            newsletter_name: string;
+        };
+        ContactList: {
+            data: components["schemas"]["ContactView"][];
+            /** Format: uuid */
+            next_cursor?: string | null;
+        };
+        /** @enum {string} */
+        ContactSource: "form" | "import" | "api" | "dashboard";
+        /** @enum {string} */
+        ContactStatus: "pending" | "subscribed" | "unsubscribed";
+        ContactView: {
+            /** @description The address is on the account's suppression list: nothing will be sent to it. */
+            blocked: boolean;
+            /** Format: date-time */
+            created_at: string;
+            email: string;
+            fields: {
+                [key: string]: string;
+            };
+            first_name?: string | null;
+            /** Format: uuid */
+            id: string;
+            last_name?: string | null;
+            source: components["schemas"]["ContactSource"];
+            status: components["schemas"]["ContactStatus"];
+            /** Format: date-time */
+            subscribed_at?: string | null;
+            tags: components["schemas"]["TagRef"][];
+            /** Format: date-time */
+            unsubscribed_at?: string | null;
+            /** Format: date-time */
+            updated_at: string;
         };
         Counts: {
             /** Format: int64 */
@@ -435,6 +697,14 @@ export interface components {
             opened: number;
             /** Format: int64 */
             sent: number;
+        };
+        CreateContactRequest: {
+            email: string;
+            fields?: components["schemas"]["BTreeMap"];
+            first_name?: string | null;
+            last_name?: string | null;
+            /** @description Tag names; missing tags are created. */
+            tags?: string[];
         };
         CreateDomainRequest: {
             click_tracking?: boolean;
@@ -543,6 +813,58 @@ export interface components {
             recipient?: string | null;
             type: string;
         };
+        ImportList: {
+            data: components["schemas"]["ImportView"][];
+        };
+        ImportRowError: {
+            /**
+             * Format: int64
+             * @description Line in the file (1 = the header row).
+             */
+            line: number;
+            reason: string;
+        };
+        /** @enum {string} */
+        ImportStatus: "queued" | "running" | "done" | "failed";
+        /** @description The multipart body of `POST /contacts/imports` (documentation only). */
+        ImportUpload: {
+            /** @description Must be `true`: these people agreed to get your emails. */
+            consent: boolean;
+            /**
+             * Format: binary
+             * @description UTF-8 CSV, ≤ 20 MB, ≤ 100,000 rows, a header row with an `email` column.
+             */
+            file: string;
+            /**
+             * Format: uuid
+             * @description A tag added to every row.
+             */
+            tag_id?: string | null;
+        };
+        ImportView: {
+            /** Format: int32 */
+            added: number;
+            /** Format: date-time */
+            created_at: string;
+            error?: string | null;
+            /** @description The first 1,000 bad rows. */
+            errors: components["schemas"]["ImportRowError"][];
+            /** Format: date-time */
+            finished_at?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: int32 */
+            rows_done: number;
+            /** Format: int32 */
+            rows_total: number;
+            /** Format: int32 */
+            skipped: number;
+            status: components["schemas"]["ImportStatus"];
+            /** Format: uuid */
+            tag_id?: string | null;
+            /** Format: int32 */
+            updated: number;
+        };
         InviteRequest: {
             email: string;
             role: components["schemas"]["MemberRole"];
@@ -598,6 +920,16 @@ export interface components {
             role: components["schemas"]["MemberRole"];
             status: components["schemas"]["AccountStatus"];
         };
+        NewsletterSettings: {
+            /** @description Why the form is closed, when it is. */
+            closed_reason?: string | null;
+            newsletter_from?: string | null;
+            newsletter_name?: string | null;
+            public_slug?: string | null;
+            signup_enabled: boolean;
+            /** @description True when `/join/<slug>` takes signups right now. */
+            signup_open: boolean;
+        };
         Overview: {
             /** Format: double */
             bounce_limit: number;
@@ -620,6 +952,18 @@ export interface components {
          * @enum {string}
          */
         Priority: "urgent" | "normal" | "bulk";
+        PublicJoinRequest: {
+            email: string;
+            first_name?: string | null;
+            slug: string;
+            /** @description Honeypot: people never fill it; a filled one gets the normal answer and nothing happens. */
+            website?: string;
+        };
+        PublicNewsletter: {
+            name: string;
+            /** @description False: show "This newsletter is not taking signups right now." */
+            open: boolean;
+        };
         RoleRequest: {
             role: components["schemas"]["MemberRole"];
         };
@@ -666,6 +1010,26 @@ export interface components {
             created_at: string;
             reason: components["schemas"]["SuppressionReason"];
         };
+        TagList: {
+            data: components["schemas"]["TagView"][];
+        };
+        TagRef: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+        };
+        TagRequest: {
+            name: string;
+        };
+        TagView: {
+            /** Format: int64 */
+            contacts: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            name: string;
+        };
         TeamView: {
             invites: components["schemas"]["InviteView"][];
             members: components["schemas"]["MemberView"][];
@@ -673,9 +1037,29 @@ export interface components {
         TokenRequest: {
             token: string;
         };
+        UnsubscribeView: {
+            /** @description None when the link is not valid any more; the page still says "You're unsubscribed". */
+            newsletter_name?: string | null;
+        };
+        /** @description Absent fields stay as they are. An empty name clears it. `fields` and `tags` replace the whole set. */
+        UpdateContactRequest: {
+            fields?: null | components["schemas"]["BTreeMap"];
+            first_name?: string | null;
+            last_name?: string | null;
+            status?: null | components["schemas"]["ContactStatus"];
+            tags?: string[] | null;
+        };
         UpdateDomainRequest: {
             click_tracking?: boolean | null;
             open_tracking?: boolean | null;
+        };
+        /** @description Absent fields stay as they are; `""` clears a text field. */
+        UpdateNewsletterRequest: {
+            /** @description Must be on a verified domain of this account. */
+            newsletter_from?: string | null;
+            newsletter_name?: string | null;
+            public_slug?: string | null;
+            signup_enabled?: boolean | null;
         };
         User: {
             email: string;
@@ -875,6 +1259,294 @@ export interface operations {
                 };
             };
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_contacts: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["ContactStatus"];
+                /** @description Tag id */
+                tag?: string;
+                /** @description Email or name, case-insensitive */
+                q?: string;
+                limit?: number;
+                after?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactList"];
+                };
+            };
+        };
+    };
+    create_contact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateContactRequest"];
+            };
+        };
+        responses: {
+            /** @description The address existed: updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactView"];
+                };
+            };
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactView"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    export_contacts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description email,first_name,last_name,status,tags,created_at, then one column per field name */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+        };
+    };
+    list_imports: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportList"];
+                };
+            };
+        };
+    };
+    upload_import: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["ImportUpload"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportView"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description consent_required, file_too_large, not_utf8, bad_csv, empty_file, no_email_column, too_many_rows */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_import: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportView"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_contact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactView"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    delete_contact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    update_contact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateContactRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactView"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1347,6 +2019,279 @@ export interface operations {
             };
         };
     };
+    get_newsletter: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewsletterSettings"];
+                };
+            };
+        };
+    };
+    update_newsletter: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateNewsletterRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewsletterSettings"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    public_confirm: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Mailrust-Web": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TokenRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfirmView"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    public_join: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Mailrust-Web": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicJoinRequest"];
+            };
+        };
+        responses: {
+            /** @description Same answer for every address */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    public_newsletter: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Mailrust-Web": string;
+            };
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicNewsletter"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    public_resubscribe: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Mailrust-Web": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TokenRequest"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    public_unsubscribe: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Mailrust-Web": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TokenRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnsubscribeView"];
+                };
+            };
+        };
+    };
+    public_unsubscribe_info: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Mailrust-Web": string;
+            };
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnsubscribeView"];
+                };
+            };
+        };
+    };
     stats_overview: {
         parameters: {
             query?: never;
@@ -1438,6 +2383,132 @@ export interface operations {
                 content?: never;
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_tags: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TagList"];
+                };
+            };
+        };
+    };
+    create_tag: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TagRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TagView"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    delete_tag: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    rename_tag: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TagRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TagView"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
