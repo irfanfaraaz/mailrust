@@ -53,3 +53,23 @@ export function cli(args: string[]) {
     encoding: "utf8",
   });
 }
+
+/** A new owner of the seed account, logged in. Login links are capped per email per hour. */
+export async function freshOwner(page: Page, prefix: string): Promise<string> {
+  const email = `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@${SEED.domain}`;
+  cli(["user", "invite", email, "--account", SEED.accountId, "--role", "owner"]);
+  await loginAs(page, email);
+  return email;
+}
+
+/** Opens the seed account's signup form at /join/<slug>, sending from news@<seed domain>. */
+export async function openSignupForm(page: Page, slug: string) {
+  await page.goto(`/a/${SEED.accountId}/signup-form`);
+  await page.getByLabel("Public address").fill(slug);
+  await page.getByLabel("Newsletter name").fill("E2E Weekly");
+  await page.getByLabel("From address").fill("news");
+  await page.getByLabel("From domain").selectOption(SEED.domain);
+  await page.getByLabel("Take signups").check();
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("Open: the form takes signups.")).toBeVisible();
+}
