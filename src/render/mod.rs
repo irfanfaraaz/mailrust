@@ -7,6 +7,7 @@ use lettre::{
 use uuid::Uuid;
 
 pub mod blocks;
+pub mod campaign;
 pub mod tracking;
 
 #[derive(Debug, Clone)]
@@ -258,5 +259,20 @@ mod tests {
             tracking::apply(r#"<body><a href="https://a.com">x</a></body>"#, id, &t).unwrap();
         assert!(out.contains(r#"href="https://a.com""#));
         assert!(links.is_empty());
+    }
+
+    #[test]
+    fn links_marked_skip_are_not_tracked() {
+        let t = Tracking {
+            base_url: "https://m.test".into(),
+            secret: S,
+            opens: true,
+            clicks: true,
+        };
+        let html = r#"<body><a href="https://shop.com/a">A</a><a data-mr-skip href="https://app.test/u/tok">Unsubscribe</a></body>"#;
+        let (out, links) = tracking::apply(html, Uuid::now_v7(), &t).unwrap();
+        assert_eq!(links, vec!["https://shop.com/a"]);
+        assert!(out.contains(r#"href="https://app.test/u/tok""#));
+        assert!(!out.contains("data-mr-skip"));
     }
 }

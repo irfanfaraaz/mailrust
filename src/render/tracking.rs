@@ -24,6 +24,11 @@ pub fn apply(
     let mut handlers = Vec::new();
     if t.clicks {
         handlers.push(element!("a[href]", |el| {
+            // The unsubscribe footer: never through /c/ (a link scanner or a click count must not touch it).
+            if el.get_attribute("data-mr-skip").is_some() {
+                el.remove_attribute("data-mr-skip");
+                return Ok(());
+            }
             if let Some(href) = el.get_attribute("href") {
                 let target = href.trim().to_string();
                 let lower = target.to_ascii_lowercase();
