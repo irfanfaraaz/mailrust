@@ -94,3 +94,25 @@ export function unsubscribeToken(contactId: string): string {
 export function randomIp(): string {
   return `10.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}.${1 + Math.floor(Math.random() * 250)}`;
 }
+
+/** The newest raw message to `email` written after `since` whose decoded text matches `re`; waits up to 60 s. */
+export async function latestMail(email: string, since: number, re: RegExp): Promise<string> {
+  const to = email.toLowerCase();
+  let found = "";
+  await expect(async () => {
+    const files = readdirSync(OUTBOX).map((f) => path.join(OUTBOX, f)).filter((f) => statSync(f).mtimeMs >= since).sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
+    for (const f of files) {
+      const raw = decodeQp(readFileSync(f, "utf8"));
+      const lower = raw.toLowerCase();
+      if ((lower.includes(`to: ${to}`) || lower.includes(`to: <${to}>`)) && re.test(raw)) {
+        found = raw;
+        return;
+      }
+    }
+    throw new Error(`no matching mail for ${email} yet`);
+  }).toPass({ timeout: 60_000 });
+  return found;
+}
+
+/** A 1x1 PNG for image uploads. */
+export const PNG_1X1 = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");

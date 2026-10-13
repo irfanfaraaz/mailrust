@@ -64,3 +64,9 @@ export function ImportStatusBadge({ status }: { status: Schemas["ImportStatus"] 
 export function BlockedBadge() {
   return <StatusBadge tone="bad" status="blocked" />;
 }
+
+const campaignTone: Record<Schemas["CampaignStatus"], Tone> = { draft: "quiet", scheduled: "info", sending: "info", paused: "wait", sent: "good", cancelled: "quiet" };
+
+export function CampaignStatusBadge({ status }: { status: Schemas["CampaignStatus"] }) {
+  return <StatusBadge tone={campaignTone[status]} status={status} />;
+}
