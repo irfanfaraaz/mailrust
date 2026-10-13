@@ -12,6 +12,7 @@ use crate::{
     api::{
         AppState,
         contacts::{ContactList, CreateContactRequest, UpdateContactRequest},
+        imports::{ImportList, ImportUpload},
         domains::{CreateDomainRequest, DomainList, UpdateDomainRequest},
         emails::{BatchResponse, EmailList},
         keys::{CreateKeyRequest, CreatedKey, KeyList},
@@ -30,6 +31,7 @@ use crate::{
         AttachmentInput, EmailStatus, EmailSummary, EmailView, EventView, Priority,
         SendEmailRequest, SendResponse,
     },
+    imports::{ImportRowError, ImportStatus, ImportView},
     keys::{KeyAccess, KeySummary},
     newsletter::NewsletterSettings,
     safety::SuppressionReason,
@@ -280,6 +282,19 @@ fn public_join() {}
     responses((status = 200, body = ConfirmView), (status = 401, body = ErrorBody)))]
 fn public_confirm() {}
 
+#[utoipa::path(post, path = "/contacts/imports", tag = "audience",
+    request_body(content = ImportUpload, content_type = "multipart/form-data"),
+    responses((status = 201, body = ImportView), (status = 400, body = ErrorBody), (status = 413, body = ErrorBody),
+               (status = 422, body = ErrorBody, description = "consent_required, file_too_large, not_utf8, bad_csv, empty_file, no_email_column, too_many_rows")))]
+fn upload_import() {}
+
+#[utoipa::path(get, path = "/contacts/imports", tag = "audience", responses((status = 200, body = ImportList)))]
+fn list_imports() {}
+
+#[utoipa::path(get, path = "/contacts/imports/{id}", tag = "audience", params(("id" = uuid::Uuid, Path)),
+    responses((status = 200, body = ImportView), (status = 404, body = ErrorBody)))]
+fn get_import() {}
+
 #[derive(OpenApi)]
 #[openapi(
     info(title = "Mailrust API", version = "0.1.0", description = "Send transactional email through your own Amazon SES. Auth: `Authorization: Bearer mr_live_…` (API key), or `Bearer mr_sess_…` (dashboard session) plus `X-Mailrust-Account: <account id>`."),
@@ -290,7 +305,7 @@ fn public_confirm() {}
           list_contacts, export_contacts, create_contact, get_contact, update_contact, delete_contact,
           list_tags, create_tag, rename_tag, delete_tag, get_newsletter, update_newsletter,
           public_newsletter, public_unsubscribe_info, public_unsubscribe, public_resubscribe,
-          public_join, public_confirm),
+          public_join, public_confirm, upload_import, list_imports, get_import),
     components(schemas(SendEmailRequest, AttachmentInput, SendResponse, BatchResponse, EmailView, EmailSummary, EmailList,
         EventView, EmailStatus, Priority, Domain, DomainStatus, DnsRecord, DomainList, CreateDomainRequest, UpdateDomainRequest,
         KeySummary, KeyAccess, CreateKeyRequest, CreatedKey, KeyList, CreateWebhookRequest, WebhookView, WebhookList,
@@ -298,7 +313,8 @@ fn public_confirm() {}
         MeResponse, MyAccount, User, MemberRole, TeamView, MemberView, InviteView, InviteRequest, RoleRequest, Overview, Counts, ErrorBody, ErrorDetail,
         ContactView, ContactList, ContactStatus, ContactSource, TagRef, CreateContactRequest, UpdateContactRequest,
         TagView, TagList, TagRequest, NewsletterSettings, UpdateNewsletterRequest,
-        PublicNewsletter, UnsubscribeView, PublicJoinRequest, ConfirmView)),
+        PublicNewsletter, UnsubscribeView, PublicJoinRequest, ConfirmView,
+        ImportView, ImportList, ImportStatus, ImportRowError, ImportUpload)),
     modifiers(&BearerAuth),
     security(("bearer" = []))
 )]
@@ -333,7 +349,7 @@ mod tests {
         let doc = serde_json::to_value(super::ApiDoc::openapi()).unwrap();
         for p in ["/contacts", "/contacts/export", "/contacts/{id}", "/tags", "/tags/{id}", "/newsletter",
             "/public/newsletter/{slug}", "/public/unsubscribe/{token}", "/public/unsubscribe", "/public/resubscribe",
-            "/public/join", "/public/confirm"] {
+            "/public/join", "/public/confirm", "/contacts/imports", "/contacts/imports/{id}"] {
             assert!(doc["paths"][p].is_object(), "missing {p}");
         }
     }

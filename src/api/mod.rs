@@ -18,6 +18,7 @@ pub mod contacts;
 pub mod domains;
 pub mod emails;
 pub mod health;
+pub mod imports;
 pub mod json;
 pub mod keys;
 pub mod login;
@@ -70,6 +71,7 @@ pub fn router(state: AppState) -> Router {
     Router::new()
         .merge(health::routes())
         .merge(contacts::routes())
+        .merge(imports::routes())
         .merge(newsletter::routes())
         .merge(public::routes())
         .merge(domains::routes())
