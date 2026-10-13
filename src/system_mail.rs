@@ -1,4 +1,4 @@
-//! Login and invite emails, sent through Mailrust's own queue.
+//! Login, invite and newsletter confirm emails, sent through Mailrust's own queue.
 use std::collections::BTreeMap;
 
 use chrono::Utc;
@@ -83,18 +83,53 @@ pub async fn queue(
             return Ok(None);
         }
     };
+    Ok(Some(
+        insert_one(state, account_id, domain.id, &email).await?,
+    ))
+}
+
+/// Like `queue`, but from `from` through `account_id` itself (newsletter confirm emails).
+/// None (logged, without the address) when the account cannot send from that domain right now.
+pub async fn queue_from(
+    state: &AppState,
+    account_id: Uuid,
+    from: &str,
+    to: &str,
+    subject: &str,
+    text: String,
+) -> anyhow::Result<Option<Uuid>> {
+    let mut email = emails::validate(request(from, to, subject, text), Utc::now())
+        .map_err(|e| anyhow::anyhow!("account email invalid: {e}"))?;
+    email.tags.insert(SYSTEM_TAG.into(), "true".into());
+    match domains::find_by_name(&state.pool, account_id, &email.from_domain).await? {
+        Some(d) if d.status == DomainStatus::Verified => {
+            Ok(Some(insert_one(state, account_id, d.id, &email).await?))
+        }
+        _ => {
+            tracing::error!(%account_id, domain = %email.from_domain, "from domain not verified; email not sent");
+            Ok(None)
+        }
+    }
+}
+
+async fn insert_one(
+    state: &AppState,
+    account_id: Uuid,
+    domain_id: Uuid,
+    email: &ValidEmail,
+) -> anyhow::Result<Uuid> {
     let mut tx = state.pool.begin().await?;
     let (id, _) = emails::insert(
         &mut tx,
         account_id,
-        domain.id,
-        &email,
+        domain_id,
+        email,
         None,
         &mut UrgentCap::default(),
     )
     .await?;
     tx.commit().await?;
-    Ok(Some(id))
+    Ok(id)
 }
 
 fn request(from: &str, to: &str, subject: &str, text: String) -> SendEmailRequest {

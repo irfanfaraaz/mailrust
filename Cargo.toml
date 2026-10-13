@@ -20,10 +20,11 @@ aws-config = { version = "1", features = ["behavior-version-latest"] }
 aws-sdk-sesv2 = { version = "1.140", default-features = false, features = ["default-https-client", "rt-tokio", "behavior-version-latest"] }
 # Not "rustls": that is the old hyper 0.14 / rustls 0.21 stack with known holes.
 aws-sdk-sts = { version = "1", default-features = false, features = ["default-https-client", "rt-tokio", "behavior-version-latest"] }
-axum = { version = "0.8", features = ["macros"] }
+axum = { version = "0.8", features = ["macros", "multipart"] }
 base64 = "0.22"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4", features = ["derive", "env"] }
+csv = "1"
 dotenvy = "0.15"
 futures = "0.3"
 governor = "0.8"

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE contact_imports SET status = 'failed', error = $2, file = NULL, lease_until = NULL, finished_at = now() WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ce322f735e1152a7da5a8a1779e1704d8f26fff91ff6d75f044615bd3aee37b6"
+}

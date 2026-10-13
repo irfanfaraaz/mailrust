@@ -213,6 +213,402 @@
         "security": []
       }
     },
+    "/contacts": {
+      "get": {
+        "tags": [
+          "audience"
+        ],
+        "operationId": "list_contacts",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ContactStatus"
+            }
+          },
+          {
+            "name": "tag",
+            "in": "query",
+            "description": "Tag id",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Email or name, case-insensitive",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactList"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "audience"
+        ],
+        "operationId": "create_contact",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateContactRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The address existed: updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactView"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contacts/export": {
+      "get": {
+        "tags": [
+          "audience"
+        ],
+        "operationId": "export_contacts",
+        "responses": {
+          "200": {
+            "description": "email,first_name,last_name,status,tags,created_at, then one column per field name",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contacts/imports": {
+      "get": {
+        "tags": [
+          "audience"
+        ],
+        "operationId": "list_imports",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportList"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "audience"
+        ],
+        "operationId": "upload_import",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportUpload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "consent_required, file_too_large, not_utf8, bad_csv, empty_file, no_email_column, too_many_rows",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contacts/imports/{id}": {
+      "get": {
+        "tags": [
+          "audience"
+        ],
+        "operationId": "get_import",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contacts/{id}": {
+      "get": {
+        "tags": [
+          "audience"
+        ],
+        "operationId": "get_contact",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "audience"
+        ],
+        "operationId": "delete_contact",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "audience"
+        ],
+        "operationId": "update_contact",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateContactRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/domains": {
       "get": {
         "tags": [
@@ -861,6 +1257,392 @@
         }
       }
     },
+    "/newsletter": {
+      "get": {
+        "tags": [
+          "audience"
+        ],
+        "operationId": "get_newsletter",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NewsletterSettings"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "audience"
+        ],
+        "operationId": "update_newsletter",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNewsletterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NewsletterSettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/public/confirm": {
+      "post": {
+        "tags": [
+          "public"
+        ],
+        "operationId": "public_confirm",
+        "parameters": [
+          {
+            "name": "X-Mailrust-Web",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfirmView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/public/join": {
+      "post": {
+        "tags": [
+          "public"
+        ],
+        "operationId": "public_join",
+        "parameters": [
+          {
+            "name": "X-Mailrust-Web",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicJoinRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Same answer for every address"
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/public/newsletter/{slug}": {
+      "get": {
+        "tags": [
+          "public"
+        ],
+        "operationId": "public_newsletter",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Mailrust-Web",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicNewsletter"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/public/resubscribe": {
+      "post": {
+        "tags": [
+          "public"
+        ],
+        "operationId": "public_resubscribe",
+        "parameters": [
+          {
+            "name": "X-Mailrust-Web",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/public/unsubscribe": {
+      "post": {
+        "tags": [
+          "public"
+        ],
+        "operationId": "public_unsubscribe",
+        "parameters": [
+          {
+            "name": "X-Mailrust-Web",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnsubscribeView"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/public/unsubscribe/{token}": {
+      "get": {
+        "tags": [
+          "public"
+        ],
+        "operationId": "public_unsubscribe_info",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Mailrust-Web",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnsubscribeView"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
     "/stats/overview": {
       "get": {
         "tags": [
@@ -987,6 +1769,167 @@
             "description": ""
           },
           "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tags": {
+      "get": {
+        "tags": [
+          "audience"
+        ],
+        "operationId": "list_tags",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagList"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "audience"
+        ],
+        "operationId": "create_tag",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TagRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tags/{id}": {
+      "delete": {
+        "tags": [
+          "audience"
+        ],
+        "operationId": "delete_tag",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "audience"
+        ],
+        "operationId": "rename_tag",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TagRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
             "description": "",
             "content": {
               "application/json": {
@@ -1401,6 +2344,15 @@
           }
         }
       },
+      "BTreeMap": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        },
+        "propertyNames": {
+          "type": "string"
+        }
+      },
       "BatchResponse": {
         "type": "object",
         "required": [
@@ -1412,6 +2364,137 @@
             "items": {
               "$ref": "#/components/schemas/SendResponse"
             }
+          }
+        }
+      },
+      "ConfirmView": {
+        "type": "object",
+        "required": [
+          "newsletter_name"
+        ],
+        "properties": {
+          "newsletter_name": {
+            "type": "string"
+          }
+        }
+      },
+      "ContactList": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContactView"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "ContactSource": {
+        "type": "string",
+        "enum": [
+          "form",
+          "import",
+          "api",
+          "dashboard"
+        ]
+      },
+      "ContactStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "subscribed",
+          "unsubscribed"
+        ]
+      },
+      "ContactView": {
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "fields",
+          "status",
+          "source",
+          "tags",
+          "blocked",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "blocked": {
+            "type": "boolean",
+            "description": "The address is on the account's suppression list: nothing will be sent to it."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "email": {
+            "type": "string"
+          },
+          "fields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "first_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "last_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source": {
+            "$ref": "#/components/schemas/ContactSource"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ContactStatus"
+          },
+          "subscribed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TagRef"
+            }
+          },
+          "unsubscribed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -1449,6 +2532,39 @@
           "sent": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "CreateContactRequest": {
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "fields": {
+            "$ref": "#/components/schemas/BTreeMap"
+          },
+          "first_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Tag names; missing tags are created."
           }
         }
       },
@@ -1881,6 +2997,148 @@
           }
         }
       },
+      "ImportList": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportView"
+            }
+          }
+        }
+      },
+      "ImportRowError": {
+        "type": "object",
+        "required": [
+          "line",
+          "reason"
+        ],
+        "properties": {
+          "line": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Line in the file (1 = the header row).",
+            "minimum": 0
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "ImportStatus": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "running",
+          "done",
+          "failed"
+        ]
+      },
+      "ImportUpload": {
+        "type": "object",
+        "description": "The multipart body of `POST /contacts/imports` (documentation only).",
+        "required": [
+          "file",
+          "consent"
+        ],
+        "properties": {
+          "consent": {
+            "type": "boolean",
+            "description": "Must be `true`: these people agreed to get your emails."
+          },
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "description": "UTF-8 CSV, ≤ 20 MB, ≤ 100,000 rows, a header row with an `email` column."
+          },
+          "tag_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "A tag added to every row."
+          }
+        }
+      },
+      "ImportView": {
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "rows_total",
+          "rows_done",
+          "added",
+          "updated",
+          "skipped",
+          "errors",
+          "created_at"
+        ],
+        "properties": {
+          "added": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportRowError"
+            },
+            "description": "The first 1,000 bad rows. Empty in the import list: get one import to see them."
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rows_done": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rows_total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "skipped": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ImportStatus"
+          },
+          "tag_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "updated": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "InviteRequest": {
         "type": "object",
         "required": [
@@ -2074,6 +3332,47 @@
           }
         }
       },
+      "NewsletterSettings": {
+        "type": "object",
+        "required": [
+          "signup_enabled",
+          "signup_open"
+        ],
+        "properties": {
+          "closed_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why the form is closed, when it is."
+          },
+          "newsletter_from": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "newsletter_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "public_slug": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "signup_enabled": {
+            "type": "boolean"
+          },
+          "signup_open": {
+            "type": "boolean",
+            "description": "True when `/join/<slug>` takes signups right now."
+          }
+        }
+      },
       "Overview": {
         "type": "object",
         "required": [
@@ -2128,6 +3427,47 @@
           "normal",
           "bulk"
         ]
+      },
+      "PublicJoinRequest": {
+        "type": "object",
+        "required": [
+          "slug",
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "first_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "slug": {
+            "type": "string"
+          },
+          "website": {
+            "type": "string",
+            "description": "Honeypot (the form's `hp_f3a1` input): people never fill it; a filled one gets the normal answer and nothing happens."
+          }
+        }
+      },
+      "PublicNewsletter": {
+        "type": "object",
+        "required": [
+          "name",
+          "open"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "open": {
+            "type": "boolean",
+            "description": "False: show \"This newsletter is not taking signups right now.\""
+          }
+        }
       },
       "RoleRequest": {
         "type": "object",
@@ -2308,6 +3648,73 @@
           }
         }
       },
+      "TagList": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TagView"
+            }
+          }
+        }
+      },
+      "TagRef": {
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "TagRequest": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "TagView": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "contacts",
+          "created_at"
+        ],
+        "properties": {
+          "contacts": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
       "TeamView": {
         "type": "object",
         "required": [
@@ -2340,6 +3747,66 @@
           }
         }
       },
+      "UnsubscribeView": {
+        "type": "object",
+        "properties": {
+          "newsletter_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "None when the link is not valid any more; the page still says \"You're unsubscribed\"."
+          }
+        }
+      },
+      "UpdateContactRequest": {
+        "type": "object",
+        "description": "Absent fields stay as they are. An empty name clears it. `fields` and `tags` replace the whole set.",
+        "properties": {
+          "fields": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BTreeMap"
+              }
+            ]
+          },
+          "first_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ContactStatus",
+                "description": "`unsubscribed`, or `subscribed` for a contact that already is. Pending and unsubscribed contacts cannot be set to `subscribed`."
+              }
+            ]
+          },
+          "tags": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "UpdateDomainRequest": {
         "type": "object",
         "properties": {
@@ -2350,6 +3817,37 @@
             ]
           },
           "open_tracking": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        }
+      },
+      "UpdateNewsletterRequest": {
+        "type": "object",
+        "description": "Absent fields stay as they are; `\"\"` clears a text field.",
+        "properties": {
+          "newsletter_from": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Must be on a verified domain of this account."
+          },
+          "newsletter_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "public_slug": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "signup_enabled": {
             "type": [
               "boolean",
               "null"

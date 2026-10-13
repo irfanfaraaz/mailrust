@@ -1,0 +1,133 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT c.id, c.email, c.first_name, c.last_name,\n                  c.fields AS \"fields!: Json<Fields>\",\n                  c.status AS \"status!: ContactStatus\", c.source AS \"source!: ContactSource\",\n                  COALESCE((SELECT json_agg(json_build_object('id', t.id, 'name', t.name) ORDER BY lower(t.name))\n                            FROM contact_tags ct JOIN tags t ON t.id = ct.tag_id\n                            WHERE ct.contact_id = c.id), '[]'::json) AS \"tags!: Json<Vec<TagRef>>\",\n                  EXISTS (SELECT 1 FROM suppressions s WHERE s.account_id = c.account_id AND s.address = c.email) AS \"blocked!\",\n                  c.subscribed_at, c.unsubscribed_at, c.created_at, c.updated_at\n           FROM contacts c\n           WHERE c.account_id = $1\n             AND ($2::contact_status IS NULL OR c.status = $2)\n             AND ($3::uuid IS NULL OR EXISTS (SELECT 1 FROM contact_tags x WHERE x.contact_id = c.id AND x.tag_id = $3))\n             AND ($4::text IS NULL OR c.email ILIKE $4 OR c.first_name ILIKE $4 OR c.last_name ILIKE $4\n                  OR concat_ws(' ', c.first_name, c.last_name) ILIKE $4)\n             AND ($5::uuid IS NULL OR c.id < $5)\n           ORDER BY c.id DESC LIMIT $6",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "email",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "first_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "last_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "fields!: Json<Fields>",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 5,
+        "name": "status!: ContactStatus",
+        "type_info": {
+          "Custom": {
+            "name": "contact_status",
+            "kind": {
+              "Enum": [
+                "pending",
+                "subscribed",
+                "unsubscribed"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "source!: ContactSource",
+        "type_info": {
+          "Custom": {
+            "name": "contact_source",
+            "kind": {
+              "Enum": [
+                "form",
+                "import",
+                "api",
+                "dashboard"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "tags!: Json<Vec<TagRef>>",
+        "type_info": "Json"
+      },
+      {
+        "ordinal": 8,
+        "name": "blocked!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 9,
+        "name": "subscribed_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 10,
+        "name": "unsubscribed_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 11,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 12,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "contact_status",
+            "kind": {
+              "Enum": [
+                "pending",
+                "subscribed",
+                "unsubscribed"
+              ]
+            }
+          }
+        },
+        "Uuid",
+        "Text",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      null,
+      null,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "d0901c10160917a35966e2c2ba5e4532eb831bf962cad47788eb40ff2c131c82"
+}

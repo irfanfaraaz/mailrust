@@ -13,7 +13,7 @@ vi.mock("next/navigation", () => ({
   notFound: () => { throw new Error("NOT_FOUND"); },
 }));
 
-const { engine, EngineError } = await import("./engine");
+const { engine, engineResponse, EngineError } = await import("./engine");
 
 function respond(status: number, body?: unknown) {
   const fetchMock = vi.fn(async () => new Response(body === undefined ? null : JSON.stringify(body), { status }));
@@ -29,6 +29,25 @@ beforeEach(() => {
 });
 
 describe("engine", () => {
+
+  it("sends FormData as multipart, without a JSON content type", async () => {
+    cookieStore.set("mr_session", "mr_sess_abc");
+    const f = respond(201, { id: "imp" });
+    const fd = new FormData();
+    fd.set("consent", "true");
+    await engine("/contacts/imports", { method: "POST", account: "acc-1", body: fd });
+    const init = (f.mock.calls[0] as unknown as [string, RequestInit])[1];
+    expect(init.body).toBe(fd);
+    expect((init.headers as Record<string, string>)["content-type"]).toBeUndefined();
+  });
+
+  it("engineResponse hands back the raw body", async () => {
+    cookieStore.set("mr_session", "mr_sess_abc");
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("email\na@x.com\n", { status: 200, headers: { "content-type": "text/csv" } })));
+    const res = await engineResponse("/contacts/export", { account: "acc-1" });
+    expect(await res.text()).toBe("email\na@x.com\n");
+  });
+
   it("sends the session, account, secret and client ip", async () => {
     cookieStore.set("mr_session", "mr_sess_abc");
     // The leftmost entry is whatever the client sent; the rightmost is what our proxy saw.

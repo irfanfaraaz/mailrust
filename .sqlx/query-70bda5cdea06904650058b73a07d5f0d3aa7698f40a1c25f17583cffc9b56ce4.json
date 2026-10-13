@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM contacts WHERE status = 'pending' AND unsubscribed_at IS NULL AND pending_since < now() - interval '30 days'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "70bda5cdea06904650058b73a07d5f0d3aa7698f40a1c25f17583cffc9b56ce4"
+}

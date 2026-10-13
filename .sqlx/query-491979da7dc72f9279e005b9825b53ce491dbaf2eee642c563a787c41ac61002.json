@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE contact_confirmations SET used_at = now()\n         WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now()\n         RETURNING contact_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "contact_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "491979da7dc72f9279e005b9825b53ce491dbaf2eee642c563a787c41ac61002"
+}

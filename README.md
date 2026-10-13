@@ -62,6 +62,8 @@ cd deploy
 docker compose -f docker-compose.prod.yml --env-file ../.env up -d
 ```
 
+The reverse proxy in front of `web` must set `X-Forwarded-For` (Caddy does by default). Without it every reader shares one IP, so the signup form's per-IP limit (5 joins an hour) stops all signups. The engine logs a warning once when this happens.
+
 ## Development
 
 ```bash

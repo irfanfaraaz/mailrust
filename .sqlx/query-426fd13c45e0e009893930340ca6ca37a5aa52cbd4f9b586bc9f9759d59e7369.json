@@ -1,0 +1,77 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT c.id, c.email, c.first_name, c.last_name, c.status AS \"status!: ContactStatus\",\n                  ARRAY(SELECT t.name FROM contact_tags ct JOIN tags t ON t.id = ct.tag_id\n                        WHERE ct.contact_id = c.id ORDER BY lower(t.name)) AS \"tags!\",\n                  c.fields AS \"fields!: Json<Fields>\", c.created_at\n           FROM contacts c\n           WHERE c.account_id = $1 AND ($2::uuid IS NULL OR c.id > $2)\n           ORDER BY c.id LIMIT $3",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "email",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "first_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "last_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "status!: ContactStatus",
+        "type_info": {
+          "Custom": {
+            "name": "contact_status",
+            "kind": {
+              "Enum": [
+                "pending",
+                "subscribed",
+                "unsubscribed"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "tags!",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 6,
+        "name": "fields!: Json<Fields>",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 7,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      false,
+      null,
+      false,
+      false
+    ]
+  },
+  "hash": "426fd13c45e0e009893930340ca6ca37a5aa52cbd4f9b586bc9f9759d59e7369"
+}

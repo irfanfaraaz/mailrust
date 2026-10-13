@@ -11,21 +11,29 @@ use crate::{
     accounts::AccountStatus,
     api::{
         AppState,
+        contacts::{ContactList, CreateContactRequest, UpdateContactRequest},
         domains::{CreateDomainRequest, DomainList, UpdateDomainRequest},
         emails::{BatchResponse, EmailList},
+        imports::{ImportList, ImportUpload},
         keys::{CreateKeyRequest, CreatedKey, KeyList},
         login::{LoginRequest, SessionResponse, TokenRequest},
         me::MeResponse,
+        newsletter::UpdateNewsletterRequest,
+        public::{ConfirmView, PublicJoinRequest, PublicNewsletter, UnsubscribeView},
         suppressions::{AddSuppressionRequest, SuppressionList, SuppressionView},
+        tags::{TagList, TagRequest, TagView},
         team::{InviteRequest, RoleRequest},
         webhooks::{CreateWebhookRequest, WebhookList},
     },
+    contacts::{ContactSource, ContactStatus, ContactView, TagRef},
     domains::{Domain, DomainStatus},
     emails::{
         AttachmentInput, EmailStatus, EmailSummary, EmailView, EventView, Priority,
         SendEmailRequest, SendResponse,
     },
+    imports::{ImportRowError, ImportStatus, ImportView},
     keys::{KeyAccess, KeySummary},
+    newsletter::NewsletterSettings,
     safety::SuppressionReason,
     sender::DnsRecord,
     stats::{Counts, Overview},
@@ -193,18 +201,120 @@ fn invites_accept() {}
 #[utoipa::path(get, path = "/stats/overview", tag = "stats", responses((status = 200, body = Overview)))]
 fn stats_overview() {}
 
+#[utoipa::path(get, path = "/contacts", tag = "audience",
+    params(("status" = Option<ContactStatus>, Query), ("tag" = Option<uuid::Uuid>, Query, description = "Tag id"),
+        ("q" = Option<String>, Query, description = "Email or name, case-insensitive"),
+        ("limit" = Option<i64>, Query), ("after" = Option<uuid::Uuid>, Query)),
+    responses((status = 200, body = ContactList)))]
+fn list_contacts() {}
+
+#[utoipa::path(post, path = "/contacts", tag = "audience", request_body = CreateContactRequest,
+    responses((status = 201, body = ContactView), (status = 200, body = ContactView, description = "The address existed: updated"),
+               (status = 400, body = ErrorBody)))]
+fn create_contact() {}
+
+#[utoipa::path(get, path = "/contacts/export", tag = "audience",
+    responses((status = 200, content_type = "text/csv", body = String,
+               description = "email,first_name,last_name,status,tags,created_at, then one column per field name")))]
+fn export_contacts() {}
+
+#[utoipa::path(get, path = "/contacts/{id}", tag = "audience", params(("id" = uuid::Uuid, Path)),
+    responses((status = 200, body = ContactView), (status = 404, body = ErrorBody)))]
+fn get_contact() {}
+
+#[utoipa::path(patch, path = "/contacts/{id}", tag = "audience", params(("id" = uuid::Uuid, Path)), request_body = UpdateContactRequest,
+    responses((status = 200, body = ContactView), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+fn update_contact() {}
+
+#[utoipa::path(delete, path = "/contacts/{id}", tag = "audience", params(("id" = uuid::Uuid, Path)),
+    responses((status = 204), (status = 404, body = ErrorBody)))]
+fn delete_contact() {}
+
+#[utoipa::path(get, path = "/newsletter", tag = "audience", responses((status = 200, body = NewsletterSettings)))]
+fn get_newsletter() {}
+
+#[utoipa::path(patch, path = "/newsletter", tag = "audience", request_body = UpdateNewsletterRequest,
+    responses((status = 200, body = NewsletterSettings), (status = 400, body = ErrorBody),
+               (status = 409, body = ErrorBody), (status = 422, body = ErrorBody)))]
+fn update_newsletter() {}
+
+#[utoipa::path(get, path = "/tags", tag = "audience", responses((status = 200, body = TagList)))]
+fn list_tags() {}
+
+#[utoipa::path(post, path = "/tags", tag = "audience", request_body = TagRequest,
+    responses((status = 201, body = TagView), (status = 400, body = ErrorBody), (status = 409, body = ErrorBody)))]
+fn create_tag() {}
+
+#[utoipa::path(patch, path = "/tags/{id}", tag = "audience", params(("id" = uuid::Uuid, Path)), request_body = TagRequest,
+    responses((status = 200, body = TagView), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+fn rename_tag() {}
+
+#[utoipa::path(delete, path = "/tags/{id}", tag = "audience", params(("id" = uuid::Uuid, Path)),
+    responses((status = 204), (status = 404, body = ErrorBody)))]
+fn delete_tag() {}
+
+#[utoipa::path(get, path = "/public/newsletter/{slug}", tag = "public", security(),
+    params(("slug" = String, Path), ("X-Mailrust-Web" = String, Header)),
+    responses((status = 200, body = PublicNewsletter), (status = 404, body = ErrorBody), (status = 429, body = ErrorBody)))]
+fn public_newsletter() {}
+
+#[utoipa::path(get, path = "/public/unsubscribe/{token}", tag = "public", security(),
+    params(("token" = String, Path), ("X-Mailrust-Web" = String, Header)),
+    responses((status = 200, body = UnsubscribeView)))]
+fn public_unsubscribe_info() {}
+
+#[utoipa::path(post, path = "/public/unsubscribe", tag = "public", security(), request_body = TokenRequest,
+    params(("X-Mailrust-Web" = String, Header)), responses((status = 200, body = UnsubscribeView)))]
+fn public_unsubscribe() {}
+
+#[utoipa::path(post, path = "/public/resubscribe", tag = "public", security(), request_body = TokenRequest,
+    params(("X-Mailrust-Web" = String, Header)), responses((status = 204), (status = 409, body = ErrorBody)))]
+fn public_resubscribe() {}
+
+#[utoipa::path(post, path = "/public/join", tag = "public", security(), request_body = PublicJoinRequest,
+    params(("X-Mailrust-Web" = String, Header)),
+    responses((status = 202, description = "Same answer for every address"), (status = 400, body = ErrorBody),
+               (status = 404, body = ErrorBody), (status = 409, body = ErrorBody), (status = 429, body = ErrorBody)))]
+fn public_join() {}
+
+#[utoipa::path(post, path = "/public/confirm", tag = "public", security(), request_body = TokenRequest,
+    params(("X-Mailrust-Web" = String, Header)),
+    responses((status = 200, body = ConfirmView), (status = 401, body = ErrorBody)))]
+fn public_confirm() {}
+
+#[utoipa::path(post, path = "/contacts/imports", tag = "audience",
+    request_body(content = ImportUpload, content_type = "multipart/form-data"),
+    responses((status = 201, body = ImportView), (status = 400, body = ErrorBody), (status = 413, body = ErrorBody),
+               (status = 422, body = ErrorBody, description = "consent_required, file_too_large, not_utf8, bad_csv, empty_file, no_email_column, too_many_rows")))]
+fn upload_import() {}
+
+#[utoipa::path(get, path = "/contacts/imports", tag = "audience", responses((status = 200, body = ImportList)))]
+fn list_imports() {}
+
+#[utoipa::path(get, path = "/contacts/imports/{id}", tag = "audience", params(("id" = uuid::Uuid, Path)),
+    responses((status = 200, body = ImportView), (status = 404, body = ErrorBody)))]
+fn get_import() {}
+
 #[derive(OpenApi)]
 #[openapi(
     info(title = "Mailrust API", version = "0.1.0", description = "Send transactional email through your own Amazon SES. Auth: `Authorization: Bearer mr_live_…` (API key), or `Bearer mr_sess_…` (dashboard session) plus `X-Mailrust-Account: <account id>`."),
     paths(send_email, send_batch, list_emails, get_email, cancel_email, create_domain, list_domains, get_domain, update_domain,
           delete_domain, verify_domain, create_key, list_keys, delete_key, create_webhook, list_webhooks, delete_webhook,
           list_suppressions, add_suppression, delete_suppression, health, auth_login, auth_verify, me, auth_logout, auth_logout_all,
-          team_list, team_invite, team_cancel_invite, team_set_role, team_remove, invites_accept, stats_overview),
+          team_list, team_invite, team_cancel_invite, team_set_role, team_remove, invites_accept, stats_overview,
+          list_contacts, export_contacts, create_contact, get_contact, update_contact, delete_contact,
+          list_tags, create_tag, rename_tag, delete_tag, get_newsletter, update_newsletter,
+          public_newsletter, public_unsubscribe_info, public_unsubscribe, public_resubscribe,
+          public_join, public_confirm, upload_import, list_imports, get_import),
     components(schemas(SendEmailRequest, AttachmentInput, SendResponse, BatchResponse, EmailView, EmailSummary, EmailList,
         EventView, EmailStatus, Priority, Domain, DomainStatus, DnsRecord, DomainList, CreateDomainRequest, UpdateDomainRequest,
         KeySummary, KeyAccess, CreateKeyRequest, CreatedKey, KeyList, CreateWebhookRequest, WebhookView, WebhookList,
         SuppressionView, SuppressionList, AddSuppressionRequest, SuppressionReason, AccountStatus, LoginRequest, TokenRequest, SessionResponse,
-        MeResponse, MyAccount, User, MemberRole, TeamView, MemberView, InviteView, InviteRequest, RoleRequest, Overview, Counts, ErrorBody, ErrorDetail)),
+        MeResponse, MyAccount, User, MemberRole, TeamView, MemberView, InviteView, InviteRequest, RoleRequest, Overview, Counts, ErrorBody, ErrorDetail,
+        ContactView, ContactList, ContactStatus, ContactSource, TagRef, CreateContactRequest, UpdateContactRequest,
+        TagView, TagList, TagRequest, NewsletterSettings, UpdateNewsletterRequest,
+        PublicNewsletter, UnsubscribeView, PublicJoinRequest, ConfirmView,
+        ImportView, ImportList, ImportStatus, ImportRowError, ImportUpload)),
     modifiers(&BearerAuth),
     security(("bearer" = []))
 )]
@@ -229,6 +339,29 @@ mod tests {
             "/team/invites",
             "/invites/accept",
             "/stats/overview",
+        ] {
+            assert!(doc["paths"][p].is_object(), "missing {p}");
+        }
+    }
+
+    #[test]
+    fn the_document_lists_the_audience_routes() {
+        let doc = serde_json::to_value(super::ApiDoc::openapi()).unwrap();
+        for p in [
+            "/contacts",
+            "/contacts/export",
+            "/contacts/{id}",
+            "/tags",
+            "/tags/{id}",
+            "/newsletter",
+            "/public/newsletter/{slug}",
+            "/public/unsubscribe/{token}",
+            "/public/unsubscribe",
+            "/public/resubscribe",
+            "/public/join",
+            "/public/confirm",
+            "/contacts/imports",
+            "/contacts/imports/{id}",
         ] {
             assert!(doc["paths"][p].is_object(), "missing {p}");
         }

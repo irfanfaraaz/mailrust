@@ -39,6 +39,17 @@ pub struct SessionResponse {
     pub expires_at: DateTime<Utc>,
 }
 
+/// True when the caller is our Next.js app: `X-Mailrust-Web` equals `WEB_SECRET` (constant-time).
+pub(crate) fn from_web(parts: &Parts, state: &AppState) -> bool {
+    match (
+        &state.config.web_secret,
+        parts.headers.get("x-mailrust-web"),
+    ) {
+        (Some(secret), Some(v)) => v.as_bytes().ct_eq(secret.as_bytes()).into(),
+        _ => false,
+    }
+}
+
 /// The browser's IP: from `X-Mailrust-Client-Ip` when the dashboard proves itself with
 /// `X-Mailrust-Web`, else the TCP peer. None in tests without either.
 pub struct ClientIp(pub Option<IpAddr>);
@@ -48,10 +59,7 @@ impl FromRequestParts<AppState> for ClientIp {
 
     async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, ApiError> {
         let h = &parts.headers;
-        let trusted = match (&state.config.web_secret, h.get("x-mailrust-web")) {
-            (Some(secret), Some(v)) => v.as_bytes().ct_eq(secret.as_bytes()).into(),
-            _ => false,
-        };
+        let trusted = from_web(parts, state);
         if trusted
             && let Some(ip) = h
                 .get("x-mailrust-client-ip")

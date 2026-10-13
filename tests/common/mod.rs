@@ -97,6 +97,17 @@ pub async fn call(router: &Router, req: Request<Body>) -> (StatusCode, Value) {
     (status, json)
 }
 
+/// Like `call`, for non-JSON answers (CSV): status, headers and the body as text.
+pub async fn call_raw(
+    router: &Router,
+    req: Request<Body>,
+) -> (StatusCode, axum::http::HeaderMap, String) {
+    let res = router.clone().oneshot(req).await.unwrap();
+    let (status, headers) = (res.status(), res.headers().clone());
+    let bytes = res.into_body().collect().await.unwrap().to_bytes();
+    (status, headers, String::from_utf8(bytes.to_vec()).unwrap())
+}
+
 pub async fn verified_domain(t: &TestApp, name: &str) -> mailrust::domains::Domain {
     let d = mailrust::domains::add(
         &t.state,
@@ -256,4 +267,39 @@ pub fn sreq(
             .insert("x-mailrust-account", a.to_string().parse().unwrap());
     }
     r
+}
+
+pub const WEB_SECRET: &str = "web-secret-for-tests-0123456789abcdef";
+
+/// Lets the router trust `X-Mailrust-Web` (the Next.js app) with `WEB_SECRET`.
+pub fn with_web_secret(t: &mut TestApp) {
+    let mut config = (*t.state.config).clone();
+    config.web_secret = Some(WEB_SECRET.to_string());
+    t.state.config = std::sync::Arc::new(config);
+    t.router = api::router(t.state.clone());
+}
+
+/// A request as the Next.js app sends it for a browser at `ip`.
+pub fn web_req(method: &str, uri: &str, ip: &str, body: Option<Value>) -> Request<Body> {
+    let mut r = req(method, uri, None, body);
+    r.headers_mut()
+        .insert("x-mailrust-web", WEB_SECRET.parse().unwrap());
+    r.headers_mut()
+        .insert("x-mailrust-client-ip", ip.parse().unwrap());
+    r
+}
+
+/// Polls `f` every 20 ms for up to 5 s (for work done after the response, like the join email).
+pub async fn eventually<F, Fut>(mut f: F)
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = bool>,
+{
+    for _ in 0..250 {
+        if f().await {
+            return;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+    panic!("condition not met within 5 s");
 }

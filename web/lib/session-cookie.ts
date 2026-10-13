@@ -4,11 +4,15 @@ export const SESSION_COOKIE = "mr_session";
 /** The engine slides a session to 30 days each time it is used. */
 const SESSION_DAYS = 30;
 
+/** COOKIE_SECURE=false: a production build served over plain http (the e2e run on localhost). */
+export function secureCookies(): boolean {
+  return process.env.NODE_ENV === "production" && process.env.COOKIE_SECURE !== "false";
+}
+
 export function sessionCookieOptions(expires: Date) {
   return {
     httpOnly: true,
-    // COOKIE_SECURE=false: a production build served over plain http (the e2e run on localhost).
-    secure: process.env.NODE_ENV === "production" && process.env.COOKIE_SECURE !== "false",
+    secure: secureCookies(),
     sameSite: "lax" as const,
     path: "/",
     expires,

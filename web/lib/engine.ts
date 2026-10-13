@@ -14,6 +14,7 @@ export class EngineError extends Error {
 
 type Opts = {
   method?: string;
+  /** JSON-encoded, or sent as multipart when it is FormData. */
   body?: unknown;
   /** Account id; sent as X-Mailrust-Account. */
   account?: string;
@@ -33,12 +34,14 @@ async function clientIp(): Promise<string | null> {
   return h.get("x-forwarded-for")?.split(",").at(-1)?.trim() || h.get("x-real-ip");
 }
 
-/** The only place that calls the Rust engine. */
-export async function engine<T>(path: string, opts: Opts = {}): Promise<T> {
+/** The only place that calls the Rust engine. The OK response as is (for CSV and other non-JSON answers). */
+export async function engineResponse(path: string, opts: Opts = {}): Promise<Response> {
   const base = process.env.ENGINE_URL ?? "http://localhost:8080";
   const auth = opts.auth !== false;
+  const form = opts.body instanceof FormData;
   const h: Record<string, string> = { accept: "application/json" };
-  if (opts.body !== undefined) h["content-type"] = "application/json";
+  // FormData sets its own multipart content type with the boundary.
+  if (opts.body !== undefined && !form) h["content-type"] = "application/json";
   if (process.env.WEB_SECRET) {
     h["x-mailrust-web"] = process.env.WEB_SECRET;
     const ip = await clientIp();
@@ -56,7 +59,7 @@ export async function engine<T>(path: string, opts: Opts = {}): Promise<T> {
     res = await fetch(base + path, {
       method: opts.method ?? "GET",
       headers: h,
-      body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+      body: opts.body === undefined ? undefined : form ? (opts.body as FormData) : JSON.stringify(opts.body),
       cache: "no-store",
     });
   } catch {
@@ -68,6 +71,11 @@ export async function engine<T>(path: string, opts: Opts = {}): Promise<T> {
     const b = await res.json().catch(() => null);
     throw new EngineError(res.status, b?.error?.code ?? "error", b?.error?.message ?? res.statusText);
   }
+  return res;
+}
+
+export async function engine<T>(path: string, opts: Opts = {}): Promise<T> {
+  const res = await engineResponse(path, opts);
   const text = await res.text();
   return (text ? JSON.parse(text) : undefined) as T;
 }

@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO contacts (id, account_id, email, first_name, last_name, fields, status, source, subscribed_at)\n           VALUES ($1, $2, $3, $4, $5, $6, 'subscribed', $7, now())\n           ON CONFLICT (account_id, email) DO UPDATE SET\n             first_name = COALESCE(EXCLUDED.first_name, contacts.first_name),\n             last_name = COALESCE(EXCLUDED.last_name, contacts.last_name),\n             fields = contacts.fields || EXCLUDED.fields,\n             updated_at = now()\n           RETURNING id, (xmax = 0) AS \"inserted!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "inserted!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Jsonb",
+        {
+          "Custom": {
+            "name": "contact_source",
+            "kind": {
+              "Enum": [
+                "form",
+                "import",
+                "api",
+                "dashboard"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "7962ff12ef40393b70cc379fedd131a0d051fda4ec78bcad50449fd5d213c380"
+}
