@@ -41,6 +41,8 @@ export async function latestLink(email: string, kind: "login" | "invite" | "conf
 }
 
 export async function loginAs(page: Page, email: string) {
+  // The engine allows 20 login requests per IP an hour; the suite makes more than that.
+  await page.setExtraHTTPHeaders({ "x-forwarded-for": randomIp() });
   await page.goto("/login");
   await page.getByLabel("Email").fill(email);
   const sent = Date.now(); // an older (used) link must not be picked up
@@ -76,6 +78,8 @@ export async function openSignupForm(page: Page, slug: string) {
   await page.getByLabel("From domain").selectOption(SEED.domain);
   await page.getByLabel("Take signups").check();
   await page.getByRole("button", { name: "Save" }).click();
+  // "Open" can already show from an earlier test, so wait for the save itself.
+  await expect(page.getByText("Signup form saved")).toBeVisible();
   await expect(page.getByText("Open: the form takes signups.")).toBeVisible();
 }
 

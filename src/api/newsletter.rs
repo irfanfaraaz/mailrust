@@ -23,9 +23,14 @@ pub struct UpdateNewsletterRequest {
     pub signup_enabled: Option<bool>,
 }
 
-pub(crate) async fn show(State(state): State<AppState>, auth: Auth) -> Result<Json<NewsletterSettings>, ApiError> {
+pub(crate) async fn show(
+    State(state): State<AppState>,
+    auth: Auth,
+) -> Result<Json<NewsletterSettings>, ApiError> {
     auth.require_full()?;
-    let n = newsletter::get(&state.pool, auth.account_id()).await?.ok_or(ApiError::NotFound)?;
+    let n = newsletter::get(&state.pool, auth.account_id())
+        .await?
+        .ok_or(ApiError::NotFound)?;
     Ok(Json(n.settings(&state.pool).await?))
 }
 
@@ -36,7 +41,9 @@ pub(crate) async fn update(
 ) -> Result<Json<NewsletterSettings>, ApiError> {
     auth.require_full()?;
     let account_id = auth.account_id();
-    let n = newsletter::get(&state.pool, account_id).await?.ok_or(ApiError::NotFound)?;
+    let n = newsletter::get(&state.pool, account_id)
+        .await?
+        .ok_or(ApiError::NotFound)?;
     let v = ApiError::Validation;
     let slug = match body.public_slug.as_deref() {
         Some(s) => newsletter::normalize_slug(s).map_err(v)?,
@@ -67,7 +74,9 @@ pub(crate) async fn update(
     };
     let enabled = body.signup_enabled.unwrap_or(n.signup_enabled);
     if enabled && slug.is_none() {
-        return Err(ApiError::Validation("choose a public address before turning signups on".into()));
+        return Err(ApiError::Validation(
+            "choose a public address before turning signups on".into(),
+        ));
     }
     sqlx::query!(
         "UPDATE accounts SET public_slug = $2, newsletter_name = $3, newsletter_from = $4, signup_enabled = $5 WHERE id = $1",
@@ -85,6 +94,8 @@ pub(crate) async fn update(
         }
         _ => e.into(),
     })?;
-    let n = newsletter::get(&state.pool, account_id).await?.ok_or(ApiError::NotFound)?;
+    let n = newsletter::get(&state.pool, account_id)
+        .await?
+        .ok_or(ApiError::NotFound)?;
     Ok(Json(n.settings(&state.pool).await?))
 }

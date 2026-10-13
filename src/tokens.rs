@@ -131,15 +131,29 @@ mod tests {
 
         let mut flipped = raw.clone();
         flipped[20] ^= 1;
-        assert_eq!(verify_unsubscribe(S, &URL_SAFE_NO_PAD.encode(&flipped)), None);
+        assert_eq!(
+            verify_unsubscribe(S, &URL_SAFE_NO_PAD.encode(&flipped)),
+            None
+        );
 
         let mut other_id = raw.clone();
         other_id[..16].copy_from_slice(Uuid::now_v7().as_bytes());
-        assert_eq!(verify_unsubscribe(S, &URL_SAFE_NO_PAD.encode(&other_id)), None, "old MAC on another id");
+        assert_eq!(
+            verify_unsubscribe(S, &URL_SAFE_NO_PAD.encode(&other_id)),
+            None,
+            "old MAC on another id"
+        );
 
         assert_eq!(verify_unsubscribe(S, &t[..t.len() - 2]), None, "truncated");
-        assert_eq!(verify_unsubscribe(b"another-secret-another-secret-xx", &t), None);
-        assert_eq!(verify_unsubscribe(S, &sign(S, id, TokenKind::Open)), None, "a tracking token is not an unsubscribe token");
+        assert_eq!(
+            verify_unsubscribe(b"another-secret-another-secret-xx", &t),
+            None
+        );
+        assert_eq!(
+            verify_unsubscribe(S, &sign(S, id, TokenKind::Open)),
+            None,
+            "a tracking token is not an unsubscribe token"
+        );
         assert_eq!(verify(S, &t), None, "and the other way round");
         assert_eq!(verify_unsubscribe(S, "not a token"), None);
     }

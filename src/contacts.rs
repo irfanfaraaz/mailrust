@@ -16,7 +16,9 @@ pub const MAX_TAG: usize = 50;
 
 pub type Fields = BTreeMap<String, String>;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, sqlx::Type, Serialize, Deserialize, utoipa::ToSchema,
+)]
 #[sqlx(type_name = "contact_status", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum ContactStatus {
@@ -25,7 +27,9 @@ pub enum ContactStatus {
     Unsubscribed,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, sqlx::Type, Serialize, Deserialize, utoipa::ToSchema,
+)]
 #[sqlx(type_name = "contact_source", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum ContactSource {
@@ -63,7 +67,8 @@ pub struct ContactView {
 
 pub fn valid_field_key(k: &str) -> bool {
     (1..=MAX_FIELD_KEY).contains(&k.len())
-        && k.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
+        && k.bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
 }
 
 /// Drops empty values, then checks the count, the keys and the value lengths.
@@ -78,10 +83,14 @@ pub fn clean_fields(fields: Fields) -> Result<Fields, String> {
     }
     for (k, v) in &fields {
         if !valid_field_key(k) {
-            return Err(format!("field name {k:?} must be 1-{MAX_FIELD_KEY} characters of a-z, 0-9 and _"));
+            return Err(format!(
+                "field name {k:?} must be 1-{MAX_FIELD_KEY} characters of a-z, 0-9 and _"
+            ));
         }
         if v.chars().count() > MAX_FIELD_VALUE {
-            return Err(format!("field {k} is longer than {MAX_FIELD_VALUE} characters"));
+            return Err(format!(
+                "field {k} is longer than {MAX_FIELD_VALUE} characters"
+            ));
         }
     }
     Ok(fields)
@@ -91,7 +100,9 @@ pub fn clean_fields(fields: Fields) -> Result<Fields, String> {
 pub fn clean_name(name: Option<&str>) -> Result<Option<String>, String> {
     match name.map(str::trim).filter(|s| !s.is_empty()) {
         None => Ok(None),
-        Some(n) if n.chars().count() > MAX_NAME => Err(format!("names are at most {MAX_NAME} characters")),
+        Some(n) if n.chars().count() > MAX_NAME => {
+            Err(format!("names are at most {MAX_NAME} characters"))
+        }
         Some(n) => Ok(Some(n.to_string())),
     }
 }
@@ -133,7 +144,11 @@ impl ContactInput {
 }
 
 /// Finds or creates each tag by name (ignoring case). Ids come back in the order of `names`.
-pub async fn ensure_tags(conn: &mut PgConnection, account_id: Uuid, names: &[String]) -> sqlx::Result<Vec<Uuid>> {
+pub async fn ensure_tags(
+    conn: &mut PgConnection,
+    account_id: Uuid,
+    names: &[String],
+) -> sqlx::Result<Vec<Uuid>> {
     let mut ids = Vec::with_capacity(names.len());
     for name in names {
         let id = sqlx::query_scalar!(
@@ -152,7 +167,11 @@ pub async fn ensure_tags(conn: &mut PgConnection, account_id: Uuid, names: &[Str
 }
 
 /// Adds tags to a contact. Ids that are gone or belong to another account are skipped.
-pub async fn add_tags(conn: &mut PgConnection, contact_id: Uuid, tag_ids: &[Uuid]) -> sqlx::Result<()> {
+pub async fn add_tags(
+    conn: &mut PgConnection,
+    contact_id: Uuid,
+    tag_ids: &[Uuid],
+) -> sqlx::Result<()> {
     if tag_ids.is_empty() {
         return Ok(());
     }
@@ -170,7 +189,11 @@ pub async fn add_tags(conn: &mut PgConnection, contact_id: Uuid, tag_ids: &[Uuid
 }
 
 /// Makes `tag_ids` the contact's whole tag set.
-pub async fn set_tags(conn: &mut PgConnection, contact_id: Uuid, tag_ids: &[Uuid]) -> sqlx::Result<()> {
+pub async fn set_tags(
+    conn: &mut PgConnection,
+    contact_id: Uuid,
+    tag_ids: &[Uuid],
+) -> sqlx::Result<()> {
     sqlx::query!(
         "DELETE FROM contact_tags WHERE contact_id = $1 AND tag_id <> ALL($2)",
         contact_id,
@@ -260,7 +283,11 @@ pub async fn list(
     after: Option<Uuid>,
     limit: i64,
 ) -> sqlx::Result<Vec<ContactView>> {
-    let pattern = f.q.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(crate::emails::like_pattern);
+    let pattern =
+        f.q.as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(crate::emails::like_pattern);
     sqlx::query_as!(
         ContactView,
         r#"SELECT c.id, c.email, c.first_name, c.last_name,
@@ -322,7 +349,12 @@ pub async fn field_keys(pool: &PgPool, account_id: Uuid) -> sqlx::Result<Vec<Str
 }
 
 /// One export page, oldest first, after `after`.
-pub async fn export_page(pool: &PgPool, account_id: Uuid, after: Option<Uuid>, limit: i64) -> sqlx::Result<Vec<ExportRow>> {
+pub async fn export_page(
+    pool: &PgPool,
+    account_id: Uuid,
+    after: Option<Uuid>,
+    limit: i64,
+) -> sqlx::Result<Vec<ExportRow>> {
     sqlx::query_as!(
         ExportRow,
         r#"SELECT c.id, c.email, c.first_name, c.last_name, c.status AS "status!: ContactStatus",
@@ -340,10 +372,21 @@ pub async fn export_page(pool: &PgPool, account_id: Uuid, after: Option<Uuid>, l
     .await
 }
 
-pub fn export_csv(keys: &[String], rows: &[ExportRow], header: bool) -> Result<Vec<u8>, csv::Error> {
+pub fn export_csv(
+    keys: &[String],
+    rows: &[ExportRow],
+    header: bool,
+) -> Result<Vec<u8>, csv::Error> {
     let mut w = csv::Writer::from_writer(Vec::new());
     if header {
-        let mut h: Vec<&str> = vec!["email", "first_name", "last_name", "status", "tags", "created_at"];
+        let mut h: Vec<&str> = vec![
+            "email",
+            "first_name",
+            "last_name",
+            "status",
+            "tags",
+            "created_at",
+        ];
         h.extend(keys.iter().map(String::as_str));
         w.write_record(&h)?;
     }
@@ -356,7 +399,10 @@ pub fn export_csv(keys: &[String], rows: &[ExportRow], header: bool) -> Result<V
             r.tags.join(";"),
             r.created_at.to_rfc3339(),
         ];
-        rec.extend(keys.iter().map(|k| r.fields.0.get(k).cloned().unwrap_or_default()));
+        rec.extend(
+            keys.iter()
+                .map(|k| r.fields.0.get(k).cloned().unwrap_or_default()),
+        );
         w.write_record(&rec)?;
     }
     w.into_inner().map_err(|e| e.into_error().into())
@@ -376,9 +422,12 @@ mod tests {
             status: ContactStatus::Unsubscribed,
             tags: vec!["a".into(), "b".into()],
             fields: Json([("z".to_string(), "line\nbreak".to_string())].into()),
-            created_at: DateTime::parse_from_rfc3339("2026-10-13T10:00:00Z").unwrap().with_timezone(&Utc),
+            created_at: DateTime::parse_from_rfc3339("2026-10-13T10:00:00Z")
+                .unwrap()
+                .with_timezone(&Utc),
         };
-        let out = String::from_utf8(export_csv(&["y".into(), "z".into()], &[row], true).unwrap()).unwrap();
+        let out = String::from_utf8(export_csv(&["y".into(), "z".into()], &[row], true).unwrap())
+            .unwrap();
         assert_eq!(
             out,
             "email,first_name,last_name,status,tags,created_at,y,z\n\
@@ -427,9 +476,33 @@ mod tests {
 
     #[test]
     fn bad_input_is_refused() {
-        let base = || ContactInput { email: "a@b.com".into(), ..Default::default() };
-        assert!(ContactInput { email: "nope".into(), ..base() }.validate().is_err());
-        assert!(ContactInput { first_name: Some("x".repeat(101)), ..base() }.validate().is_err());
-        assert!(ContactInput { tags: vec!["x".repeat(51)], ..base() }.validate().is_err());
+        let base = || ContactInput {
+            email: "a@b.com".into(),
+            ..Default::default()
+        };
+        assert!(
+            ContactInput {
+                email: "nope".into(),
+                ..base()
+            }
+            .validate()
+            .is_err()
+        );
+        assert!(
+            ContactInput {
+                first_name: Some("x".repeat(101)),
+                ..base()
+            }
+            .validate()
+            .is_err()
+        );
+        assert!(
+            ContactInput {
+                tags: vec!["x".repeat(51)],
+                ..base()
+            }
+            .validate()
+            .is_err()
+        );
     }
 }

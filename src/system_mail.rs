@@ -83,7 +83,9 @@ pub async fn queue(
             return Ok(None);
         }
     };
-    Ok(Some(insert_one(state, account_id, domain.id, &email).await?))
+    Ok(Some(
+        insert_one(state, account_id, domain.id, &email).await?,
+    ))
 }
 
 /// Like `queue`, but from `from` through `account_id` itself (newsletter confirm emails).
@@ -117,7 +119,15 @@ async fn insert_one(
     email: &ValidEmail,
 ) -> anyhow::Result<Uuid> {
     let mut tx = state.pool.begin().await?;
-    let (id, _) = emails::insert(&mut tx, account_id, domain_id, email, None, &mut UrgentCap::default()).await?;
+    let (id, _) = emails::insert(
+        &mut tx,
+        account_id,
+        domain_id,
+        email,
+        None,
+        &mut UrgentCap::default(),
+    )
+    .await?;
     tx.commit().await?;
     Ok(id)
 }

@@ -70,9 +70,17 @@ pub(crate) async fn list(
     auth.require_full()?;
     let Query(q) = q.map_err(|e| ApiError::Validation(e.body_text()))?;
     let limit = q.limit.unwrap_or(50).clamp(1, 100);
-    let f = contacts::ListFilter { status: q.status, tag: q.tag, q: q.q };
+    let f = contacts::ListFilter {
+        status: q.status,
+        tag: q.tag,
+        q: q.q,
+    };
     let data = contacts::list(&state.pool, auth.account_id(), &f, q.after, limit).await?;
-    let next_cursor = if data.len() as i64 == limit { data.last().map(|c| c.id) } else { None };
+    let next_cursor = if data.len() as i64 == limit {
+        data.last().map(|c| c.id)
+    } else {
+        None
+    };
     Ok(Json(ContactList { data, next_cursor }))
 }
 
@@ -91,12 +99,25 @@ pub(crate) async fn create(
     }
     .validate()
     .map_err(ApiError::Validation)?;
-    let source = if auth.member.is_some() { ContactSource::Dashboard } else { ContactSource::Api };
+    let source = if auth.member.is_some() {
+        ContactSource::Dashboard
+    } else {
+        ContactSource::Api
+    };
     let mut tx = state.pool.begin().await?;
     let (id, new) = contacts::save(&mut tx, auth.account_id(), &input, source, None).await?;
     tx.commit().await?;
-    let view = contacts::view(&state.pool, auth.account_id(), id).await?.ok_or(ApiError::NotFound)?;
-    Ok((if new { StatusCode::CREATED } else { StatusCode::OK }, Json(view)))
+    let view = contacts::view(&state.pool, auth.account_id(), id)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+    Ok((
+        if new {
+            StatusCode::CREATED
+        } else {
+            StatusCode::OK
+        },
+        Json(view),
+    ))
 }
 
 pub(crate) async fn get_one(
@@ -105,7 +126,10 @@ pub(crate) async fn get_one(
     Path(id): Path<Uuid>,
 ) -> Result<Json<ContactView>, ApiError> {
     auth.require_full()?;
-    contacts::view(&state.pool, auth.account_id(), id).await?.map(Json).ok_or(ApiError::NotFound)
+    contacts::view(&state.pool, auth.account_id(), id)
+        .await?
+        .map(Json)
+        .ok_or(ApiError::NotFound)
 }
 
 pub(crate) async fn update(
@@ -117,13 +141,34 @@ pub(crate) async fn update(
     auth.require_full()?;
     let account_id = auth.account_id();
     if body.status == Some(ContactStatus::Pending) {
-        return Err(ApiError::Validation("status can be set to subscribed or unsubscribed only".into()));
+        return Err(ApiError::Validation(
+            "status can be set to subscribed or unsubscribed only".into(),
+        ));
     }
     let v = ApiError::Validation;
-    let first = body.first_name.as_deref().map(|n| contacts::clean_name(Some(n))).transpose().map_err(v)?;
-    let last = body.last_name.as_deref().map(|n| contacts::clean_name(Some(n))).transpose().map_err(v)?;
-    let fields = body.fields.map(contacts::clean_fields).transpose().map_err(v)?;
-    let tags = body.tags.as_deref().map(contacts::clean_tags).transpose().map_err(v)?;
+    let first = body
+        .first_name
+        .as_deref()
+        .map(|n| contacts::clean_name(Some(n)))
+        .transpose()
+        .map_err(v)?;
+    let last = body
+        .last_name
+        .as_deref()
+        .map(|n| contacts::clean_name(Some(n)))
+        .transpose()
+        .map_err(v)?;
+    let fields = body
+        .fields
+        .map(contacts::clean_fields)
+        .transpose()
+        .map_err(v)?;
+    let tags = body
+        .tags
+        .as_deref()
+        .map(contacts::clean_tags)
+        .transpose()
+        .map_err(v)?;
     let (set_first, set_last) = (first.is_some(), last.is_some());
 
     let mut tx = state.pool.begin().await?;
@@ -168,7 +213,10 @@ pub(crate) async fn update(
         contacts::set_tags(&mut tx, id, &ids).await?;
     }
     tx.commit().await?;
-    contacts::view(&state.pool, account_id, id).await?.map(Json).ok_or(ApiError::NotFound)
+    contacts::view(&state.pool, account_id, id)
+        .await?
+        .map(Json)
+        .ok_or(ApiError::NotFound)
 }
 
 /// Hard delete (GDPR erase): tag links and confirmations go with it.
@@ -178,16 +226,27 @@ pub(crate) async fn remove(
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
     auth.require_full()?;
-    let r = sqlx::query!("DELETE FROM contacts WHERE id = $1 AND account_id = $2", id, auth.account_id())
-        .execute(&state.pool)
-        .await?;
-    if r.rows_affected() == 1 { Ok(StatusCode::NO_CONTENT) } else { Err(ApiError::NotFound) }
+    let r = sqlx::query!(
+        "DELETE FROM contacts WHERE id = $1 AND account_id = $2",
+        id,
+        auth.account_id()
+    )
+    .execute(&state.pool)
+    .await?;
+    if r.rows_affected() == 1 {
+        Ok(StatusCode::NO_CONTENT)
+    } else {
+        Err(ApiError::NotFound)
+    }
 }
 
 pub const EXPORT_PAGE: i64 = 1000;
 
 /// Streams every contact as CSV, 1,000 rows per query, so a 100k list never sits in memory.
-pub(crate) async fn export(State(state): State<AppState>, auth: Auth) -> Result<Response, ApiError> {
+pub(crate) async fn export(
+    State(state): State<AppState>,
+    auth: Auth,
+) -> Result<Response, ApiError> {
     auth.require_full()?;
     let account_id = auth.account_id();
     let keys = contacts::field_keys(&state.pool, account_id).await?;
@@ -207,15 +266,24 @@ pub(crate) async fn export(State(state): State<AppState>, auth: Auth) -> Result<
             if page.is_empty() {
                 return None;
             }
-            let next = (page.len() as i64 == EXPORT_PAGE).then(|| (page.last().map(|r| r.id), keys.clone()));
-            Some((contacts::export_csv(&keys, &page, false).map_err(std::io::Error::other), next))
+            let next = (page.len() as i64 == EXPORT_PAGE)
+                .then(|| (page.last().map(|r| r.id), keys.clone()));
+            Some((
+                contacts::export_csv(&keys, &page, false).map_err(std::io::Error::other),
+                next,
+            ))
         }
     });
-    let body = Body::from_stream(futures::stream::once(async { Ok::<_, std::io::Error>(first) }).chain(pages));
+    let body = Body::from_stream(
+        futures::stream::once(async { Ok::<_, std::io::Error>(first) }).chain(pages),
+    );
     Ok((
         [
             (header::CONTENT_TYPE, "text/csv; charset=utf-8"),
-            (header::CONTENT_DISPOSITION, "attachment; filename=\"contacts.csv\""),
+            (
+                header::CONTENT_DISPOSITION,
+                "attachment; filename=\"contacts.csv\"",
+            ),
         ],
         body,
     )

@@ -41,7 +41,10 @@ pub struct SessionResponse {
 
 /// True when the caller is our Next.js app: `X-Mailrust-Web` equals `WEB_SECRET` (constant-time).
 pub(crate) fn from_web(parts: &Parts, state: &AppState) -> bool {
-    match (&state.config.web_secret, parts.headers.get("x-mailrust-web")) {
+    match (
+        &state.config.web_secret,
+        parts.headers.get("x-mailrust-web"),
+    ) {
         (Some(secret), Some(v)) => v.as_bytes().ct_eq(secret.as_bytes()).into(),
         _ => false,
     }

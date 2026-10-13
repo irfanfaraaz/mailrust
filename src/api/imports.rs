@@ -41,7 +41,11 @@ pub struct ImportUpload {
 }
 
 fn multipart_error(e: MultipartError) -> ApiError {
-    if e.status() == StatusCode::PAYLOAD_TOO_LARGE { ApiError::TooLarge } else { ApiError::Validation(e.body_text()) }
+    if e.status() == StatusCode::PAYLOAD_TOO_LARGE {
+        ApiError::TooLarge
+    } else {
+        ApiError::Validation(e.body_text())
+    }
 }
 
 pub(crate) async fn upload(
@@ -55,21 +59,32 @@ pub(crate) async fn upload(
     while let Some(field) = mp.next_field().await.map_err(multipart_error)? {
         match field.name() {
             Some("file") => file = Some(field.bytes().await.map_err(multipart_error)?),
-            Some("consent") => consent = field.text().await.map_err(multipart_error)?.trim() == "true",
+            Some("consent") => {
+                consent = field.text().await.map_err(multipart_error)?.trim() == "true"
+            }
             Some("tag_id") => {
                 let t = field.text().await.map_err(multipart_error)?;
                 if !t.trim().is_empty() {
-                    tag_id = Some(t.trim().parse::<Uuid>().map_err(|_| ApiError::Validation("tag_id must be a tag id".into()))?);
+                    tag_id = Some(
+                        t.trim()
+                            .parse::<Uuid>()
+                            .map_err(|_| ApiError::Validation("tag_id must be a tag id".into()))?,
+                    );
                 }
             }
             _ => {}
         }
     }
     if !consent {
-        return Err(ApiError::Unprocessable("consent_required", "confirm that these people agreed to get your emails".into()));
+        return Err(ApiError::Unprocessable(
+            "consent_required",
+            "confirm that these people agreed to get your emails".into(),
+        ));
     }
-    let file = file.ok_or_else(|| ApiError::Validation("add the CSV file in the `file` field".into()))?;
-    let rows_total = imports::check_file(&file).map_err(|(code, m)| ApiError::Unprocessable(code, m))?;
+    let file =
+        file.ok_or_else(|| ApiError::Validation("add the CSV file in the `file` field".into()))?;
+    let rows_total =
+        imports::check_file(&file).map_err(|(code, m)| ApiError::Unprocessable(code, m))?;
     let account_id = auth.account_id();
     if let Some(t) = tag_id {
         let mine = sqlx::query_scalar!(
@@ -96,16 +111,30 @@ pub(crate) async fn upload(
     .execute(&state.pool)
     .await?;
     tracing::info!(import_id = %id, %account_id, rows_total, "import queued");
-    let view = imports::view(&state.pool, account_id, id).await?.ok_or(ApiError::NotFound)?;
+    let view = imports::view(&state.pool, account_id, id)
+        .await?
+        .ok_or(ApiError::NotFound)?;
     Ok((StatusCode::CREATED, Json(view)))
 }
 
-pub(crate) async fn get_one(State(state): State<AppState>, auth: Auth, Path(id): Path<Uuid>) -> Result<Json<ImportView>, ApiError> {
+pub(crate) async fn get_one(
+    State(state): State<AppState>,
+    auth: Auth,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ImportView>, ApiError> {
     auth.require_full()?;
-    imports::view(&state.pool, auth.account_id(), id).await?.map(Json).ok_or(ApiError::NotFound)
+    imports::view(&state.pool, auth.account_id(), id)
+        .await?
+        .map(Json)
+        .ok_or(ApiError::NotFound)
 }
 
-pub(crate) async fn list(State(state): State<AppState>, auth: Auth) -> Result<Json<ImportList>, ApiError> {
+pub(crate) async fn list(
+    State(state): State<AppState>,
+    auth: Auth,
+) -> Result<Json<ImportList>, ApiError> {
     auth.require_full()?;
-    Ok(Json(ImportList { data: imports::list(&state.pool, auth.account_id()).await? }))
+    Ok(Json(ImportList {
+        data: imports::list(&state.pool, auth.account_id()).await?,
+    }))
 }

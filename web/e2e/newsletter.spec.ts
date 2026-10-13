@@ -24,6 +24,7 @@ test("a reader joins, confirms, unsubscribes and comes back", async ({ page, req
   const row = page.getByRole("row", { name: new RegExp(reader) });
   await expect(row.getByText("Subscribed")).toBeVisible();
   await row.getByRole("link", { name: reader }).click();
+  await page.waitForURL(/\/contacts\/[0-9a-f-]{36}$/); // a client navigation: the URL changes after click() returns
   const contactId = page.url().split("/").pop()!;
   const token = unsubscribeToken(contactId);
 

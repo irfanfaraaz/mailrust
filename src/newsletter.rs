@@ -43,7 +43,9 @@ pub struct NewsletterSettings {
 
 impl Newsletter {
     pub fn display_name(&self) -> &str {
-        self.newsletter_name.as_deref().unwrap_or(&self.account_name)
+        self.newsletter_name
+            .as_deref()
+            .unwrap_or(&self.account_name)
     }
 
     /// None when the public form is open.
@@ -61,10 +63,12 @@ impl Newsletter {
             return Ok(Some("the account is paused".into()));
         }
         let domain = from_domain(from);
-        Ok(match domains::find_by_name(pool, self.account_id, domain).await? {
-            Some(d) if d.status == DomainStatus::Verified => None,
-            _ => Some(format!("{domain} is not a verified domain of this account")),
-        })
+        Ok(
+            match domains::find_by_name(pool, self.account_id, domain).await? {
+                Some(d) if d.status == DomainStatus::Verified => None,
+                _ => Some(format!("{domain} is not a verified domain of this account")),
+            },
+        )
     }
 
     pub async fn settings(&self, pool: &PgPool) -> sqlx::Result<NewsletterSettings> {
@@ -109,8 +113,14 @@ pub fn normalize_slug(raw: &str) -> Result<Option<String>, String> {
     if s.is_empty() {
         return Ok(None);
     }
-    let ok = (3..=40).contains(&s.len()) && s.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
-    if ok { Ok(Some(s)) } else { Err("the public address is 3-40 characters of a-z, 0-9 and -".into()) }
+    let ok = (3..=40).contains(&s.len())
+        && s.bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
+    if ok {
+        Ok(Some(s))
+    } else {
+        Err("the public address is 3-40 characters of a-z, 0-9 and -".into())
+    }
 }
 
 pub fn normalize_from(raw: &str) -> Result<Option<String>, String> {
@@ -118,7 +128,9 @@ pub fn normalize_from(raw: &str) -> Result<Option<String>, String> {
     if s.is_empty() {
         return Ok(None);
     }
-    let m: Mailbox = s.parse().map_err(|_| format!("{s} is not a valid address"))?;
+    let m: Mailbox = s
+        .parse()
+        .map_err(|_| format!("{s} is not a valid address"))?;
     Ok(Some(m.email.to_string().to_ascii_lowercase()))
 }
 
@@ -126,10 +138,14 @@ pub fn from_domain(from: &str) -> &str {
     from.rsplit_once('@').map_or("", |(_, d)| d)
 }
 
-
 /// Runs after `POST /public/join` has answered: new or unsubscribed → `pending` + confirm email;
 /// pending → a new email unless one went out in the last 10 minutes; subscribed → nothing.
-pub async fn process_join(state: &AppState, n: &Newsletter, email: &str, first_name: Option<String>) -> anyhow::Result<()> {
+pub async fn process_join(
+    state: &AppState,
+    n: &Newsletter,
+    email: &str,
+    first_name: Option<String>,
+) -> anyhow::Result<()> {
     let Some(from) = n.newsletter_from.as_deref() else {
         return Ok(());
     };
@@ -194,8 +210,14 @@ mod tests {
 
     #[test]
     fn slugs_are_trimmed_lower_cased_and_checked() {
-        assert_eq!(normalize_slug("  Weekly ").unwrap().as_deref(), Some("weekly"));
-        assert_eq!(normalize_slug("shop-news-2").unwrap().as_deref(), Some("shop-news-2"));
+        assert_eq!(
+            normalize_slug("  Weekly ").unwrap().as_deref(),
+            Some("weekly")
+        );
+        assert_eq!(
+            normalize_slug("shop-news-2").unwrap().as_deref(),
+            Some("shop-news-2")
+        );
         assert_eq!(normalize_slug("   ").unwrap(), None);
         for bad in ["ab", "a_b", "a b", "ünï", &"x".repeat(41)] {
             assert!(normalize_slug(bad).is_err(), "{bad}");
@@ -204,8 +226,14 @@ mod tests {
 
     #[test]
     fn from_is_a_bare_lower_case_address() {
-        assert_eq!(normalize_from(" Hello@News.Shop.COM ").unwrap().as_deref(), Some("hello@news.shop.com"));
-        assert_eq!(normalize_from("Shop <hi@shop.com>").unwrap().as_deref(), Some("hi@shop.com"));
+        assert_eq!(
+            normalize_from(" Hello@News.Shop.COM ").unwrap().as_deref(),
+            Some("hello@news.shop.com")
+        );
+        assert_eq!(
+            normalize_from("Shop <hi@shop.com>").unwrap().as_deref(),
+            Some("hi@shop.com")
+        );
         assert_eq!(normalize_from("").unwrap(), None);
         assert!(normalize_from("nope").is_err());
         assert_eq!(from_domain("hi@news.shop.com"), "news.shop.com");

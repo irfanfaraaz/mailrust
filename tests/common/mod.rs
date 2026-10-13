@@ -98,7 +98,10 @@ pub async fn call(router: &Router, req: Request<Body>) -> (StatusCode, Value) {
 }
 
 /// Like `call`, for non-JSON answers (CSV): status, headers and the body as text.
-pub async fn call_raw(router: &Router, req: Request<Body>) -> (StatusCode, axum::http::HeaderMap, String) {
+pub async fn call_raw(
+    router: &Router,
+    req: Request<Body>,
+) -> (StatusCode, axum::http::HeaderMap, String) {
     let res = router.clone().oneshot(req).await.unwrap();
     let (status, headers) = (res.status(), res.headers().clone());
     let bytes = res.into_body().collect().await.unwrap().to_bytes();
@@ -279,8 +282,10 @@ pub fn with_web_secret(t: &mut TestApp) {
 /// A request as the Next.js app sends it for a browser at `ip`.
 pub fn web_req(method: &str, uri: &str, ip: &str, body: Option<Value>) -> Request<Body> {
     let mut r = req(method, uri, None, body);
-    r.headers_mut().insert("x-mailrust-web", WEB_SECRET.parse().unwrap());
-    r.headers_mut().insert("x-mailrust-client-ip", ip.parse().unwrap());
+    r.headers_mut()
+        .insert("x-mailrust-web", WEB_SECRET.parse().unwrap());
+    r.headers_mut()
+        .insert("x-mailrust-client-ip", ip.parse().unwrap());
     r
 }
 

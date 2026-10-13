@@ -1,18 +1,33 @@
 mod common;
 
-use axum::{body::Body, http::{Request, StatusCode}};
+use axum::{
+    body::Body,
+    http::{Request, StatusCode},
+};
 use mailrust::imports;
 use serde_json::json;
 
 const BOUNDARY: &str = "XmailrustBoundaryX";
 const TRUE: &[u8] = b"true";
 
+/// Upload parts, the status expected back, and the error code expected.
+type Case<'a> = (Vec<(&'a str, &'a [u8])>, StatusCode, &'a str);
+
 /// A multipart upload to /contacts/imports with these parts (a part named "file" gets a filename).
 fn upload(key: &str, parts: &[(&str, &[u8])]) -> Request<Body> {
     let mut body = Vec::new();
     for (name, data) in parts {
-        let filename = if *name == "file" { "; filename=\"contacts.csv\"" } else { "" };
-        body.extend_from_slice(format!("--{BOUNDARY}\r\nContent-Disposition: form-data; name=\"{name}\"{filename}\r\n\r\n").as_bytes());
+        let filename = if *name == "file" {
+            "; filename=\"contacts.csv\""
+        } else {
+            ""
+        };
+        body.extend_from_slice(
+            format!(
+                "--{BOUNDARY}\r\nContent-Disposition: form-data; name=\"{name}\"{filename}\r\n\r\n"
+            )
+            .as_bytes(),
+        );
         body.extend_from_slice(data);
         body.extend_from_slice(b"\r\n");
     }
@@ -21,7 +36,10 @@ fn upload(key: &str, parts: &[(&str, &[u8])]) -> Request<Body> {
         .method("POST")
         .uri("/contacts/imports")
         .header("authorization", format!("Bearer {key}"))
-        .header("content-type", format!("multipart/form-data; boundary={BOUNDARY}"))
+        .header(
+            "content-type",
+            format!("multipart/form-data; boundary={BOUNDARY}"),
+        )
         .body(Body::from(body))
         .unwrap()
 }
@@ -29,20 +47,50 @@ fn upload(key: &str, parts: &[(&str, &[u8])]) -> Request<Body> {
 #[sqlx::test]
 async fn a_good_file_is_queued(pool: sqlx::PgPool) {
     let t = common::app(pool.clone()).await;
-    let (s, b) = common::call(&t.router, upload(&t.key, &[("file", &b"email\na@x.com\nb@x.com\n"[..]), ("consent", TRUE)])).await;
+    let (s, b) = common::call(
+        &t.router,
+        upload(
+            &t.key,
+            &[
+                ("file", &b"email\na@x.com\nb@x.com\n"[..]),
+                ("consent", TRUE),
+            ],
+        ),
+    )
+    .await;
     assert_eq!(s, StatusCode::CREATED, "{b}");
     assert_eq!(b["status"], "queued");
     assert_eq!(b["rows_total"], 2);
     let id = b["id"].as_str().unwrap();
-    let (s, one) = common::call(&t.router, common::req("GET", &format!("/contacts/imports/{id}"), Some(&t.key), None)).await;
+    let (s, one) = common::call(
+        &t.router,
+        common::req(
+            "GET",
+            &format!("/contacts/imports/{id}"),
+            Some(&t.key),
+            None,
+        ),
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(one["id"], b["id"]);
-    let (_, list) = common::call(&t.router, common::req("GET", "/contacts/imports", Some(&t.key), None)).await;
+    let (_, list) = common::call(
+        &t.router,
+        common::req("GET", "/contacts/imports", Some(&t.key), None),
+    )
+    .await;
     assert_eq!(list["data"][0]["id"], b["id"]);
 
     let other = mailrust::accounts::create(&pool, "Other").await.unwrap();
-    let key = mailrust::keys::create(&pool, other.id, "k", mailrust::keys::KeyAccess::Full).await.unwrap().token;
-    let (s, _) = common::call(&t.router, common::req("GET", &format!("/contacts/imports/{id}"), Some(&key), None)).await;
+    let key = mailrust::keys::create(&pool, other.id, "k", mailrust::keys::KeyAccess::Full)
+        .await
+        .unwrap()
+        .token;
+    let (s, _) = common::call(
+        &t.router,
+        common::req("GET", &format!("/contacts/imports/{id}"), Some(&key), None),
+    )
+    .await;
     assert_eq!(s, StatusCode::NOT_FOUND);
 }
 
@@ -50,74 +98,179 @@ async fn a_good_file_is_queued(pool: sqlx::PgPool) {
 async fn bad_uploads_are_refused_and_nothing_is_saved(pool: sqlx::PgPool) {
     let t = common::app(pool.clone()).await;
     let ok_file: &[u8] = b"email\na@x.com\n";
-    let cases: Vec<(Vec<(&str, &[u8])>, StatusCode, &str)> = vec![
-        (vec![("file", ok_file)], StatusCode::UNPROCESSABLE_ENTITY, "consent_required"),
-        (vec![("file", ok_file), ("consent", &b"false"[..])], StatusCode::UNPROCESSABLE_ENTITY, "consent_required"),
-        (vec![("consent", TRUE)], StatusCode::BAD_REQUEST, "validation_error"),
-        (vec![("file", &b"name\nAna\n"[..]), ("consent", TRUE)], StatusCode::UNPROCESSABLE_ENTITY, "no_email_column"),
-        (vec![("file", ok_file), ("consent", TRUE), ("tag_id", &b"0190f5a0-0000-7000-8000-000000000000"[..])], StatusCode::BAD_REQUEST, "validation_error"),
+    let cases: Vec<Case> = vec![
+        (
+            vec![("file", ok_file)],
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "consent_required",
+        ),
+        (
+            vec![("file", ok_file), ("consent", &b"false"[..])],
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "consent_required",
+        ),
+        (
+            vec![("consent", TRUE)],
+            StatusCode::BAD_REQUEST,
+            "validation_error",
+        ),
+        (
+            vec![("file", &b"name\nAna\n"[..]), ("consent", TRUE)],
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "no_email_column",
+        ),
+        (
+            vec![
+                ("file", ok_file),
+                ("consent", TRUE),
+                ("tag_id", &b"0190f5a0-0000-7000-8000-000000000000"[..]),
+            ],
+            StatusCode::BAD_REQUEST,
+            "validation_error",
+        ),
     ];
     for (parts, status, code) in cases {
         let (s, b) = common::call(&t.router, upload(&t.key, &parts)).await;
-        assert_eq!((s, b["error"]["code"].as_str().unwrap()), (status, code), "{b}");
+        assert_eq!(
+            (s, b["error"]["code"].as_str().unwrap()),
+            (status, code),
+            "{b}"
+        );
     }
     let big = vec![b' '; mailrust::imports::MAX_FILE_BYTES + 1];
-    let (s, b) = common::call(&t.router, upload(&t.key, &[("file", &big[..]), ("consent", TRUE)])).await;
-    assert_eq!((s, b["error"]["code"].clone()), (StatusCode::UNPROCESSABLE_ENTITY, json!("file_too_large")));
-    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM contact_imports").fetch_one(&pool).await.unwrap();
+    let (s, b) = common::call(
+        &t.router,
+        upload(&t.key, &[("file", &big[..]), ("consent", TRUE)]),
+    )
+    .await;
+    assert_eq!(
+        (s, b["error"]["code"].clone()),
+        (StatusCode::UNPROCESSABLE_ENTITY, json!("file_too_large"))
+    );
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM contact_imports")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
     assert_eq!(n, 0);
 }
 
 #[sqlx::test]
 async fn ten_thousand_rows_import_and_resume_after_a_crash(pool: sqlx::PgPool) {
     let t = common::app(pool.clone()).await;
-    let api = |m: &str, uri: &str, body: Option<serde_json::Value>| common::req(m, uri, Some(&t.key), body);
+    let api = |m: &str, uri: &str, body: Option<serde_json::Value>| {
+        common::req(m, uri, Some(&t.key), body)
+    };
     // An existing unsubscribed contact, a suppressed address and a tag for every row.
-    let (_, keep) = common::call(&t.router, api("POST", "/contacts", Some(json!({"email": "keep@x.com"})))).await;
+    let (_, keep) = common::call(
+        &t.router,
+        api("POST", "/contacts", Some(json!({"email": "keep@x.com"}))),
+    )
+    .await;
     let keep_uri = format!("/contacts/{}", keep["id"].as_str().unwrap());
-    common::call(&t.router, api("PATCH", &keep_uri, Some(json!({"status": "unsubscribed"})))).await;
-    common::call(&t.router, api("POST", "/suppressions", Some(json!({"address": "r0@x.com"})))).await;
-    let (_, tag) = common::call(&t.router, api("POST", "/tags", Some(json!({"name": "Imported"})))).await;
+    common::call(
+        &t.router,
+        api("PATCH", &keep_uri, Some(json!({"status": "unsubscribed"}))),
+    )
+    .await;
+    common::call(
+        &t.router,
+        api(
+            "POST",
+            "/suppressions",
+            Some(json!({"address": "r0@x.com"})),
+        ),
+    )
+    .await;
+    let (_, tag) = common::call(
+        &t.router,
+        api("POST", "/tags", Some(json!({"name": "Imported"}))),
+    )
+    .await;
 
     let mut csv = String::from("email,first_name,plan\n");
     for i in 0..9_998 {
         csv.push_str(&format!("r{i}@x.com,R{i},free\n"));
     }
     csv.push_str("KEEP@X.com,Keeper,pro\nnot-an-email,Bad,free\n");
-    let (s, b) = common::call(&t.router, upload(&t.key, &[
-        ("file", csv.as_bytes()), ("consent", TRUE), ("tag_id", tag["id"].as_str().unwrap().as_bytes()),
-    ])).await;
+    let (s, b) = common::call(
+        &t.router,
+        upload(
+            &t.key,
+            &[
+                ("file", csv.as_bytes()),
+                ("consent", TRUE),
+                ("tag_id", tag["id"].as_str().unwrap().as_bytes()),
+            ],
+        ),
+    )
+    .await;
     assert_eq!(s, StatusCode::CREATED, "{b}");
     assert_eq!(b["rows_total"], 10_000);
     let id = b["id"].as_str().unwrap().to_string();
 
     // One batch, then the worker "dies": its lease runs out and another worker resumes.
     let job = imports::claim(&pool).await.unwrap().expect("claimed");
-    assert!(imports::claim(&pool).await.unwrap().is_none(), "a leased job is not claimed twice");
+    assert!(
+        imports::claim(&pool).await.unwrap().is_none(),
+        "a leased job is not claimed twice"
+    );
     let stale = job.clone();
     imports::run_job(&pool, job, 1).await.unwrap();
-    let done: i32 = sqlx::query_scalar("SELECT rows_done FROM contact_imports").fetch_one(&pool).await.unwrap();
+    let done: i32 = sqlx::query_scalar("SELECT rows_done FROM contact_imports")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
     assert_eq!(done, 1_000);
-    sqlx::query("UPDATE contact_imports SET lease_until = now() - interval '1 second'").execute(&pool).await.unwrap();
+    sqlx::query("UPDATE contact_imports SET lease_until = now() - interval '1 second'")
+        .execute(&pool)
+        .await
+        .unwrap();
     assert!(imports::run_once(&pool).await.unwrap());
     // The old worker wakes up late: it must not apply anything twice.
     imports::run_job(&pool, stale, usize::MAX).await.unwrap();
 
-    let (_, v) = common::call(&t.router, api("GET", &format!("/contacts/imports/{id}"), None)).await;
+    let (_, v) = common::call(
+        &t.router,
+        api("GET", &format!("/contacts/imports/{id}"), None),
+    )
+    .await;
     assert_eq!(v["status"], "done");
-    assert_eq!((v["rows_done"].as_i64(), v["added"].as_i64(), v["updated"].as_i64(), v["skipped"].as_i64()),
-               (Some(10_000), Some(9_998), Some(1), Some(1)), "{v}");
-    assert_eq!(v["errors"], json!([{"line": 10_001, "reason": "not-an-email is not a valid email address"}]));
+    assert_eq!(
+        (
+            v["rows_done"].as_i64(),
+            v["added"].as_i64(),
+            v["updated"].as_i64(),
+            v["skipped"].as_i64()
+        ),
+        (Some(10_000), Some(9_998), Some(1), Some(1)),
+        "{v}"
+    );
+    assert_eq!(
+        v["errors"],
+        json!([{"line": 10_001, "reason": "not-an-email is not a valid email address"}])
+    );
     assert!(v["finished_at"].is_string());
-    let file_gone: bool = sqlx::query_scalar("SELECT file IS NULL FROM contact_imports").fetch_one(&pool).await.unwrap();
+    let file_gone: bool = sqlx::query_scalar("SELECT file IS NULL FROM contact_imports")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
     assert!(file_gone);
 
-    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM contacts").fetch_one(&pool).await.unwrap();
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM contacts")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
     assert_eq!(n, 9_999, "no duplicates after the resume");
-    let tagged: i64 = sqlx::query_scalar("SELECT count(*) FROM contact_tags").fetch_one(&pool).await.unwrap();
+    let tagged: i64 = sqlx::query_scalar("SELECT count(*) FROM contact_tags")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
     assert_eq!(tagged, 9_999);
     let (_, keep) = common::call(&t.router, api("GET", &keep_uri, None)).await;
-    assert_eq!(keep["status"], "unsubscribed", "a re-import never re-subscribes");
+    assert_eq!(
+        keep["status"], "unsubscribed",
+        "a re-import never re-subscribes"
+    );
     assert_eq!(keep["first_name"], "Keeper");
     let (_, r0) = common::call(&t.router, api("GET", "/contacts?q=r0%40x.com", None)).await;
     assert_eq!(r0["data"][0]["blocked"], true);

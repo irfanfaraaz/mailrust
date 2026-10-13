@@ -12,9 +12,9 @@ use crate::{
     api::{
         AppState,
         contacts::{ContactList, CreateContactRequest, UpdateContactRequest},
-        imports::{ImportList, ImportUpload},
         domains::{CreateDomainRequest, DomainList, UpdateDomainRequest},
         emails::{BatchResponse, EmailList},
+        imports::{ImportList, ImportUpload},
         keys::{CreateKeyRequest, CreatedKey, KeyList},
         login::{LoginRequest, SessionResponse, TokenRequest},
         me::MeResponse,
@@ -347,9 +347,22 @@ mod tests {
     #[test]
     fn the_document_lists_the_audience_routes() {
         let doc = serde_json::to_value(super::ApiDoc::openapi()).unwrap();
-        for p in ["/contacts", "/contacts/export", "/contacts/{id}", "/tags", "/tags/{id}", "/newsletter",
-            "/public/newsletter/{slug}", "/public/unsubscribe/{token}", "/public/unsubscribe", "/public/resubscribe",
-            "/public/join", "/public/confirm", "/contacts/imports", "/contacts/imports/{id}"] {
+        for p in [
+            "/contacts",
+            "/contacts/export",
+            "/contacts/{id}",
+            "/tags",
+            "/tags/{id}",
+            "/newsletter",
+            "/public/newsletter/{slug}",
+            "/public/unsubscribe/{token}",
+            "/public/unsubscribe",
+            "/public/resubscribe",
+            "/public/join",
+            "/public/confirm",
+            "/contacts/imports",
+            "/contacts/imports/{id}",
+        ] {
             assert!(doc["paths"][p].is_object(), "missing {p}");
         }
     }

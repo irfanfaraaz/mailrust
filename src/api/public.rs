@@ -15,7 +15,13 @@ use super::{
     json::ApiJson,
     login::{ClientIp, TokenRequest, from_web},
 };
-use crate::{contacts, error::ApiError, keys::hash_token, newsletter::{self, JOIN_PER_IP_PER_HOUR}, tokens, users};
+use crate::{
+    contacts,
+    error::ApiError,
+    keys::hash_token,
+    newsletter::{self, JOIN_PER_IP_PER_HOUR},
+    tokens, users,
+};
 
 pub fn routes() -> Router<AppState> {
     Router::new()
@@ -64,7 +70,10 @@ pub struct UnsubscribeView {
 }
 
 fn not_allowed() -> ApiError {
-    ApiError::Conflict("resubscribe_not_allowed", "this link cannot subscribe you again; use the signup form".into())
+    ApiError::Conflict(
+        "resubscribe_not_allowed",
+        "this link cannot subscribe you again; use the signup form".into(),
+    )
 }
 
 async fn name_of(state: &AppState, contact_id: Uuid) -> sqlx::Result<Option<String>> {
@@ -81,10 +90,18 @@ pub(crate) async fn show_newsletter(
     _: WebCaller,
     Path(slug): Path<String>,
 ) -> Result<Json<PublicNewsletter>, ApiError> {
-    let slug = newsletter::normalize_slug(&slug).ok().flatten().ok_or(ApiError::NotFound)?;
-    let n = newsletter::by_slug(&state.pool, &slug).await?.ok_or(ApiError::NotFound)?;
+    let slug = newsletter::normalize_slug(&slug)
+        .ok()
+        .flatten()
+        .ok_or(ApiError::NotFound)?;
+    let n = newsletter::by_slug(&state.pool, &slug)
+        .await?
+        .ok_or(ApiError::NotFound)?;
     let open = n.closed_reason(&state.pool).await?.is_none();
-    Ok(Json(PublicNewsletter { name: n.display_name().to_string(), open }))
+    Ok(Json(PublicNewsletter {
+        name: n.display_name().to_string(),
+        open,
+    }))
 }
 
 pub(crate) async fn unsubscribe_info(
@@ -106,7 +123,9 @@ pub(crate) async fn unsubscribe(
     ApiJson(body): ApiJson<TokenRequest>,
 ) -> Result<Json<UnsubscribeView>, ApiError> {
     let Some(id) = tokens::verify_unsubscribe(&state.config.tracking_secret, &body.token) else {
-        return Ok(Json(UnsubscribeView { newsletter_name: None }));
+        return Ok(Json(UnsubscribeView {
+            newsletter_name: None,
+        }));
     };
     let r = sqlx::query!(
         "UPDATE contacts SET status = 'unsubscribed', unsubscribed_at = now(), unsubscribed_via_link = true, updated_at = now()
@@ -118,7 +137,9 @@ pub(crate) async fn unsubscribe(
     if r.rows_affected() == 1 {
         tracing::info!(contact_id = %id, "unsubscribed by link");
     }
-    Ok(Json(UnsubscribeView { newsletter_name: name_of(&state, id).await? }))
+    Ok(Json(UnsubscribeView {
+        newsletter_name: name_of(&state, id).await?,
+    }))
 }
 
 /// Works only for a contact that left through this same link.
@@ -127,7 +148,8 @@ pub(crate) async fn resubscribe(
     _: WebCaller,
     ApiJson(body): ApiJson<TokenRequest>,
 ) -> Result<StatusCode, ApiError> {
-    let id = tokens::verify_unsubscribe(&state.config.tracking_secret, &body.token).ok_or_else(not_allowed)?;
+    let id = tokens::verify_unsubscribe(&state.config.tracking_secret, &body.token)
+        .ok_or_else(not_allowed)?;
     let r = sqlx::query!(
         "UPDATE contacts SET status = 'subscribed', subscribed_at = now(), unsubscribed_at = NULL,
                 unsubscribed_via_link = false, updated_at = now()
@@ -136,7 +158,11 @@ pub(crate) async fn resubscribe(
     )
     .execute(&state.pool)
     .await?;
-    if r.rows_affected() == 1 { Ok(StatusCode::NO_CONTENT) } else { Err(not_allowed()) }
+    if r.rows_affected() == 1 {
+        Ok(StatusCode::NO_CONTENT)
+    } else {
+        Err(not_allowed())
+    }
 }
 
 #[derive(Deserialize, utoipa::ToSchema)]
@@ -161,11 +187,20 @@ pub(crate) async fn join(
     ApiJson(body): ApiJson<PublicJoinRequest>,
 ) -> Result<StatusCode, ApiError> {
     let email = users::normalize_email(&body.email).map_err(ApiError::Validation)?;
-    let first_name = contacts::clean_name(body.first_name.as_deref()).map_err(ApiError::Validation)?;
-    let slug = newsletter::normalize_slug(&body.slug).ok().flatten().ok_or(ApiError::NotFound)?;
-    let n = newsletter::by_slug(&state.pool, &slug).await?.ok_or(ApiError::NotFound)?;
+    let first_name =
+        contacts::clean_name(body.first_name.as_deref()).map_err(ApiError::Validation)?;
+    let slug = newsletter::normalize_slug(&body.slug)
+        .ok()
+        .flatten()
+        .ok_or(ApiError::NotFound)?;
+    let n = newsletter::by_slug(&state.pool, &slug)
+        .await?
+        .ok_or(ApiError::NotFound)?;
     if n.closed_reason(&state.pool).await?.is_some() {
-        return Err(ApiError::Conflict("signup_closed", "this newsletter is not taking signups right now".into()));
+        return Err(ApiError::Conflict(
+            "signup_closed",
+            "this newsletter is not taking signups right now".into(),
+        ));
     }
     if !body.website.trim().is_empty() {
         return Ok(StatusCode::ACCEPTED);
@@ -180,9 +215,13 @@ pub(crate) async fn join(
         .fetch_one(&state.pool)
         .await?,
     };
-    sqlx::query!("INSERT INTO join_requests (ip, email) VALUES ($1, $2)", ipnet, email)
-        .execute(&state.pool)
-        .await?;
+    sqlx::query!(
+        "INSERT INTO join_requests (ip, email) VALUES ($1, $2)",
+        ipnet,
+        email
+    )
+    .execute(&state.pool)
+    .await?;
     if by_ip >= JOIN_PER_IP_PER_HOUR {
         tracing::warn!(account_id = %n.account_id, "join limit reached");
         return Ok(StatusCode::ACCEPTED);
@@ -221,6 +260,8 @@ pub(crate) async fn confirm(
     .await?;
     tx.commit().await?;
     tracing::info!(%contact_id, "subscription confirmed");
-    let newsletter_name = name_of(&state, contact_id).await?.ok_or(ApiError::BadToken)?;
+    let newsletter_name = name_of(&state, contact_id)
+        .await?
+        .ok_or(ApiError::BadToken)?;
     Ok(Json(ConfirmView { newsletter_name }))
 }

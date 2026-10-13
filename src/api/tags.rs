@@ -48,7 +48,10 @@ fn exists() -> ApiError {
     ApiError::Conflict("tag_exists", "a tag with this name already exists".into())
 }
 
-pub(crate) async fn list(State(state): State<AppState>, auth: Auth) -> Result<Json<TagList>, ApiError> {
+pub(crate) async fn list(
+    State(state): State<AppState>,
+    auth: Auth,
+) -> Result<Json<TagList>, ApiError> {
     auth.require_full()?;
     let data = sqlx::query_as!(
         TagView,
@@ -113,8 +116,16 @@ pub(crate) async fn remove(
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
     auth.require_full()?;
-    let r = sqlx::query!("DELETE FROM tags WHERE id = $1 AND account_id = $2", id, auth.account_id())
-        .execute(&state.pool)
-        .await?;
-    if r.rows_affected() == 1 { Ok(StatusCode::NO_CONTENT) } else { Err(ApiError::NotFound) }
+    let r = sqlx::query!(
+        "DELETE FROM tags WHERE id = $1 AND account_id = $2",
+        id,
+        auth.account_id()
+    )
+    .execute(&state.pool)
+    .await?;
+    if r.rows_affected() == 1 {
+        Ok(StatusCode::NO_CONTENT)
+    } else {
+        Err(ApiError::NotFound)
+    }
 }

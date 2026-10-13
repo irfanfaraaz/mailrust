@@ -13,9 +13,12 @@ test("a contact is added, edited, unsubscribed and deleted", async ({ page }) =>
   await expect(row.getByText("Subscribed")).toBeVisible();
 
   await row.getByRole("link", { name: email }).click();
-  await page.getByLabel("First name").fill("Ana");
-  await page.getByLabel("Fields").fill("plan=pro");
-  await page.getByRole("button", { name: "Save" }).click();
+  // The list page's add form also has "First name" and stays mounted for a moment: use the edit form.
+  const edit = page.locator("form", { has: page.getByRole("button", { name: "Save" }) });
+  await edit.getByLabel("First name").fill("Ana");
+  await edit.getByLabel("Fields").fill("plan=pro");
+  await edit.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("Contact saved")).toBeVisible();
   await page.reload();
   await expect(page.getByLabel("First name")).toHaveValue("Ana");
   await expect(page.getByLabel("Fields")).toHaveValue("plan=pro");
