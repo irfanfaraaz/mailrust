@@ -27,6 +27,7 @@ use crate::{
     },
     keys::{KeyAccess, KeySummary},
     safety::SuppressionReason,
+    stats::{Counts, Overview},
     sender::DnsRecord,
     team::{InviteView, MemberView, TeamView},
     users::{MemberRole, MyAccount, User},
@@ -73,7 +74,9 @@ fn send_email() {}
 fn send_batch() {}
 
 #[utoipa::path(get, path = "/emails", tag = "emails",
-    params(("status" = Option<EmailStatus>, Query), ("limit" = Option<i64>, Query), ("after" = Option<uuid::Uuid>, Query)),
+    params(("status" = Option<EmailStatus>, Query), ("priority" = Option<Priority>, Query),
+        ("since" = Option<chrono::DateTime<chrono::Utc>>, Query), ("until" = Option<chrono::DateTime<chrono::Utc>>, Query),
+        ("q" = Option<String>, Query), ("limit" = Option<i64>, Query), ("after" = Option<uuid::Uuid>, Query)),
     responses((status = 200, body = EmailList)))]
 fn list_emails() {}
 
@@ -130,7 +133,8 @@ fn list_webhooks() {}
 fn delete_webhook() {}
 
 #[utoipa::path(get, path = "/suppressions", tag = "suppressions",
-    params(("limit" = Option<i64>, Query), ("after" = Option<String>, Query)), responses((status = 200, body = SuppressionList)))]
+    params(("limit" = Option<i64>, Query), ("after" = Option<String>, Query), ("q" = Option<String>, Query)),
+    responses((status = 200, body = SuppressionList)))]
 fn list_suppressions() {}
 
 #[utoipa::path(post, path = "/suppressions", tag = "suppressions", request_body = AddSuppressionRequest,
@@ -186,18 +190,21 @@ fn team_remove() {}
     responses((status = 200, body = SessionResponse), (status = 401, body = ErrorBody)))]
 fn invites_accept() {}
 
+#[utoipa::path(get, path = "/stats/overview", tag = "stats", responses((status = 200, body = Overview)))]
+fn stats_overview() {}
+
 #[derive(OpenApi)]
 #[openapi(
     info(title = "Mailrust API", version = "0.1.0", description = "Send transactional email through your own Amazon SES. Auth: `Authorization: Bearer mr_live_…` (API key), or `Bearer mr_sess_…` (dashboard session) plus `X-Mailrust-Account: <account id>`."),
     paths(send_email, send_batch, list_emails, get_email, cancel_email, create_domain, list_domains, get_domain, update_domain,
           delete_domain, verify_domain, create_key, list_keys, delete_key, create_webhook, list_webhooks, delete_webhook,
           list_suppressions, add_suppression, delete_suppression, health, auth_login, auth_verify, me, auth_logout, auth_logout_all,
-          team_list, team_invite, team_cancel_invite, team_set_role, team_remove, invites_accept),
+          team_list, team_invite, team_cancel_invite, team_set_role, team_remove, invites_accept, stats_overview),
     components(schemas(SendEmailRequest, AttachmentInput, SendResponse, BatchResponse, EmailView, EmailSummary, EmailList,
         EventView, EmailStatus, Priority, Domain, DomainStatus, DnsRecord, DomainList, CreateDomainRequest, UpdateDomainRequest,
         KeySummary, KeyAccess, CreateKeyRequest, CreatedKey, KeyList, CreateWebhookRequest, WebhookView, WebhookList,
         SuppressionView, SuppressionList, AddSuppressionRequest, SuppressionReason, AccountStatus, LoginRequest, TokenRequest, SessionResponse,
-        MeResponse, MyAccount, User, MemberRole, TeamView, MemberView, InviteView, InviteRequest, RoleRequest, ErrorBody, ErrorDetail)),
+        MeResponse, MyAccount, User, MemberRole, TeamView, MemberView, InviteView, InviteRequest, RoleRequest, Overview, Counts, ErrorBody, ErrorDetail)),
     modifiers(&BearerAuth),
     security(("bearer" = []))
 )]

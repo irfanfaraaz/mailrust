@@ -18,6 +18,7 @@ pub mod keys;
 pub mod login;
 pub mod me;
 pub mod ses;
+pub mod stats;
 pub mod suppressions;
 pub mod team;
 pub mod webhooks;
@@ -60,6 +61,7 @@ pub fn router(state: AppState) -> Router {
         .merge(keys::routes())
         .merge(login::routes())
         .merge(me::routes())
+        .merge(stats::routes())
         .merge(suppressions::routes())
         .merge(team::routes())
         .merge(crate::tracking::routes())

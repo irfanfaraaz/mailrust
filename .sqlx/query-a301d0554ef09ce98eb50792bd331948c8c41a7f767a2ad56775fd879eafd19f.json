@@ -1,0 +1,88 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n            COALESCE(SUM(jsonb_array_length(data->'recipients')) FILTER (WHERE type = 'sent' AND created_at > now() - interval '1 day'), 0)::bigint AS \"s1!\",\n            COUNT(*) FILTER (WHERE type = 'delivered'  AND created_at > now() - interval '1 day') AS \"d1!\",\n            COUNT(*) FILTER (WHERE type = 'bounced'    AND created_at > now() - interval '1 day') AS \"b1!\",\n            COUNT(*) FILTER (WHERE type = 'complained' AND created_at > now() - interval '1 day') AS \"c1!\",\n            COUNT(*) FILTER (WHERE type = 'opened'     AND created_at > now() - interval '1 day') AS \"o1!\",\n            COUNT(*) FILTER (WHERE type = 'clicked'    AND created_at > now() - interval '1 day') AS \"k1!\",\n            COALESCE(SUM(jsonb_array_length(data->'recipients')) FILTER (WHERE type = 'sent'), 0)::bigint AS \"s7!\",\n            COUNT(*) FILTER (WHERE type = 'delivered')  AS \"d7!\",\n            COUNT(*) FILTER (WHERE type = 'bounced')    AS \"b7!\",\n            COUNT(*) FILTER (WHERE type = 'complained') AS \"c7!\",\n            COUNT(*) FILTER (WHERE type = 'opened')     AS \"o7!\",\n            COUNT(*) FILTER (WHERE type = 'clicked')    AS \"k7!\"\n           FROM email_events WHERE account_id = $1 AND created_at > now() - interval '7 days'",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "s1!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "d1!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "b1!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "c1!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "o1!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "k1!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 6,
+        "name": "s7!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 7,
+        "name": "d7!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 8,
+        "name": "b7!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 9,
+        "name": "c7!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 10,
+        "name": "o7!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 11,
+        "name": "k7!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "a301d0554ef09ce98eb50792bd331948c8c41a7f767a2ad56775fd879eafd19f"
+}

@@ -560,22 +560,49 @@ pub async fn view(pool: &PgPool, account_id: Uuid, id: Uuid) -> sqlx::Result<Opt
     }))
 }
 
+#[derive(Debug, Default)]
+pub struct ListFilter {
+    pub status: Option<EmailStatus>,
+    pub priority: Option<Priority>,
+    pub since: Option<DateTime<Utc>>,
+    pub until: Option<DateTime<Utc>>,
+    pub q: Option<String>,
+}
+
+/// `%text%` for ILIKE, with `\`, `%` and `_` matched literally.
+pub fn like_pattern(q: &str) -> String {
+    let escaped = q.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
+    format!("%{escaped}%")
+}
+
 pub async fn list(
     pool: &PgPool,
     account_id: Uuid,
-    status: Option<EmailStatus>,
+    filter: &ListFilter,
     after: Option<Uuid>,
     limit: i64,
 ) -> sqlx::Result<Vec<EmailSummary>> {
+    let pattern = filter.q.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(like_pattern);
     let rows = sqlx::query!(
         r#"SELECT id, from_address, to_addresses, subject, status AS "status: EmailStatus", priority AS "priority: Priority", send_at, created_at
            FROM emails
-           WHERE account_id = $1 AND ($2::email_status IS NULL OR status = $2) AND ($3::uuid IS NULL OR id < $3)
+           WHERE account_id = $1
+             AND ($2::email_status IS NULL OR status = $2)
+             AND ($3::uuid IS NULL OR id < $3)
+             AND ($5::email_priority IS NULL OR priority = $5)
+             AND ($6::timestamptz IS NULL OR created_at >= $6)
+             AND ($7::timestamptz IS NULL OR created_at < $7)
+             AND ($8::text IS NULL OR subject ILIKE $8
+                  OR EXISTS (SELECT 1 FROM unnest(to_addresses) AS a WHERE a ILIKE $8))
            ORDER BY id DESC LIMIT $4"#,
         account_id,
-        status as Option<EmailStatus>,
+        filter.status as Option<EmailStatus>,
         after,
-        limit
+        limit,
+        filter.priority as Option<Priority>,
+        filter.since,
+        filter.until,
+        pattern
     )
     .fetch_all(pool)
     .await?;
@@ -599,6 +626,11 @@ pub async fn list(
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn like_patterns_escape_wildcards() {
+        assert_eq!(like_pattern("a%b_c\\d"), "%a\\%b\\_c\\\\d%");
+    }
 
     fn req(v: serde_json::Value) -> SendEmailRequest {
         serde_json::from_value(v).unwrap()

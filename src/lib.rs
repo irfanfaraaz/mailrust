@@ -21,6 +21,7 @@ pub mod render;
 pub mod safety;
 pub mod sender;
 pub mod sessions;
+pub mod stats;
 pub mod system_mail;
 pub mod team;
 pub mod telemetry;

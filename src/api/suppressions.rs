@@ -43,6 +43,7 @@ pub struct AddSuppressionRequest {
 pub struct ListQuery {
     pub limit: Option<i64>,
     pub after: Option<String>,
+    pub q: Option<String>,
 }
 
 pub(crate) async fn list(
@@ -57,10 +58,12 @@ pub(crate) async fn list(
         SuppressionView,
         r#"SELECT address, reason AS "reason: SuppressionReason", created_at FROM suppressions
            WHERE account_id = $1 AND ($2::text IS NULL OR address > $2)
+             AND ($4::text IS NULL OR address ILIKE $4)
            ORDER BY address LIMIT $3"#,
         auth.account_id(),
         q.after,
-        limit
+        limit,
+        q.q.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(crate::emails::like_pattern)
     )
     .fetch_all(&state.pool)
     .await?;

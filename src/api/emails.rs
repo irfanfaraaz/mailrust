@@ -10,7 +10,7 @@ use axum::{
     http::{HeaderMap, StatusCode},
     routing::{get, post},
 };
-use chrono::{Duration, Utc};
+use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
@@ -19,7 +19,7 @@ use super::{AppState, auth::Auth};
 use crate::{
     domains::{self, DomainStatus},
     emails::{
-        self, EmailStatus, EmailSummary, EmailView, MAX_BATCH, Priority, SendEmailRequest,
+        self, EmailStatus, EmailSummary, EmailView, ListFilter, MAX_BATCH, Priority, SendEmailRequest,
         SendResponse, ValidEmail,
     },
     error::ApiError,
@@ -49,6 +49,10 @@ pub struct EmailList {
 #[derive(Deserialize, utoipa::IntoParams)]
 pub struct ListQuery {
     pub status: Option<EmailStatus>,
+    pub priority: Option<Priority>,
+    pub since: Option<DateTime<Utc>>,
+    pub until: Option<DateTime<Utc>>,
+    pub q: Option<String>,
     pub limit: Option<i64>,
     pub after: Option<Uuid>,
 }
@@ -243,7 +247,14 @@ pub(crate) async fn list(
     auth.require_full()?;
     let Query(q) = q.map_err(|e| ApiError::Validation(e.body_text()))?;
     let limit = q.limit.unwrap_or(50).clamp(1, 100);
-    let data = emails::list(&state.pool, auth.account_id(), q.status, q.after, limit).await?;
+    let filter = ListFilter {
+        status: q.status,
+        priority: q.priority,
+        since: q.since,
+        until: q.until,
+        q: q.q,
+    };
+    let data = emails::list(&state.pool, auth.account_id(), &filter, q.after, limit).await?;
     let next_cursor = if data.len() as i64 == limit {
         data.last().map(|e| e.id)
     } else {
