@@ -222,7 +222,21 @@ async fn api(
     uri: &str,
     body: Option<serde_json::Value>,
 ) -> (StatusCode, serde_json::Value) {
-    common::call(&t.router, common::req(method, uri, Some(&t.key), body)).await
+    limited(|| common::req(method, uri, Some(&t.key), body.clone()), t).await
+}
+
+/// Calls again after a 429: the 10/s key limit answers before any handler runs.
+async fn limited(
+    mk: impl Fn() -> axum::http::Request<axum::body::Body>,
+    t: &common::TestApp,
+) -> (StatusCode, serde_json::Value) {
+    loop {
+        let (s, b) = common::call(&t.router, mk()).await;
+        if s != StatusCode::TOO_MANY_REQUESTS {
+            return (s, b);
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
 }
 
 #[sqlx::test]
@@ -446,4 +460,235 @@ async fn the_list_pages_newest_first(pool: sqlx::PgPool) {
     .await;
     assert_eq!(b["data"].as_array().unwrap().len(), 1);
     assert!(b["next_cursor"].is_null());
+}
+
+/// Verified news.shop.com, from + name + postal address set.
+async fn ready(t: &common::TestApp) {
+    common::verified_domain(t, "news.shop.com").await;
+    let (s, b) = api(t, "PATCH", "/newsletter", Some(json!({
+        "newsletter_name": "Shop Weekly", "newsletter_from": "news@news.shop.com", "postal_address": "1 Main St"
+    }))).await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+}
+
+async fn contact(
+    t: &common::TestApp,
+    email: &str,
+    first: Option<&str>,
+    tags: &[&str],
+) -> uuid::Uuid {
+    let (s, b) = api(
+        t,
+        "POST",
+        "/contacts",
+        Some(json!({"email": email, "first_name": first, "tags": tags})),
+    )
+    .await;
+    assert!(s.is_success(), "{b}");
+    b["id"].as_str().unwrap().parse().unwrap()
+}
+
+async fn preview(t: &common::TestApp, id: &str) -> serde_json::Value {
+    let (s, p) = api(t, "POST", &format!("/campaigns/{id}/preview"), None).await;
+    assert_eq!(s, StatusCode::OK, "{p}");
+    p
+}
+
+fn failed(p: &serde_json::Value) -> Vec<String> {
+    p["checks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|c| c["ok"] == false)
+        .map(|c| c["code"].as_str().unwrap().to_string())
+        .collect()
+}
+
+fn greeting(fallback: Option<&str>) -> serde_json::Value {
+    json!({"type": "doc", "content": [{"type": "paragraph", "content": [
+        {"type": "text", "text": "Hi "}, {"type": "mergeTag", "attrs": {"key": "first_name", "fallback": fallback}}
+    ]}]})
+}
+
+#[sqlx::test]
+async fn a_fresh_campaign_fails_every_check_that_applies(pool: sqlx::PgPool) {
+    let t = common::app(pool).await;
+    let (_, c) = api(&t, "POST", "/campaigns", Some(json!({}))).await;
+    let p = preview(&t, c["id"].as_str().unwrap()).await;
+    assert_eq!(
+        failed(&p),
+        vec!["from_address", "subject", "postal_address", "readers"]
+    );
+    assert_eq!(p["readers"], 0);
+    assert_eq!(p["waves"], json!([]));
+    assert_eq!(
+        p["warnings"].as_array().unwrap().len(),
+        1,
+        "preview text is empty"
+    );
+}
+
+#[sqlx::test]
+async fn a_ready_campaign_passes_and_previews_with_fallbacks(pool: sqlx::PgPool) {
+    let t = common::app(pool).await;
+    ready(&t).await;
+    contact(&t, "ann@x.com", Some("Ann"), &[]).await;
+    contact(&t, "bob@x.com", None, &[]).await;
+    let (_, c) = api(
+        &t,
+        "POST",
+        "/campaigns",
+        Some(
+            json!({"subject": "Hello", "preview_text": "News", "blocks": greeting(Some("there"))}),
+        ),
+    )
+    .await;
+    let p = preview(&t, c["id"].as_str().unwrap()).await;
+    assert_eq!(failed(&p), Vec::<String>::new(), "{p}");
+    assert_eq!(
+        (p["readers"].as_i64(), p["missing_first_name"].as_i64()),
+        (Some(2), Some(1))
+    );
+    assert_eq!(p["first_name_fallback"], "there");
+    assert_eq!(p["waves"], json!([2]));
+    assert!(p["html"].as_str().unwrap().contains("Hi there"));
+    assert!(p["text"].as_str().unwrap().contains("Hi there"));
+    assert!(p["size_bytes"].as_u64().unwrap() > 1000);
+    assert_eq!(p["warnings"], json!([]));
+}
+
+#[sqlx::test]
+async fn block_rules_name_what_is_wrong(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    ready(&t).await;
+    contact(&t, "ann@x.com", None, &[]).await;
+    let check = |blocks: serde_json::Value| {
+        let t = &t;
+        async move {
+            let (_, c) = api(
+                t,
+                "POST",
+                "/campaigns",
+                Some(json!({"subject": "S", "blocks": blocks})),
+            )
+            .await;
+            failed(&preview(t, c["id"].as_str().unwrap()).await)
+        }
+    };
+    assert_eq!(check(greeting(None)).await, vec!["merge_tag_fallback"]);
+    let js = json!({"type": "doc", "content": [{"type": "button", "attrs": {"label": "Go", "href": "javascript:alert(1)"}}]});
+    assert_eq!(check(js).await, vec!["bad_blocks"]);
+
+    let u = common::app(pool).await;
+    let (_, img) = common::call(
+        &u.router,
+        common::multipart_file("/images", &u.key, &common::png_1x1(), "image/png"),
+    )
+    .await;
+    let theirs = json!({"type": "doc", "content": [{"type": "image", "attrs": {"id": img["id"], "alt": "x"}}]});
+    assert_eq!(
+        check(theirs).await,
+        vec!["image_not_found"],
+        "another account's image"
+    );
+    let (_, mine) = limited(
+        || common::multipart_file("/images", &t.key, &common::png_1x1(), "image/png"),
+        &t,
+    )
+    .await;
+    let ok = json!({"type": "doc", "content": [{"type": "image", "attrs": {"id": mine["id"], "alt": "x"}}]});
+    assert_eq!(check(ok).await, Vec::<String>::new());
+}
+
+#[sqlx::test]
+async fn a_huge_issue_and_a_paused_account_fail(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    ready(&t).await;
+    contact(&t, "ann@x.com", None, &[]).await;
+    let paras: Vec<_> = (0..1200)
+        .map(
+            |_| json!({"type": "paragraph", "content": [{"type": "text", "text": "x".repeat(90)}]}),
+        )
+        .collect();
+    let (_, c) = api(
+        &t,
+        "POST",
+        "/campaigns",
+        Some(json!({"subject": "Big", "blocks": {"type": "doc", "content": paras}})),
+    )
+    .await;
+    let id = c["id"].as_str().unwrap().to_string();
+    assert_eq!(failed(&preview(&t, &id).await), vec!["size"]);
+    mailrust::accounts::pause(&pool, t.account.id, "test")
+        .await
+        .unwrap();
+    assert_eq!(
+        failed(&preview(&t, &id).await),
+        vec!["size", "account_active"]
+    );
+}
+
+#[sqlx::test]
+async fn the_reader_count_follows_the_tags(pool: sqlx::PgPool) {
+    let t = common::app(pool.clone()).await;
+    ready(&t).await;
+    contact(&t, "a@x.com", None, &["news"]).await;
+    contact(&t, "b@x.com", None, &["news", "skip"]).await;
+    contact(&t, "c@x.com", None, &[]).await;
+    let d = contact(&t, "d@x.com", None, &["news"]).await;
+    api(
+        &t,
+        "PATCH",
+        &format!("/contacts/{d}"),
+        Some(json!({"status": "unsubscribed"})),
+    )
+    .await;
+    contact(&t, "e@x.com", None, &["news"]).await;
+    api(
+        &t,
+        "POST",
+        "/suppressions",
+        Some(json!({"address": "e@x.com"})),
+    )
+    .await;
+    sqlx::query("INSERT INTO contacts (id, account_id, email, status, source) VALUES (gen_random_uuid(), $1, 'p@x.com', 'pending', 'form')")
+        .bind(t.account.id).execute(&pool).await.unwrap();
+
+    let (_, tags) = api(&t, "GET", "/tags", None).await;
+    let tag = |n: &str| {
+        tags["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|x| x["name"] == n)
+            .unwrap()["id"]
+            .clone()
+    };
+    let (_, c) = api(&t, "POST", "/campaigns", Some(json!({"subject": "S"}))).await;
+    let id = c["id"].as_str().unwrap().to_string();
+    assert_eq!(
+        preview(&t, &id).await["readers"],
+        3,
+        "a, b, c: not unsubscribed, suppressed or pending"
+    );
+    api(
+        &t,
+        "PATCH",
+        &format!("/campaigns/{id}"),
+        Some(json!({"include_tags": [tag("news")]})),
+    )
+    .await;
+    assert_eq!(preview(&t, &id).await["readers"], 2);
+    api(
+        &t,
+        "PATCH",
+        &format!("/campaigns/{id}"),
+        Some(json!({"exclude_tags": [tag("skip")]})),
+    )
+    .await;
+    assert_eq!(
+        preview(&t, &id).await["readers"],
+        1,
+        "skip wins over include"
+    );
 }

@@ -5,6 +5,9 @@ use serde::{Deserialize, Serialize};
 use sqlx::{PgConnection, PgPool, types::Json};
 use uuid::Uuid;
 
+pub mod checks;
+pub mod plan;
+
 pub const EMPTY_DOC: &str = r#"{"type":"doc","content":[]}"#;
 
 #[derive(

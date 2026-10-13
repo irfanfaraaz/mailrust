@@ -2,7 +2,7 @@ use axum::{
     Json, Router,
     extract::{Path, Query, State, rejection::QueryRejection},
     http::StatusCode,
-    routing::get,
+    routing::{get, post},
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -19,6 +19,7 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/campaigns", get(list).post(create))
         .route("/campaigns/{id}", get(get_one).patch(update).delete(remove))
+        .route("/campaigns/{id}/preview", post(preview))
 }
 
 /// Create and edit. Absent fields stay as they are; `preview_text: ""` clears it.
@@ -229,4 +230,67 @@ pub(crate) async fn remove(
     .execute(&state.pool)
     .await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Serialize, utoipa::ToSchema)]
+pub struct CampaignPreview {
+    /// The email as a reader without merge values sees it (fallbacks), footer included.
+    pub html: String,
+    pub text: String,
+    /// The largest copy any reader can get, in bytes (None until the body is a valid document).
+    pub size_bytes: Option<usize>,
+    pub checks: Vec<crate::campaigns::checks::Check>,
+    pub warnings: Vec<String>,
+    pub readers: i64,
+    pub missing_first_name: i64,
+    /// What readers without a first name see, when the issue greets by name.
+    pub first_name_fallback: Option<String>,
+    /// Readers per wave.
+    pub waves: Vec<usize>,
+}
+
+pub(crate) async fn preview(
+    State(state): State<AppState>,
+    auth: Auth,
+    Path(id): Path<Uuid>,
+) -> Result<Json<CampaignPreview>, ApiError> {
+    auth.require_full()?;
+    let c = load(&state, &auth, id).await?;
+    let r = campaigns::checks::run(&state, &c).await?;
+    let (html, text, fallback, size_bytes) = match &r.doc {
+        Some(doc) => {
+            let issue = crate::render::campaign::Issue {
+                subject: &c.subject,
+                preview_text: c.preview_text.as_deref(),
+                newsletter_name: &r.newsletter_name,
+                postal_address: &r.postal_address,
+                doc,
+            };
+            let p = crate::render::campaign::email(
+                &issue,
+                &Default::default(),
+                &state.config.web_base(),
+                Some("#"),
+            );
+            let size = crate::render::campaign::email_size(
+                &issue,
+                &state.config.web_base(),
+                &state.config.tracking_secret,
+            )
+            .ok();
+            (p.html, p.text, blocks::first_name_fallback(doc), size)
+        }
+        None => (String::new(), String::new(), None, None),
+    };
+    Ok(Json(CampaignPreview {
+        html,
+        text,
+        size_bytes,
+        waves: campaigns::plan::wave_sizes(r.audience.readers as usize),
+        readers: r.audience.readers,
+        missing_first_name: r.audience.missing_first_name,
+        first_name_fallback: fallback,
+        checks: r.checks,
+        warnings: r.warnings,
+    }))
 }

@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT count(*) AS \"readers!\",\n                  count(*) FILTER (WHERE COALESCE(btrim(c.first_name), '') = '') AS \"missing!\"\n           FROM contacts c\n           WHERE c.account_id = $1 AND c.status = 'subscribed'\n             AND (cardinality($2::uuid[]) = 0\n                  OR EXISTS (SELECT 1 FROM contact_tags x WHERE x.contact_id = c.id AND x.tag_id = ANY($2)))\n             AND NOT EXISTS (SELECT 1 FROM contact_tags x WHERE x.contact_id = c.id AND x.tag_id = ANY($3))\n             AND NOT EXISTS (SELECT 1 FROM suppressions s WHERE s.account_id = c.account_id AND s.address = c.email)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "readers!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "missing!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray",
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "4f821a5e5dd79d77e38e8ed1563e252a8b9e2a22ba42283f3fae31a6ddb8a295"
+}

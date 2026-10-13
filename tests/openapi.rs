@@ -28,6 +28,7 @@ async fn openapi_lists_every_public_route(pool: sqlx::PgPool) {
         "/public/img/{id}",
         "/campaigns",
         "/campaigns/{id}",
+        "/campaigns/{id}/preview",
     ] {
         assert!(paths.contains_key(p), "missing {p}");
     }
