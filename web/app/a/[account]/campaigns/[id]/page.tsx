@@ -4,7 +4,10 @@ import { Loading } from "@/components/loading";
 import { CampaignStatusBadge } from "@/components/status-badge";
 import { currentAccount } from "@/lib/account";
 import { engine, type Schemas } from "@/lib/engine";
+import { utc } from "@/lib/format";
 import { CampaignEditor } from "./editor/campaign-editor";
+import { Report } from "./report";
+import { SendDialog } from "./send-dialog";
 
 export const metadata = { title: "Campaign" };
 
@@ -23,11 +26,15 @@ export default function CampaignPage(props: Props) {
 async function Body({ params }: Props) {
   const { account, id } = await params;
   const nextPath = `/a/${account}/campaigns/${id}`;
-  const [c, { me }] = await Promise.all([
+  const [c, { me }, tags, newsletter] = await Promise.all([
     engine<Schemas["Campaign"]>(`/campaigns/${id}`, { account, nextPath }),
     currentAccount(account, nextPath),
+    engine<Schemas["TagList"]>("/tags", { account, nextPath }),
+    engine<Schemas["NewsletterSettings"]>("/newsletter", { account, nextPath }),
   ]);
   const editable = c.status === "draft" || c.status === "scheduled";
+  const report = editable ? null : await engine<Schemas["CampaignReport"]>(`/campaigns/${id}/report`, { account, nextPath });
+  const archiveUrl = c.status === "sent" && !c.archive_hidden && newsletter.public_slug && c.archive_slug ? `/p/${newsletter.public_slug}/${c.archive_slug}` : null;
   return (
     <>
       <BackLink href={`/a/${account}/campaigns`}>Campaigns</BackLink>
@@ -35,10 +42,13 @@ async function Body({ params }: Props) {
         <h1 className="text-2xl font-semibold">{c.subject || "Untitled draft"}</h1>
         <CampaignStatusBadge status={c.status} />
       </div>
+      {c.status === "scheduled" && c.send_at && <p role="status" className="text-sm">Scheduled for {utc(c.send_at)}. Editing it puts it back to draft.</p>}
       {editable ? (
-        <CampaignEditor account={account} campaign={c} me={me.user.email} />
+        <CampaignEditor account={account} campaign={c} me={me.user.email}>
+          <SendDialog account={account} campaign={c} tags={tags.data} />
+        </CampaignEditor>
       ) : (
-        <p className="text-sm text-muted-foreground">This issue is {c.status}; it can no longer be edited.</p>
+        <Report account={account} campaign={c} report={report!} archiveUrl={archiveUrl} />
       )}
     </>
   );

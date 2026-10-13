@@ -55,3 +55,8 @@ export async function changeStatus(account: string, id: string, action: "send" |
   revalidatePath(`/a/${account}/campaigns/${id}`);
   return r;
 }
+
+export async function setArchiveHidden(account: string, id: string, hidden: boolean) {
+  await engine(`/campaigns/${id}`, { method: "PATCH", account, body: { archive_hidden: hidden } });
+  revalidatePath(`/a/${account}/campaigns/${id}`);
+}
