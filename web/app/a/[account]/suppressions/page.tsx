@@ -67,6 +67,7 @@ async function List({ params, searchParams }: Props) {
                   title={`Unblock ${s.address}?`}
                   description="Mailrust will send to this address again. If it bounced or complained before, sending to it can raise your bounce or complaint rate."
                   confirm="Unblock address"
+                  done="Address unblocked"
                   action={removeSuppression.bind(null, account, s.address)}
                 />
               </TableCell>

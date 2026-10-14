@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { ActionForm } from "@/components/action-form";
 import { EmptyState } from "@/components/empty-state";
 import { Loading } from "@/components/loading";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -66,9 +67,9 @@ async function List({ params }: Props) {
                       </DialogHeader>
                       <DialogFooter>
                         <DialogClose className={buttonVariants({ variant: "outline" })}>Cancel</DialogClose>
-                        <form action={deleteWebhook.bind(null, account, h.id)}>
+                        <ActionForm action={deleteWebhook.bind(null, account, h.id)} done="Webhook deleted">
                           <button type="submit" className={buttonVariants({ variant: "destructive" })}>Delete webhook</button>
-                        </form>
+                        </ActionForm>
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>

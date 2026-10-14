@@ -56,6 +56,7 @@ async function List({ params }: Props) {
                     title={`Delete the tag ${t.name}?`}
                     description="The tag comes off every contact. The contacts stay."
                     confirm="Delete tag"
+                    done="Tag deleted"
                     action={deleteTag.bind(null, account, t.id)}
                   />
                 </TableCell>

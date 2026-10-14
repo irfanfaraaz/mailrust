@@ -50,6 +50,7 @@ async function Body({ params }: Props) {
               description="The draft is erased for good. This cannot be undone."
               confirm="Delete draft"
               dismiss="Keep it"
+              done="Draft deleted"
               action={deleteDraft.bind(null, account, c.id)}
             />
           </div>

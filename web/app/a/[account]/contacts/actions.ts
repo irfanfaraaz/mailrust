@@ -1,6 +1,5 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { engine, EngineError } from "@/lib/engine";
 import { parseFields } from "@/lib/fields";
 
@@ -52,5 +51,5 @@ export async function unsubscribeContact(account: string, id: string) {
 export async function deleteContact(account: string, id: string) {
   await engine(`/contacts/${id}`, { method: "DELETE", account });
   revalidatePath(`/a/${account}/contacts`);
-  redirect(`/a/${account}/contacts`);
+  return { goto: `/a/${account}/contacts` }; // the client goes there after its toast; a server redirect would drop the toast
 }

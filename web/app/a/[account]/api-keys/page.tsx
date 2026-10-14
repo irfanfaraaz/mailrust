@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { ActionForm } from "@/components/action-form";
 import { EmptyState } from "@/components/empty-state";
 import { Loading } from "@/components/loading";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -68,9 +69,9 @@ async function Keys({ params }: Props) {
                       </DialogHeader>
                       <DialogFooter>
                         <DialogClose className={buttonVariants({ variant: "outline" })}>Cancel</DialogClose>
-                        <form action={deleteKey.bind(null, account, k.id)}>
+                        <ActionForm action={deleteKey.bind(null, account, k.id)} done="Key deleted">
                           <button type="submit" className={buttonVariants({ variant: "destructive" })}>Delete key</button>
-                        </form>
+                        </ActionForm>
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>

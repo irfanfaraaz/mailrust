@@ -1,6 +1,5 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { engine, EngineError, type Schemas } from "@/lib/engine";
 
 type Result = { error?: string };
@@ -66,5 +65,5 @@ export async function setArchiveHidden(account: string, id: string, hidden: bool
 export async function deleteDraft(account: string, id: string) {
   await engine(`/campaigns/${id}`, { method: "DELETE", account });
   revalidatePath(`/a/${account}/campaigns`);
-  redirect(`/a/${account}/campaigns`);
+  return { goto: `/a/${account}/campaigns` }; // the client goes there after its toast; a server redirect would drop the toast
 }

@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { buttonVariants } from "@/components/ui/button";
@@ -22,6 +23,7 @@ export function TestDialog({ account, id, me, beforeSend }: { account: string; i
             await beforeSend();
             const r = await sendTest(account, id, to);
             setState(r.error ? { error: r.error } : { done: true });
+            if (!r.error) toast.success("Test sent");
           }}
         >
           <label className="flex flex-col gap-1">Send to

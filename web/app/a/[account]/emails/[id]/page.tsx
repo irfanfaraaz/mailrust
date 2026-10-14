@@ -41,6 +41,7 @@ async function Detail({ params }: Props) {
           description="It will not be sent. This cannot be undone."
           dismiss="Keep it"
           confirm="Cancel email"
+          done="Email cancelled"
           action={cancelEmail.bind(null, account, id)}
         />
       )}
@@ -60,8 +61,12 @@ async function Detail({ params }: Props) {
       </section>
       <section className="flex flex-col gap-2">
         <h2 className="text-lg font-medium">Body</h2>
-        {/* Customer content: show text only, never render e.html. */}
-        <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border p-3 text-sm">{e.text ?? (e.html ? "(HTML only)" : "(Hidden: login and invite emails hold one-time links.)")}</pre>
+        {e.html ? (
+          // Customer HTML: never add allow-scripts. Tracking is added at send time, so viewing here counts no open.
+          <iframe title="Email body" sandbox="allow-same-origin" srcDoc={e.html} height={560} className="w-full rounded-lg border bg-white" />
+        ) : (
+          <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border p-3 text-sm">{e.text ?? "(Hidden: login and invite emails hold one-time links.)"}</pre>
+        )}
       </section>
     </article>
   );

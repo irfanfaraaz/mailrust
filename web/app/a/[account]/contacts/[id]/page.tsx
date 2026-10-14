@@ -53,6 +53,7 @@ async function Detail({ params }: Props) {
             title={`Unsubscribe ${c.email}?`}
             description="They stop getting the newsletter. Only they can subscribe again, through the signup form or their own unsubscribe link."
             confirm="Unsubscribe contact"
+            done="Contact unsubscribed"
             action={unsubscribeContact.bind(null, account, c.id)}
           />
         )}
@@ -61,6 +62,7 @@ async function Detail({ params }: Props) {
           title={`Delete ${c.email}?`}
           description="Erases the contact, their tags and fields for good. If they unsubscribed, a later import can add them back as subscribed; unsubscribe instead to keep their choice."
           confirm="Delete contact"
+          done="Contact deleted"
           action={deleteContact.bind(null, account, c.id)}
         />
       </div>
