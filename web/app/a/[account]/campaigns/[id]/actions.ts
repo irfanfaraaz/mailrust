@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { engine, EngineError, type Schemas } from "@/lib/engine";
 
 type Result = { error?: string };
@@ -59,4 +60,11 @@ export async function changeStatus(account: string, id: string, action: "send" |
 export async function setArchiveHidden(account: string, id: string, hidden: boolean) {
   await engine(`/campaigns/${id}`, { method: "PATCH", account, body: { archive_hidden: hidden } });
   revalidatePath(`/a/${account}/campaigns/${id}`);
+}
+
+/** Only a draft can be deleted (the engine says so for any other status). */
+export async function deleteDraft(account: string, id: string) {
+  await engine(`/campaigns/${id}`, { method: "DELETE", account });
+  revalidatePath(`/a/${account}/campaigns`);
+  redirect(`/a/${account}/campaigns`);
 }
