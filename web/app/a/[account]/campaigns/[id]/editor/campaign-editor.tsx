@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { Schemas } from "@/lib/engine";
+import { plain } from "@/lib/plain";
 import { previewCampaign, saveDraft } from "../actions";
 import { SendDialog } from "../send-dialog";
 import { CampaignImage, EmailButton, MergeTag } from "./extensions";
@@ -57,7 +58,7 @@ export function CampaignEditor({ account, campaign, me, tags }: Props) {
   const flush = useCallback(async () => {
     if (!dirty.current) return;
     setSave("saving");
-    const r = await saveDraft(account, campaign.id, { subject, preview_text: previewText, blocks: doc });
+    const r = await saveDraft(account, campaign.id, { subject, preview_text: previewText, blocks: plain(doc) });
     setSave(r.error ? { error: r.error } : "saved");
     dirty.current = Boolean(r.error);
     if (!r.error && campaign.status === "scheduled") router.refresh(); // the badge follows the engine
