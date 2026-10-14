@@ -12,9 +12,9 @@ import { createCampaign } from "./campaigns/actions";
 
 type Props = { children: React.ReactNode; params: Promise<{ account: string }> };
 
-const grid = "grid min-h-dvh md:grid-cols-[248px_1fr]";
+const grid = "grid min-h-dvh grid-cols-[minmax(0,1fr)] md:grid-cols-[248px_minmax(0,1fr)]";
 // md+: the sidebar stays put while the page scrolls, so sending health is always in view.
-const aside = "flex flex-col border-b bg-sidebar md:sticky md:top-0 md:h-dvh md:overflow-y-auto md:border-b-0 md:border-r";
+const aside = "flex min-w-0 flex-col border-b bg-sidebar md:sticky md:top-0 md:h-dvh md:overflow-y-auto md:border-b-0 md:border-r";
 const main = "px-4 py-6 md:px-10 md:py-9";
 
 export default function AccountLayout(props: Props) {

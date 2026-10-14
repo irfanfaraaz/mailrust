@@ -87,7 +87,7 @@ async function Stats({ params }: Props) {
   const rows: [string, keyof Schemas["Counts"]][] = [["Sent", "sent"], ["Delivered", "delivered"], ["Bounced", "bounced"], ["Complained", "complained"], ["Opened", "opened"], ["Clicked", "clicked"]];
   return (
     <>
-      <section aria-label="Last 7 days" className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+      <section aria-label="Last 7 days" className="grid grid-cols-2 gap-4 md:gap-5 xl:grid-cols-4">
         <Stat label="Sent" value={num.format(w.sent)} note={`${num.format(o.last_24h.sent)} in the last 24 h`} />
         <Stat label="Delivered" value={share(w.delivered, w.sent)} note={`${num.format(w.delivered)} emails reached the inbox`} />
         <Stat label="Open rate" value={share(w.opened, w.delivered)} note={`${num.format(w.opened)} opens`} />
