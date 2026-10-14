@@ -1,16 +1,17 @@
 "use client";
 import { TriangleAlertIcon } from "lucide-react";
 import { useRef, useState } from "react";
+import { CopiedHint } from "@/components/copied-hint";
 import { Button } from "@/components/ui/button";
 
 export function CopyOnce({ label, value }: { label: string; value: string }) {
   const ref = useRef<HTMLElement>(null);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState(0);
   const noun = label.toLowerCase().includes("secret") ? "secret" : "key";
   async function copy() {
     try {
       await navigator.clipboard.writeText(value);
-      setCopied(true);
+      setCopied((n) => n + 1);
     } catch {
       const r = document.createRange();
       if (ref.current) { r.selectNodeContents(ref.current); getSelection()?.removeAllRanges(); getSelection()?.addRange(r); }
@@ -24,7 +25,10 @@ export function CopyOnce({ label, value }: { label: string; value: string }) {
         <TriangleAlertIcon aria-hidden className="mt-0.5 size-4 shrink-0" />
         <span>You will not see this {noun} again. Copy it now and store it somewhere safe.</span>
       </p>
-      <Button type="button" className="self-start" onClick={copy}>{copied ? "Copied" : `Copy ${noun}`}</Button>
+      <span className="relative self-start">
+        <Button type="button" onClick={copy}>{copied ? "Copied" : `Copy ${noun}`}</Button>
+        <CopiedHint n={copied} />
+      </span>
     </div>
   );
 }

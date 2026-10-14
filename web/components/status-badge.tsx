@@ -1,19 +1,7 @@
 import type { Schemas } from "@/lib/engine";
+import { Stamp, type Tone } from "./stamp";
 
-export type Tone = "good" | "wait" | "bad" | "info" | "quiet";
-
-// One colour language for every status: green done, amber waiting or delayed, red needs attention, navy in progress.
-const tones: Record<Tone, string> = {
-  good: "text-good",
-  wait: "text-wait",
-  bad: "text-destructive",
-  info: "text-primary",
-  quiet: "text-muted-foreground",
-};
-
-/** A rubber stamp: mono uppercase, double rule, a slight tilt. */
-const stamp =
-  "inline-flex w-fit shrink-0 -rotate-2 items-center rounded-[2px] border-[1.5px] border-current px-1.5 py-px font-mono text-[0.6875rem] font-bold tracking-[0.08em] whitespace-nowrap uppercase outline-1 outline-offset-[1.5px] outline-current/40";
+export { Stamp, type Tone };
 
 const emailTone: Record<string, Tone> = {
   delivered: "good",
@@ -34,11 +22,6 @@ const domainTone: Record<Schemas["DomainStatus"], Tone> = { verified: "good", pe
 
 /** "delivery_delayed" -> "Delivery delayed" */
 export const statusLabel = (s: string) => (s.charAt(0).toUpperCase() + s.slice(1)).replace(/_/g, " ");
-
-/** A rubber-stamp label in one of the status tones. */
-export function Stamp({ tone, title, children }: { tone: Tone; title?: string; children: React.ReactNode }) {
-  return <span className={`${stamp} ${tones[tone]}`} title={title}>{children}</span>;
-}
 
 function StatusBadge({ tone, status, title }: { tone: Tone; status: string; title?: string }) {
   return <Stamp tone={tone} title={title}>{statusLabel(status)}</Stamp>;

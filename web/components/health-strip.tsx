@@ -17,7 +17,7 @@ export async function HealthStrip({ accountId }: { accountId: string }) {
         <span className="tabular-nums text-xs text-muted-foreground">{pct(o.bounce_rate)} bounce</span>
       </span>
       <span aria-hidden className="h-1.5 overflow-hidden rounded-full bg-foreground/10">
-        <span className={cn("block h-full rounded-full", tone)} style={{ width: `${Math.max(share * 100, 2)}%` }} />
+        <span className={cn("meter-fill block h-full rounded-full", tone)} style={{ width: `${Math.max(share * 100, 2)}%` }} />
       </span>
       <span className="flex justify-between text-xs text-muted-foreground">
         <span>Last 7 days</span>

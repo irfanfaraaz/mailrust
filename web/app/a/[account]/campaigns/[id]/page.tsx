@@ -9,6 +9,7 @@ import { engine, type Schemas } from "@/lib/engine";
 import { deleteDraft } from "./actions";
 import { CampaignEditor } from "./editor/campaign-editor";
 import { Report } from "./report";
+import { SentCelebration } from "./sent-celebration";
 import { LocalTime } from "@/components/local-time";
 
 export const metadata = { title: "Campaign" };
@@ -67,6 +68,7 @@ async function Body({ params }: Props) {
       ) : (
         <Report account={account} campaign={c} report={report!} archiveUrl={archiveUrl} />
       )}
+      <SentCelebration campaignId={c.id} />
     </>
   );
 }

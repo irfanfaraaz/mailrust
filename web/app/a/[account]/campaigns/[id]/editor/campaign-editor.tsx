@@ -18,7 +18,7 @@ import { SlashCommand, type DialogKind } from "./slash-menu";
 import { TestDialog } from "./test-dialog";
 
 type Props = { account: string; campaign: Schemas["Campaign"]; me: string; tags: Schemas["TagView"][] };
-type SaveState = "idle" | "saved" | "saving" | { error: string };
+type SaveState = "idle" | "saved" | "settled" | "saving" | { error: string };
 
 /** A new issue is a doc with no blocks; give it one empty paragraph so the "type /" hint shows. */
 const startDoc = (blocks: unknown): JSONContent => {
@@ -84,6 +84,13 @@ export function CampaignEditor({ account, campaign, me, tags }: Props) {
     return () => clearTimeout(t);
   }, [flush]);
 
+  // "Saved" with its tick shows for 2 s, then settles into a quiet line.
+  useEffect(() => {
+    if (save !== "saved") return;
+    const t = setTimeout(() => setSave("settled"), 2000);
+    return () => clearTimeout(t);
+  }, [save]);
+
   const edit = (f: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
     dirty.current = true;
     f(e.target.value);
@@ -117,7 +124,14 @@ export function CampaignEditor({ account, campaign, me, tags }: Props) {
             <Button type="button" variant="outline" onClick={async () => { await flush(); setPreview(await previewCampaign(account, campaign.id)); }}>Preview</Button>
             <TestDialog account={account} id={campaign.id} me={me} beforeSend={flush} />
             <span role="status" className="text-sm text-muted-foreground">
-              {save === "idle" ? "" : save === "saved" ? "Saved" : save === "saving" ? "Saving…" : <span className="text-destructive">Not saved: {save.error}</span>}
+              {save === "idle" ? "" : save === "saving" ? (
+                <span className="inline-flex items-center gap-2"><span aria-hidden className="save-dot size-1.5 rounded-full bg-wait" />Saving…</span>
+              ) : save === "saved" ? (
+                <span className="inline-flex items-center gap-1.5 text-good">
+                  <svg aria-hidden className="tick-draw size-4" viewBox="0 0 16 16"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  Saved
+                </span>
+              ) : save === "settled" ? "All changes saved" : <span className="text-destructive">Not saved: {save.error}</span>}
             </span>
           </CardContent>
         </Card>

@@ -2,7 +2,9 @@ import { PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 import { cn } from "cn";
+import { CountUp } from "@/components/count-up";
 import { Loading } from "@/components/loading";
+import { MilestoneNote, type Milestone } from "@/components/milestone-note";
 import { PageHeader } from "@/components/page-header";
 import { CampaignStatusBadge, Stamp, type Tone } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -34,7 +36,7 @@ export default function Overview(props: Props) {
 /** The newest issue at a glance: what it is, where it stands, how it did. */
 function LatestIssue({ account, c }: { account: string; c: Schemas["CampaignSummary"] | undefined }) {
   return (
-    <Card>
+    <Card className="lift">
       <CardHeader>
         <h2 className="text-lg leading-snug font-semibold">Latest issue</h2>
         <CardAction>
@@ -67,12 +69,12 @@ function LatestIssue({ account, c }: { account: string; c: Schemas["CampaignSumm
   );
 }
 
-function Stat({ label, value, note }: { label: string; value: string; note: string }) {
+function Stat({ label, value, note, i }: { label: string; value: string; note: string; i: number }) {
   return (
-    <Card className="sketch-wobble">
+    <Card className="sketch-wobble rise lift" style={{ "--i": i } as React.CSSProperties}>
       <CardContent className="flex flex-col gap-1.5">
         <span className="label-caps text-muted-foreground">{label}</span>
-        <span className="tabular-nums text-3xl font-semibold tracking-tight">{value}</span>
+        <span className="tabular-nums text-3xl font-semibold tracking-tight"><CountUp value={value} /></span>
         <span className="text-sm text-muted-foreground">{note}</span>
       </CardContent>
     </Card>
@@ -105,7 +107,7 @@ function Rate({ label, rate, limit, sent, minSent }: { label: string; rate: numb
           aria-valuetext={`${pct(rate)} of a ${pct(limit)} limit`}
           className="relative h-1.5 rounded-full bg-foreground/10"
         >
-          <div className={cn("h-full rounded-full", tone)} style={{ width: `${Math.min(fill, 1) * 100}%` }} />
+          <div className={cn("meter-fill h-full rounded-full", tone)} style={{ width: `${Math.min(fill, 1) * 100}%` }} />
           {/* The limit itself, drawn at the end of the track. */}
           <span aria-hidden className="absolute -top-1 right-0 h-3.5 w-0.5 rounded-full bg-destructive" />
         </div>
@@ -120,13 +122,22 @@ function Rate({ label, rate, limit, sent, minSent }: { label: string; rate: numb
 async function Stats({ params }: Props) {
   const { account } = await params;
   const nextPath = `/a/${account}/overview`;
-  const [o, latest] = await Promise.all([
+  const [o, latest, readers] = await Promise.all([
     engine<Schemas["Overview"]>("/stats/overview", { account, nextPath }),
-    engine<Schemas["CampaignList"]>("/campaigns?limit=1", { account, nextPath }),
+    // shortcut: "first issue sent" only looks at the newest 50 issues; fine until an account keeps 50+ drafts.
+    engine<Schemas["CampaignList"]>("/campaigns?limit=50", { account, nextPath }),
+    engine<Schemas["ContactList"]>("/contacts?status=subscribed&limit=1", { account, nextPath }),
   ]);
   const w = o.last_7d;
   const over = (r: number, l: number) => l > 0 && r >= l;
   const health: { tone: Tone; text: string } = o.status === "paused" ? { tone: "bad", text: "Paused" } : over(o.bounce_rate, o.bounce_limit / 2) || over(o.complaint_rate, o.complaint_limit / 2) ? { tone: "wait", text: "Watch" } : { tone: "good", text: "Healthy" };
+  // Real firsts, biggest first: the note shows the top one the viewer has not closed.
+  const milestones: Milestone[] = [
+    readers.total >= 1000 && { id: "readers-1000", badge: "1,000", title: "Your list just passed 1,000 readers.", body: "That is a real audience. Every issue now goes out in safe waves." },
+    w.sent >= 1000 && { id: "sent-1000-week", badge: "1k", title: "You sent 1,000 emails this week.", body: "Bounces and complaints stay under the limits on the left." },
+    readers.total >= 100 && { id: "readers-100", badge: "100", title: "Your list just passed 100 readers.", body: "Nice work. Your next issue goes to all of them." },
+    latest.data.some((c) => c.status === "sent") && { id: "first-issue", badge: "No. 1", title: "Your first issue went out.", body: "Open its report to see who read it and what they clicked." },
+  ].filter((m) => m !== false);
   const rows: [string, keyof Schemas["Counts"]][] = [["Sent", "sent"], ["Delivered", "delivered"], ["Bounced", "bounced"], ["Complained", "complained"], ["Opened", "opened"], ["Clicked", "clicked"]];
   return (
     <>
@@ -142,11 +153,12 @@ async function Stats({ params }: Props) {
           </form>
         }
       />
+      <MilestoneNote account={account} milestones={milestones} />
       <section aria-label="Last 7 days" className="grid grid-cols-2 gap-4 md:gap-5 xl:grid-cols-4">
-        <Stat label="Sent" value={num.format(w.sent)} note={`${num.format(o.last_24h.sent)} in the last 24 h`} />
-        <Stat label="Delivered" value={share(w.delivered, w.sent)} note={`${num.format(w.delivered)} emails reached the inbox`} />
-        <Stat label="Open rate" value={share(w.opened, w.delivered)} note={`${num.format(w.opened)} opens`} />
-        <Stat label="Click rate" value={share(w.clicked, w.delivered)} note={`${num.format(w.clicked)} clicks`} />
+        <Stat i={0} label="Sent" value={num.format(w.sent)} note={`${num.format(o.last_24h.sent)} in the last 24 h`} />
+        <Stat i={1} label="Delivered" value={share(w.delivered, w.sent)} note={`${num.format(w.delivered)} emails reached the inbox`} />
+        <Stat i={2} label="Open rate" value={share(w.opened, w.delivered)} note={`${num.format(w.opened)} opens`} />
+        <Stat i={3} label="Click rate" value={share(w.clicked, w.delivered)} note={`${num.format(w.clicked)} clicks`} />
       </section>
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
         <section aria-labelledby="health" className="contents">

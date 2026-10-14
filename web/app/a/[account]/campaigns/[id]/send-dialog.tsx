@@ -9,6 +9,7 @@ import type { Schemas } from "@/lib/engine";
 import { when } from "@/lib/format";
 import { namesMissingText, wavePlanText } from "@/lib/report";
 import { changeStatus, previewCampaign, setAudience } from "./actions";
+import { celebrateSend } from "./sent-celebration";
 
 type Props = { account: string; campaign: Schemas["Campaign"]; tags: Schemas["TagView"][]; beforeOpen?: () => Promise<void> };
 
@@ -53,6 +54,7 @@ export function SendDialog({ account, campaign, tags, beforeOpen }: Props) {
     setPending(false);
     if (r.error) return setError(r.error);
     toast.success(sendAt ? `Scheduled for ${when(sendAt, Intl.DateTimeFormat().resolvedOptions().timeZone)}` : "Sending started");
+    if (!sendAt) celebrateSend(campaign.id, preview?.readers ?? 0);
     setOpen(false);
     router.refresh();
   };
