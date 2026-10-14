@@ -37,7 +37,7 @@ async function List({ params, searchParams }: Props) {
         description="Every issue you have written, sent or scheduled."
         actions={
           <form action={createCampaign.bind(null, account)}>
-            <Button type="submit">New campaign</Button>
+            <Button type="submit" size="lg">New issue</Button>
           </form>
         }
       />
@@ -49,10 +49,10 @@ async function List({ params, searchParams }: Props) {
             <TableRow>
               <TableHead>Subject</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="text-right">Readers</TableHead>
-              <TableHead className="text-right">Opened</TableHead>
-              <TableHead className="text-right">Clicked</TableHead>
-              <TableHead className="text-right">Updated</TableHead>
+              <TableHead className="max-md:hidden text-right">Readers</TableHead>
+              <TableHead className="max-md:hidden text-right">Opened</TableHead>
+              <TableHead className="max-md:hidden text-right">Clicked</TableHead>
+              <TableHead className="max-md:hidden text-right">Updated</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -62,10 +62,10 @@ async function List({ params, searchParams }: Props) {
                   <Link className="text-primary underline-offset-2 hover:underline" href={`${base}/${c.id}`}>{c.subject || "Untitled draft"}</Link>
                 </TableCell>
                 <TableCell><CampaignStatusBadge status={c.status} /></TableCell>
-                <TableCell className="text-right tabular-nums">{c.recipients.toLocaleString("en-US")}</TableCell>
-                <TableCell className="text-right tabular-nums">{c.opened.toLocaleString("en-US")}</TableCell>
-                <TableCell className="text-right tabular-nums">{c.clicked.toLocaleString("en-US")}</TableCell>
-                <TableCell className="text-right tabular-nums text-muted-foreground"><LocalTime iso={c.updated_at} /></TableCell>
+                <TableCell className="max-md:hidden text-right tabular-nums">{c.recipients.toLocaleString("en-US")}</TableCell>
+                <TableCell className="max-md:hidden text-right tabular-nums">{c.opened.toLocaleString("en-US")}</TableCell>
+                <TableCell className="max-md:hidden text-right tabular-nums">{c.clicked.toLocaleString("en-US")}</TableCell>
+                <TableCell className="max-md:hidden text-right tabular-nums text-muted-foreground"><LocalTime iso={c.updated_at} /></TableCell>
               </TableRow>
             ))}
           </TableBody>

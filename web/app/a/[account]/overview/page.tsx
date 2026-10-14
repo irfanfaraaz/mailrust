@@ -1,11 +1,15 @@
+import { PlusIcon } from "lucide-react";
+import Link from "next/link";
 import { Suspense } from "react";
 import { cn } from "cn";
 import { Loading } from "@/components/loading";
 import { PageHeader } from "@/components/page-header";
-import { Stamp, type Tone } from "@/components/status-badge";
+import { CampaignStatusBadge, Stamp, type Tone } from "@/components/status-badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { engine, type Schemas } from "@/lib/engine";
+import { createCampaign } from "../campaigns/actions";
 
 export const metadata = { title: "Overview" };
 
@@ -19,7 +23,6 @@ type Props = { params: Promise<{ account: string }> };
 export default function Overview(props: Props) {
   return (
     <div className="flex flex-col gap-8">
-      <PageHeader title="Overview" description="Your newsletter and your app email, last 7 days." />
       {/* params and the engine call are request data: read them inside Suspense (cacheComponents). */}
       <Suspense fallback={<Loading rows={5} />}>
         <Stats {...props} />
@@ -28,9 +31,45 @@ export default function Overview(props: Props) {
   );
 }
 
-function Stat({ label, value, note }: { label: string; value: string; note: string }) {
+/** The newest issue at a glance: what it is, where it stands, how it did. */
+function LatestIssue({ account, c }: { account: string; c: Schemas["CampaignSummary"] | undefined }) {
   return (
     <Card>
+      <CardHeader>
+        <h2 className="text-lg leading-snug font-semibold">Latest issue</h2>
+        <CardAction>
+          <Link href={`/a/${account}/campaigns`} className="text-sm text-primary underline-offset-2 hover:underline">All campaigns</Link>
+        </CardAction>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        {c ? (
+          <>
+            <div className="flex items-start justify-between gap-3">
+              <Link href={`/a/${account}/campaigns/${c.id}`} className="font-heading text-xl leading-snug font-semibold hover:underline">
+                {c.subject || "Untitled draft"}
+              </Link>
+              <CampaignStatusBadge status={c.status} />
+            </div>
+            <dl className="grid grid-cols-3 gap-3">
+              {([["Readers", c.recipients], ["Opened", c.opened], ["Clicked", c.clicked]] as const).map(([label, n]) => (
+                <div key={label} className="flex flex-col gap-1">
+                  <dt className="label-caps text-muted-foreground">{label}</dt>
+                  <dd className="tabular-nums text-xl font-semibold">{num.format(n)}</dd>
+                </div>
+              ))}
+            </dl>
+          </>
+        ) : (
+          <p className="text-muted-foreground">No issues yet. Write one, send yourself a test, then send it in safe waves.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function Stat({ label, value, note }: { label: string; value: string; note: string }) {
+  return (
+    <Card className="sketch-wobble">
       <CardContent className="flex flex-col gap-1.5">
         <span className="label-caps text-muted-foreground">{label}</span>
         <span className="tabular-nums text-3xl font-semibold tracking-tight">{value}</span>
@@ -80,13 +119,29 @@ function Rate({ label, rate, limit, sent, minSent }: { label: string; rate: numb
 
 async function Stats({ params }: Props) {
   const { account } = await params;
-  const o = await engine<Schemas["Overview"]>("/stats/overview", { account, nextPath: `/a/${account}/overview` });
+  const nextPath = `/a/${account}/overview`;
+  const [o, latest] = await Promise.all([
+    engine<Schemas["Overview"]>("/stats/overview", { account, nextPath }),
+    engine<Schemas["CampaignList"]>("/campaigns?limit=1", { account, nextPath }),
+  ]);
   const w = o.last_7d;
   const over = (r: number, l: number) => l > 0 && r >= l;
   const health: { tone: Tone; text: string } = o.status === "paused" ? { tone: "bad", text: "Paused" } : over(o.bounce_rate, o.bounce_limit / 2) || over(o.complaint_rate, o.complaint_limit / 2) ? { tone: "wait", text: "Watch" } : { tone: "good", text: "Healthy" };
   const rows: [string, keyof Schemas["Counts"]][] = [["Sent", "sent"], ["Delivered", "delivered"], ["Bounced", "bounced"], ["Complained", "complained"], ["Opened", "opened"], ["Clicked", "clicked"]];
   return (
     <>
+      <PageHeader
+        title="Overview"
+        description="Your newsletter and your app email, last 7 days."
+        actions={
+          <form action={createCampaign.bind(null, account)}>
+            <Button type="submit" size="lg">
+              <PlusIcon aria-hidden />
+              New issue
+            </Button>
+          </form>
+        }
+      />
       <section aria-label="Last 7 days" className="grid grid-cols-2 gap-4 md:gap-5 xl:grid-cols-4">
         <Stat label="Sent" value={num.format(w.sent)} note={`${num.format(o.last_24h.sent)} in the last 24 h`} />
         <Stat label="Delivered" value={share(w.delivered, w.sent)} note={`${num.format(w.delivered)} emails reached the inbox`} />
@@ -110,7 +165,9 @@ async function Stats({ params }: Props) {
           </CardContent>
         </Card>
         </section>
-        <section aria-labelledby="events" className="flex flex-col gap-3">
+        <LatestIssue account={account} c={latest.data[0]} />
+      </div>
+      <section aria-labelledby="events" className="flex flex-col gap-3">
           <h2 id="events" className="text-lg font-semibold">Events</h2>
           <Table>
             <TableHeader>
@@ -130,8 +187,7 @@ async function Stats({ params }: Props) {
               ))}
             </TableBody>
           </Table>
-        </section>
-      </div>
+      </section>
     </>
   );
 }

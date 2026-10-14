@@ -11,7 +11,7 @@ export async function HealthStrip({ accountId }: { accountId: string }) {
   const share = o.bounce_limit > 0 ? Math.min(o.bounce_rate / o.bounce_limit, 1) : 0;
   const tone = paused || share >= 1 ? "bg-destructive" : share >= 0.5 ? "bg-wait" : "bg-good";
   return (
-    <Link href={`/a/${accountId}/overview`} className="m-3 flex flex-col gap-2 rounded-md bg-sidebar-accent/70 p-3 text-sm hover:bg-sidebar-accent">
+    <Link href={`/a/${accountId}/overview`} className="m-3 mt-1 flex flex-col gap-2 rounded-md md:mt-3 bg-sidebar-accent/70 p-3 text-sm hover:bg-sidebar-accent">
       <span className="flex items-baseline justify-between gap-2">
         <span className={cn("font-medium", paused && "text-destructive")}>{paused ? "Sending paused" : share >= 0.5 ? "Watch bounces" : "Sending healthy"}</span>
         <span className="tabular-nums text-xs text-muted-foreground">{pct(o.bounce_rate)} bounce</span>

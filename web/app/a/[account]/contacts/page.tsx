@@ -121,10 +121,10 @@ async function List({ params, searchParams }: Props) {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Email</TableHead>
-                    <TableHead>Name</TableHead>
+                    <TableHead className="max-md:hidden">Name</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Tags</TableHead>
-                    <TableHead className="text-right">Added</TableHead>
+                    <TableHead className="max-md:hidden">Tags</TableHead>
+                    <TableHead className="max-md:hidden text-right">Added</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -133,15 +133,15 @@ async function List({ params, searchParams }: Props) {
                       <TableCell className="font-medium">
                         <Link className="underline-offset-2 hover:underline" href={`${base}/${c.id}`}>{c.email}</Link>
                       </TableCell>
-                      <TableCell>{[c.first_name, c.last_name].filter(Boolean).join(" ")}</TableCell>
+                      <TableCell className="max-md:hidden">{[c.first_name, c.last_name].filter(Boolean).join(" ")}</TableCell>
                       <TableCell>
                         <span className="flex flex-wrap gap-1.5">
                           <ContactStatusBadge status={c.status} />
                           {c.blocked && <BlockedBadge />}
                         </span>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{c.tags.map((t) => t.name).join(", ")}</TableCell>
-                      <TableCell className="text-right tabular-nums text-muted-foreground"><LocalTime iso={c.created_at} /></TableCell>
+                      <TableCell className="max-md:hidden text-muted-foreground">{c.tags.map((t) => t.name).join(", ")}</TableCell>
+                      <TableCell className="max-md:hidden text-right tabular-nums text-muted-foreground"><LocalTime iso={c.created_at} /></TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

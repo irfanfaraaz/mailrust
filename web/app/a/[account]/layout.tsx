@@ -47,14 +47,14 @@ async function Shell({ children, params }: Props) {
     <div className={grid}>
       <aside className={aside}>
         <AccountMenu me={me} current={account} />
-        <form action={createCampaign.bind(null, id)} className="hidden px-3 pb-3 md:block">
+        <form action={createCampaign.bind(null, id)} className="px-3 pb-3">
           <Button type="submit" size="lg" className="w-full">
             <PlusIcon aria-hidden />
             New issue
           </Button>
         </form>
         <Sidebar accountId={id} />
-        <div className="mt-auto hidden md:block">
+        <div className="md:mt-auto">
           <Suspense fallback={<Loading rows={1} className="m-3" />}>
             <HealthStrip accountId={id} />
           </Suspense>

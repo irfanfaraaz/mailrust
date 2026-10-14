@@ -45,10 +45,10 @@ async function Log({ params, searchParams }: Props) {
         <TableHeader>
           <TableRow>
             <TableHead>Subject</TableHead>
-            <TableHead>To</TableHead>
+            <TableHead className="max-md:hidden">To</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead>Priority</TableHead>
-            <TableHead className="text-right">Created</TableHead>
+            <TableHead className="max-md:hidden">Priority</TableHead>
+            <TableHead className="max-md:hidden text-right">Created</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -57,10 +57,10 @@ async function Log({ params, searchParams }: Props) {
               <TableCell className="max-w-80 truncate">
                 <Link className="font-medium text-primary underline-offset-2 hover:underline" href={`/a/${account}/emails/${e.id}`}>{e.subject}</Link>
               </TableCell>
-              <TableCell className="max-w-64 truncate font-mono text-[0.8125rem]">{e.to.join(", ")}</TableCell>
+              <TableCell className="max-md:hidden max-w-64 truncate font-mono text-[0.8125rem]">{e.to.join(", ")}</TableCell>
               <TableCell><EmailStatusBadge status={e.status} /></TableCell>
-              <TableCell className="text-muted-foreground">{statusLabel(e.priority)}</TableCell>
-              <TableCell className="text-right tabular-nums text-muted-foreground"><LocalTime iso={e.created_at} /></TableCell>
+              <TableCell className="max-md:hidden text-muted-foreground">{statusLabel(e.priority)}</TableCell>
+              <TableCell className="max-md:hidden text-right tabular-nums text-muted-foreground"><LocalTime iso={e.created_at} /></TableCell>
             </TableRow>
           ))}
         </TableBody>

@@ -53,26 +53,26 @@
 
 :root {
   /* Field notes: parchment ground, paper cards, ink text, one navy ink accent. */
-  --background: #f6f3ea;
+  --background: #f5f4ed;
   --foreground: #1a2030;
-  --paper: #fdfbf5;
-  --card: #fdfbf5;
+  --paper: #fbfaf5;
+  --card: #fbfaf5;
   --card-foreground: #1a2030;
-  --popover: #fdfbf5;
+  --popover: #fbfaf5;
   --popover-foreground: #1a2030;
   --primary: #1f3d7a;
   --primary-foreground: #ffffff;
-  --secondary: #ebe6d8;
+  --secondary: #e9e7dd;
   --secondary-foreground: #1a2030;
-  --muted: #ece8dc;
+  --muted: #ebe9e0;
   --muted-foreground: #5b6070;
-  --accent: #ebe6d8;
+  --accent: #e9e7dd;
   --accent-foreground: #1a2030;
   --destructive: #c42b1c;
   --good: #1d7a43;
   --wait: #a35a0a;
-  --border: #ddd7c7;
-  --input: #c9c2b0;
+  --border: #dcd9cd;
+  --input: #c8c5b8;
   --ring: #1f3d7a;
   --chart-1: #1f3d7a;
   --chart-2: #1d7a43;
@@ -80,13 +80,13 @@
   --chart-4: #6b55b8;
   --chart-5: #5b6070;
   --radius: 0.5rem;
-  --sidebar: #f0ece1;
+  --sidebar: #efede4;
   --sidebar-foreground: #1a2030;
   --sidebar-primary: #1f3d7a;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #e5e0d1;
+  --sidebar-accent: #e4e2d7;
   --sidebar-accent-foreground: #1a2030;
-  --sidebar-border: #ddd7c7;
+  --sidebar-border: #dcd9cd;
   --sidebar-ring: #1f3d7a;
   /* Sidebar group tabs, kept soft so they never compete with the navy accent. */
   --tab-newsletter: #c4632f;
@@ -155,12 +155,16 @@
 /* Hand-drawn card: ink border with uneven corners and a short offset shadow. */
 .sketch {
   border: 2px solid var(--foreground);
-  border-radius: 255px 14px 225px 14px / 14px 225px 14px 255px;
+  border-radius: 40px 10px 36px 10px / 10px 36px 10px 40px;
   box-shadow: 3px 4px 0 var(--ink-shadow);
 }
 /* Big panels (tables, the editor) keep the wobble small so the frame never looks bent. */
 .sketch-lg {
   border-radius: 28px 8px 24px 8px / 8px 24px 8px 28px;
+}
+/* Small cards (stat tiles) carry the full hand-drawn wobble. */
+.sketch-wobble {
+  border-radius: 255px 14px 225px 14px / 14px 225px 14px 255px;
 }
 /* A sketch card that needs attention (one-time secrets): amber ink. */
 .sketch-warn {
@@ -170,6 +174,17 @@
   border-width: 2px;
   border-color: var(--foreground);
   border-radius: 225px 12px 255px 12px / 12px 255px 12px 225px;
+}
+/* Native checkboxes, radios, date pickers and progress bars use the navy ink. */
+:root {
+  accent-color: var(--primary);
+}
+.select-chevron {
+  appearance: none;
+  padding-right: 2rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%235b6070' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
 }
 /* Numbers read as figures: every tabular number is set in the mono face. */
 .tabular-nums {
