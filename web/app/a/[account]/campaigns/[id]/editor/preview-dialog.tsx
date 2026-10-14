@@ -9,7 +9,7 @@ export function PreviewDialog({ preview, close }: { preview: Schemas["CampaignPr
   const [width, setWidth] = useState<600 | 375>(600);
   return (
     <Dialog open={preview !== null} onOpenChange={(o) => !o && close()}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader><DialogTitle>Preview</DialogTitle></DialogHeader>
         <div className="flex gap-2">
           <Button variant={width === 600 ? "default" : "outline"} size="sm" onClick={() => setWidth(600)}>Desktop</Button>

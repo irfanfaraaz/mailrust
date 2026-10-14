@@ -32,6 +32,7 @@ export function Report({ account, campaign: c, report: r, archiveUrl }: Props) {
       <p className="text-sm text-muted-foreground">
         {c.started_at ? <>Started <LocalTime iso={c.started_at} /></> : "Not started"}
         {c.finished_at && <> · finished <LocalTime iso={c.finished_at} /></>}
+        {c.status === "sending" && c.next_wave_at && <> · next wave <LocalTime iso={c.next_wave_at} /></>}
         {archiveUrl && <> · <a className="underline underline-offset-2" href={archiveUrl}>Public archive page</a></>}
       </p>
       <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
