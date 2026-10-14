@@ -757,6 +757,54 @@ async fn pause_takes_back_queued_emails_and_resume_finishes_the_wave_first(pool:
     assert_eq!(once_each(&pool, id).await, (600, 600));
 }
 
+/// Wave 1 sent and its gap started, then a pause between waves.
+async fn paused_between_waves(t: &common::TestApp, pool: &PgPool) -> Uuid {
+    ready(t).await;
+    readers(pool, t.account.id, 600).await; // waves 100, 200, 300
+    let id = new_campaign(t, json!({"subject": "Hello"})).await;
+    send_now(t, id).await;
+    send::tick(&t.state, Utc::now()).await.unwrap();
+    mark_sent(pool, id).await;
+    send::tick(&t.state, Utc::now()).await.unwrap(); // wave 1 done: the gap starts
+    let (s, _) = post(t, id, "pause").await;
+    assert_eq!(s, StatusCode::OK);
+    id
+}
+
+#[sqlx::test]
+async fn resume_between_waves_keeps_the_gap_after_the_last_wave(pool: PgPool) {
+    let t = common::app(pool.clone()).await;
+    let id = paused_between_waves(&t, &pool).await;
+    let (s, _) = post(&t, id, "resume").await;
+    assert_eq!(s, StatusCode::OK);
+    let now = Utc::now();
+    send::tick(&t.state, now).await.unwrap();
+    assert_eq!(queued(&pool, id).await, 0, "wave 2 waits out the gap");
+    send::tick(&t.state, now + Duration::minutes(10) + Duration::seconds(1))
+        .await
+        .unwrap();
+    assert_eq!(queued(&pool, id).await, 200);
+}
+
+#[sqlx::test]
+async fn resume_after_a_long_pause_sends_the_next_wave_at_once(pool: PgPool) {
+    let t = common::app(pool.clone()).await;
+    let id = paused_between_waves(&t, &pool).await;
+    sqlx::query("UPDATE emails SET sent_at = now() - interval '1 hour' WHERE campaign_id = $1")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, _) = post(&t, id, "resume").await;
+    assert_eq!(s, StatusCode::OK);
+    send::tick(&t.state, Utc::now()).await.unwrap();
+    assert_eq!(
+        queued(&pool, id).await,
+        200,
+        "the gap ended while it was paused"
+    );
+}
+
 #[sqlx::test]
 async fn auto_pause_mid_wave_takes_back_queued_emails(pool: PgPool) {
     let rec = common::RecordingSender::ok();

@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT CASE\n                 WHEN EXISTS (SELECT 1 FROM campaign_recipients WHERE campaign_id = $1 AND wave <= $2 AND email_id IS NULL) THEN $3\n                 WHEN EXISTS (SELECT 1 FROM emails WHERE campaign_id = $1 AND status IN ('queued', 'sending', 'unknown')) THEN NULL\n                 ELSE GREATEST($3, (SELECT max(sent_at) FROM emails WHERE campaign_id = $1) + make_interval(mins => $4))\n               END AS \"next: DateTime<Utc>\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "next: DateTime<Utc>",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4",
+        "Timestamptz",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "5a40f62da0bfa5dd3d770101b812805df844e9af59959aa4bf5b1046c0958184"
+}
