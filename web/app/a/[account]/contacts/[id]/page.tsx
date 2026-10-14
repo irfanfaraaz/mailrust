@@ -3,7 +3,9 @@ import { Suspense } from "react";
 import { BackLink } from "@/components/back-link";
 import { ConfirmAction } from "@/components/confirm-action";
 import { Loading } from "@/components/loading";
+import { PageHeader } from "@/components/page-header";
 import { BlockedBadge, ContactStatusBadge, PENDING_HINT } from "@/components/status-badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { engine, type Schemas } from "@/lib/engine";
 import { deleteContact, unsubscribeContact } from "../actions";
 import { EditContact } from "./edit-contact";
@@ -25,26 +27,35 @@ async function Detail({ params }: Props) {
   const { account, id } = await params;
   const c = await engine<Schemas["ContactView"]>(`/contacts/${id}`, { account, nextPath: `/a/${account}/contacts/${id}` });
   return (
-    <div className="flex flex-col gap-6">
-      <BackLink href={`/a/${account}/contacts`}>Contacts</BackLink>
-      <div className="flex flex-wrap items-center gap-2">
-        <h1 className="break-all text-2xl font-semibold">{c.email}</h1>
-        <ContactStatusBadge status={c.status} />
-        {c.blocked && <BlockedBadge />}
-      </div>
-      <dl className="grid max-w-xl grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-        <dt className="text-muted-foreground">Source</dt><dd>{c.source}</dd>
-        <dt className="text-muted-foreground">Added</dt><dd><LocalTime iso={c.created_at} /></dd>
-        {c.subscribed_at && (<><dt className="text-muted-foreground">Subscribed at</dt><dd><LocalTime iso={c.subscribed_at} /></dd></>)}
-        {c.unsubscribed_at && (<><dt className="text-muted-foreground">Unsubscribed at</dt><dd><LocalTime iso={c.unsubscribed_at} /></dd></>)}
-      </dl>
-      {c.status === "pending" && <p className="max-w-prose text-sm text-muted-foreground">Pending: {PENDING_HINT.charAt(0).toLowerCase() + PENDING_HINT.slice(1)}</p>}
-      {c.blocked && (
-        <p className="max-w-prose text-sm text-muted-foreground">
-          This address is on your{" "}
-          <Link className="text-foreground underline underline-offset-2" href={`/a/${account}/suppressions`}>suppression list</Link>, so nothing will be sent to it.
-        </p>
-      )}
+    <div className="flex flex-col gap-8">
+      <PageHeader
+        title={<span className="break-all">{c.email}</span>}
+        description={
+          <span className="flex flex-wrap items-center gap-2">
+            <ContactStatusBadge status={c.status} />
+            {c.blocked && <BlockedBadge />}
+          </span>
+        }
+      >
+        <BackLink href={`/a/${account}/contacts`}>Contacts</BackLink>
+      </PageHeader>
+      <Card className="max-w-xl">
+        <CardContent className="flex flex-col gap-4">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
+            <dt className="label-caps self-center text-muted-foreground">Source</dt><dd>{c.source}</dd>
+            <dt className="label-caps self-center text-muted-foreground">Added</dt><dd className="tabular-nums"><LocalTime iso={c.created_at} /></dd>
+            {c.subscribed_at && (<><dt className="label-caps self-center text-muted-foreground">Subscribed at</dt><dd className="tabular-nums"><LocalTime iso={c.subscribed_at} /></dd></>)}
+            {c.unsubscribed_at && (<><dt className="label-caps self-center text-muted-foreground">Unsubscribed at</dt><dd className="tabular-nums"><LocalTime iso={c.unsubscribed_at} /></dd></>)}
+          </dl>
+          {c.status === "pending" && <p className="max-w-prose text-sm text-muted-foreground">Pending: {PENDING_HINT.charAt(0).toLowerCase() + PENDING_HINT.slice(1)}</p>}
+          {c.blocked && (
+            <p className="max-w-prose text-sm text-muted-foreground">
+              This address is on your{" "}
+              <Link className="text-primary underline underline-offset-2" href={`/a/${account}/suppressions`}>suppression list</Link>, so nothing will be sent to it.
+            </p>
+          )}
+        </CardContent>
+      </Card>
       <EditContact account={account} contact={c} />
       <div className="flex flex-wrap gap-2">
         {c.status !== "unsubscribed" && (

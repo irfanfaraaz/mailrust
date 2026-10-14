@@ -24,8 +24,8 @@ export function EmbedCode({ code }: { code: string }) {
   }
   return (
     <div className="flex flex-col gap-2">
-      <label className="flex flex-col gap-1 text-sm">Embed code
-        <Textarea ref={ref} readOnly rows={7} value={code} onFocus={(e) => e.currentTarget.select()} className="bg-muted/40 font-mono md:text-xs" />
+      <label className="flex flex-col gap-1.5 text-sm"><span className="label-caps text-muted-foreground">Embed code</span>
+        <Textarea ref={ref} readOnly rows={7} value={code} onFocus={(e) => e.currentTarget.select()} className="bg-foreground/[0.04] font-mono leading-relaxed md:text-xs" />
       </label>
       <div className="flex items-center gap-3">
         <Button type="button" variant="outline" size="sm" onClick={copy}>{status === "copied" ? "Copied" : "Copy code"}</Button>

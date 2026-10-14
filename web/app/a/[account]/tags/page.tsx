@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { ConfirmAction } from "@/components/confirm-action";
 import { EmptyState } from "@/components/empty-state";
 import { Loading } from "@/components/loading";
+import { PageHeader } from "@/components/page-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { engine, type Schemas } from "@/lib/engine";
 import { deleteTag } from "./actions";
@@ -14,9 +15,8 @@ type Props = { params: Promise<{ account: string }> };
 
 export default function Tags(props: Props) {
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Tags</h1>
-      <p className="max-w-prose text-sm text-muted-foreground">Tags group contacts. Add them by hand, from a CSV column, or to every row of an import.</p>
+    <div className="flex flex-col gap-8">
+      <PageHeader title="Tags" description="Tags group contacts. Add them by hand, from a CSV column, or to every row of an import." />
       <Suspense fallback={<Loading />}>
         <List {...props} />
       </Suspense>
@@ -48,7 +48,7 @@ async function List({ params }: Props) {
                   <RenameTag account={account} id={t.id} name={t.name} />
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
-                  <Link className="underline underline-offset-2" href={`/a/${account}/contacts?tag=${t.id}`}>{t.contacts}</Link>
+                  <Link className="text-primary underline underline-offset-2" href={`/a/${account}/contacts?tag=${t.id}`}>{t.contacts}</Link>
                 </TableCell>
                 <TableCell className="text-right">
                   <ConfirmAction

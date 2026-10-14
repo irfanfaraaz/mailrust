@@ -2,6 +2,7 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { createTag, renameTag, type TagState } from "./actions";
 
@@ -17,13 +18,17 @@ export function AddTag({ account }: { account: string }) {
     }
   }, [state]);
   return (
+    <Card>
+      <CardContent>
     <form ref={form} action={action} className="flex flex-wrap items-end gap-3 text-sm">
-      <label className="flex flex-col gap-1">New tag
+      <label className="flex flex-col gap-1.5"><span className="label-caps text-muted-foreground">New tag</span>
         <Input id="new-tag" name="name" required maxLength={50} aria-invalid={state.error ? true : undefined} aria-describedby={state.error ? "new-tag-error" : undefined} />
       </label>
       <Button type="submit" disabled={pending}>Add tag</Button>
       {state.error && <p id="new-tag-error" role="alert" className="basis-full text-destructive">{state.error}</p>}
     </form>
+      </CardContent>
+    </Card>
   );
 }
 

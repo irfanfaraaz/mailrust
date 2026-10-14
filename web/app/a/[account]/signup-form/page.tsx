@@ -2,6 +2,8 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { Suspense } from "react";
 import { Loading } from "@/components/loading";
+import { PageHeader } from "@/components/page-header";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { engine, type Schemas } from "@/lib/engine";
 import { embedSnippet } from "@/lib/embed";
 import { closedMessage } from "@/lib/format";
@@ -14,11 +16,11 @@ type Props = { params: Promise<{ account: string }> };
 
 export default function SignupForm(props: Props) {
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Signup form</h1>
-      <p className="max-w-prose text-sm text-muted-foreground">
-        Readers join on a page Mailrust hosts, or through a form on your own site. Each one gets an email to confirm the address before they count as subscribed.
-      </p>
+    <div className="flex flex-col gap-8">
+      <PageHeader
+        title="Signup form"
+        description="Readers join on a page Mailrust hosts, or through a form on your own site. Each one gets an email to confirm the address before they count as subscribed."
+      />
       {/* params, headers and the engine calls are request data: read them inside Suspense (cacheComponents). */}
       <Suspense fallback={<Loading />}>
         <Settings {...props} />
@@ -41,18 +43,24 @@ async function Settings({ params }: Props) {
   const closed = s.signup_open ? null : closedMessage(s.closed_reason ?? "unknown reason");
   return (
     <>
-      <p role="status" className={closed ? "max-w-prose text-sm text-muted-foreground" : "text-sm font-medium text-emerald-700 dark:text-emerald-300"}>
+      <p role="status" className={closed ? "max-w-prose text-sm text-muted-foreground" : "text-sm font-medium text-good"}>
         {closed ? closed.text : "Open: the form takes signups."}
-        {closed?.domains && <> <Link className="text-foreground underline underline-offset-2" href={`/a/${account}/domains`}>Go to Domains</Link></>}
+        {closed?.domains && <> <Link className="text-primary underline underline-offset-2" href={`/a/${account}/domains`}>Go to Domains</Link></>}
       </p>
       <SettingsForm account={account} settings={s} domains={verified} origin={origin} />
       {link && (
-        <section className="flex max-w-xl flex-col gap-3">
-          <h2 className="text-lg font-medium">Share it</h2>
-          <p className="text-sm">
-            Public page (preview): <a className="underline underline-offset-2" href={link} target="_blank" rel="noreferrer">{link}</a>
-          </p>
-          <EmbedCode code={embedSnippet(origin, s.public_slug!, s.newsletter_name ?? "the newsletter")} />
+        <section aria-labelledby="share-title">
+          <Card className="max-w-xl">
+            <CardHeader>
+              <h2 id="share-title" className="text-lg leading-snug font-semibold">Share it</h2>
+              <p className="text-sm text-muted-foreground">
+                Public page (preview): <a className="break-all text-primary underline underline-offset-2" href={link} target="_blank" rel="noreferrer">{link}</a>
+              </p>
+            </CardHeader>
+            <CardContent>
+              <EmbedCode code={embedSnippet(origin, s.public_slug!, s.newsletter_name ?? "the newsletter")} />
+            </CardContent>
+          </Card>
         </section>
       )}
     </>

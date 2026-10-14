@@ -1,6 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Schemas } from "@/lib/engine";
 
@@ -26,20 +27,24 @@ export function ImportProgress({ job }: { job: Schemas["ImportView"] }) {
     failed: "Import failed",
   }[job.status];
   return (
-    <section aria-labelledby="import-title" className="flex flex-col gap-3 rounded-lg border p-4">
-      {/* Only the status is announced, so screen readers hear each change once instead of every 2 s refresh. */}
-      <p role="status" className="sr-only">{announce[job.status]}</p>
-      <h2 id="import-title" className="text-lg font-medium">{title}</h2>
+    <section aria-labelledby="import-title">
+    <Card>
+      <CardHeader>
+        {/* Only the status is announced, so screen readers hear each change once instead of every 2 s refresh. */}
+        <p role="status" className="sr-only">{announce[job.status]}</p>
+        <h2 id="import-title" className="text-lg leading-snug font-semibold">{title}</h2>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
       <progress
         aria-label="Rows processed"
         max={Math.max(job.rows_total, 1)}
         value={job.status === "queued" ? undefined : job.rows_done}
-        className="w-full"
+        className="w-full accent-primary"
       />
-      <div className="flex flex-wrap gap-6 text-sm">
-        <p>Added <strong className="tabular-nums">{job.added}</strong></p>
-        <p>Updated <strong className="tabular-nums">{job.updated}</strong></p>
-        <p>Skipped <strong className="tabular-nums">{job.skipped}</strong></p>
+      <div className="flex flex-wrap gap-8 text-sm">
+        <p className="flex flex-col gap-1"><span className="label-caps text-muted-foreground">Added</span><strong className="tabular-nums text-2xl font-semibold">{job.added}</strong></p>
+        <p className="flex flex-col gap-1"><span className="label-caps text-muted-foreground">Updated</span><strong className="tabular-nums text-2xl font-semibold">{job.updated}</strong></p>
+        <p className="flex flex-col gap-1"><span className="label-caps text-muted-foreground">Skipped</span><strong className="tabular-nums text-2xl font-semibold">{job.skipped}</strong></p>
       </div>
       {job.error && <p role="alert" className="text-sm text-destructive">{job.error}</p>}
       {job.errors.length > 0 && (
@@ -61,6 +66,8 @@ export function ImportProgress({ job }: { job: Schemas["ImportView"] }) {
         </Table>
       )}
       {job.skipped > job.errors.length && <p className="text-sm text-muted-foreground">Only the first 1,000 problems are listed.</p>}
+      </CardContent>
+    </Card>
     </section>
   );
 }
