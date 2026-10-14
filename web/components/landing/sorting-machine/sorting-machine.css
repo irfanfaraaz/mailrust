@@ -1,0 +1,260 @@
+/* landing: sorting machine. Anatomy's tokens mapped onto the app's field-notes tokens.
+   Light follows :root, dark follows .dark, so next-themes drives it with no extra code. */
+.iso.sm {
+  --sm-paper: var(--background);
+  --sm-face: color-mix(in oklab, var(--background) 60%, white);
+  --sm-top: color-mix(in oklab, var(--background) 55%, white);
+  --sm-s0: color-mix(in oklab, var(--sidebar) 82%, var(--foreground));
+  --sm-s1: color-mix(in oklab, var(--sidebar) 89%, var(--foreground));
+  --sm-s2: color-mix(in oklab, var(--sidebar) 95%, var(--foreground));
+  --sm-s3: var(--sidebar);
+  --anatomy-page: var(--background);
+  --anatomy-card: var(--paper);
+  --anatomy-text: var(--muted-foreground);
+  --anatomy-strong: var(--foreground);
+  --anatomy-muted: var(--muted-foreground);
+  --anatomy-hi: var(--foreground);
+  --anatomy-mid: color-mix(in oklab, var(--foreground) 72%, var(--background));
+  --anatomy-lo: color-mix(in oklab, var(--foreground) 50%, var(--background));
+  --anatomy-faint: color-mix(in oklab, var(--foreground) 26%, var(--background));
+  --anatomy-lit: var(--foreground);
+  --anatomy-halo: var(--foreground);
+  --anatomy-halo-opacity: 0.2;
+  --anatomy-dot: var(--foreground);
+  --anatomy-red: var(--destructive);
+  --anatomy-green: var(--good);
+  --anatomy-blue: var(--primary);
+  --anatomy-weight: 0.95px;
+  --anatomy-mono: var(--font-mono), ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --anatomy-lit-top: var(--sm-top);
+  --anatomy-lit-shade: var(--sm-s2);
+  display: block;
+  color-scheme: light;
+}
+
+.dark .iso.sm {
+  color-scheme: dark;
+  --sm-paper: var(--paper);
+  --sm-face: color-mix(in oklab, var(--paper) 88%, white);
+  --sm-top: color-mix(in oklab, var(--paper) 84%, white);
+  --sm-s0: color-mix(in oklab, var(--paper) 60%, black);
+  --sm-s1: color-mix(in oklab, var(--paper) 72%, black);
+  --sm-s2: color-mix(in oklab, var(--paper) 85%, black);
+  --sm-s3: color-mix(in oklab, var(--paper) 94%, black);
+  --anatomy-mid: color-mix(in oklab, var(--foreground) 66%, var(--paper));
+  --anatomy-lo: color-mix(in oklab, var(--foreground) 44%, var(--paper));
+  --anatomy-faint: color-mix(in oklab, var(--foreground) 22%, var(--paper));
+  --anatomy-halo: black;
+  --anatomy-halo-opacity: 0.55;
+}
+
+/* One place maps the --sm-* shades onto anatomy's names; groups below re-tint --sm-* only. */
+.sm .iso-plate,
+.sm [class^="sm-"],
+.sm [class*=" sm-"] {
+  --anatomy-paper: var(--sm-paper);
+  --anatomy-face: var(--sm-face);
+  --anatomy-top: var(--sm-top);
+  --anatomy-shade-0: var(--sm-s0);
+  --anatomy-shade-1: var(--sm-s1);
+  --anatomy-shade-2: var(--sm-s2);
+  --anatomy-shade-3: var(--sm-s3);
+  --anatomy-lit-top: var(--sm-top);
+  --anatomy-lit-shade: var(--sm-s2);
+}
+
+/* Newsletter lane: the Newsletter tab colour. Fast lane: the API tab colour. Gantry and knob: navy. */
+.sm .sm-news,
+.sm .sm-code,
+.sm .sm-primary {
+  --tint: var(--tab-newsletter);
+  --a: 22%;
+}
+
+.sm .sm-code {
+  --tint: var(--tab-api);
+}
+
+.sm .sm-primary {
+  --tint: var(--primary);
+  --a: 30%;
+}
+
+.sm .sm-news,
+.sm .sm-code,
+.sm .sm-primary {
+  --sm-paper: color-mix(in oklab, var(--tint) calc(var(--a) * 0.5), var(--background));
+  --sm-face: color-mix(in oklab, var(--tint) var(--a), var(--background));
+  --sm-top: color-mix(in oklab, var(--tint) var(--a), color-mix(in oklab, var(--background) 60%, white));
+  --sm-s0: color-mix(in oklab, var(--tint) calc(var(--a) * 1.9), color-mix(in oklab, var(--sidebar) 80%, var(--foreground)));
+  --sm-s1: color-mix(in oklab, var(--tint) calc(var(--a) * 1.5), color-mix(in oklab, var(--sidebar) 88%, var(--foreground)));
+  --sm-s2: color-mix(in oklab, var(--tint) calc(var(--a) * 1.1), var(--sidebar));
+  --sm-s3: color-mix(in oklab, var(--tint) var(--a), var(--sidebar));
+  --anatomy-lo: color-mix(in oklab, var(--tint) 45%, var(--anatomy-mid));
+  --anatomy-faint: color-mix(in oklab, var(--tint) 40%, var(--anatomy-faint));
+}
+
+.dark .sm .sm-news,
+.dark .sm .sm-code,
+.dark .sm .sm-primary {
+  --sm-paper: color-mix(in oklab, var(--tint) calc(var(--a) * 0.5), var(--paper));
+  --sm-face: color-mix(in oklab, var(--tint) var(--a), var(--paper));
+  --sm-top: color-mix(in oklab, var(--tint) var(--a), color-mix(in oklab, var(--paper) 84%, white));
+  --sm-s0: color-mix(in oklab, var(--tint) var(--a), color-mix(in oklab, var(--paper) 60%, black));
+  --sm-s1: color-mix(in oklab, var(--tint) var(--a), color-mix(in oklab, var(--paper) 72%, black));
+  --sm-s2: color-mix(in oklab, var(--tint) var(--a), color-mix(in oklab, var(--paper) 85%, black));
+  --sm-s3: color-mix(in oklab, var(--tint) var(--a), color-mix(in oklab, var(--paper) 94%, black));
+}
+
+/* Paper things inside a tinted lane: envelopes, cards, stacks. */
+.sm .sm-news .sm-paper,
+.sm .sm-code .sm-paper,
+.sm .sm-paper {
+  --sm-paper: var(--paper);
+  --sm-face: color-mix(in oklab, var(--paper) 60%, white);
+  --sm-top: color-mix(in oklab, var(--paper) 40%, white);
+  --sm-s0: color-mix(in oklab, var(--paper) 86%, var(--foreground));
+  --sm-s1: color-mix(in oklab, var(--paper) 91%, var(--foreground));
+  --sm-s2: color-mix(in oklab, var(--paper) 95%, var(--foreground));
+  --sm-s3: color-mix(in oklab, var(--paper) 98%, var(--foreground));
+  --anatomy-lo: color-mix(in oklab, var(--foreground) 50%, var(--paper));
+  --anatomy-faint: color-mix(in oklab, var(--foreground) 26%, var(--paper));
+}
+
+.dark .sm .sm-paper {
+  --sm-top: color-mix(in oklab, var(--paper) 78%, white);
+  --sm-face: color-mix(in oklab, var(--paper) 84%, white);
+  --sm-s0: color-mix(in oklab, var(--paper) 70%, white);
+  --sm-s1: color-mix(in oklab, var(--paper) 76%, white);
+  --sm-s2: color-mix(in oklab, var(--paper) 82%, white);
+  --sm-s3: color-mix(in oklab, var(--paper) 88%, white);
+}
+
+/* The card: ink border, short offset shadow, like the other field-notes cards. */
+.sm .iso-figure {
+  margin: 0;
+}
+
+.sm .iso-plate {
+  padding: 34px 4px 34px;
+  background: var(--paper);
+  border: 2px solid var(--foreground);
+  border-radius: 20px 6px 18px 6px / 6px 18px 6px 20px;
+  box-shadow: 3px 4px 0 var(--ink-shadow);
+}
+
+.sm .iso-plate-corners {
+  inset: 16px 18px;
+}
+
+.sm .iso-plate-corner {
+  font-size: 10px;
+}
+
+.sm-root {
+  display: block;
+  outline: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  border-radius: 6px;
+}
+
+.sm-root:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 4px;
+}
+
+.sm-svg {
+  overflow: visible;
+}
+
+.sm-root:not([data-ready]) [data-piece],
+.sm-root:not([data-ready]) [data-gate] {
+  visibility: hidden;
+}
+
+[data-knob] {
+  cursor: grab;
+  touch-action: none;
+  fill: transparent;
+  stroke: none;
+  pointer-events: all;
+}
+
+.sm-root[data-held] [data-knob] {
+  cursor: grabbing;
+}
+
+.sm-seal {
+  fill: none;
+  stroke: var(--anatomy-blue);
+  stroke-width: var(--anatomy-weight);
+}
+
+[data-wave="1"] .sm-seal,
+.sm-seal[data-wave="1"] {
+  fill: var(--anatomy-blue);
+}
+
+[data-wave="3"] .sm-seal,
+.sm-seal[data-wave="3"] {
+  stroke: var(--anatomy-lo);
+}
+
+/* Earlier waves are the most engaged readers, so their paper carries more ink. */
+[data-wave="1"] > .iso-solid > .iso-top {
+  fill: color-mix(in oklab, var(--tab-newsletter) 55%, var(--anatomy-top));
+}
+
+[data-wave="2"] > .iso-solid > .iso-top {
+  fill: color-mix(in oklab, var(--tab-newsletter) 28%, var(--anatomy-top));
+}
+
+[data-wave="3"] > .iso-solid > .iso-top {
+  fill: color-mix(in oklab, var(--tab-newsletter) 10%, var(--anatomy-top));
+}
+
+.sm-pips circle {
+  fill: var(--tab-api);
+  opacity: 1;
+}
+
+.sm-needle {
+  fill: var(--anatomy-lit);
+  stroke: var(--anatomy-lit);
+  stroke-width: 0.5;
+  stroke-linejoin: round;
+}
+
+.sm-stamp {
+  opacity: 0;
+}
+
+.sm-stamp-text {
+  fill: var(--anatomy-red);
+  font-family: var(--anatomy-mono);
+  font-weight: 700;
+}
+
+.sm-shadow {
+  filter: blur(4px);
+  opacity: 0.7;
+}
+
+@media (max-width: 560px) {
+  .sm .iso-plate {
+    padding: 40px 4px 62px;
+  }
+
+  /* The bench has empty margin at both ends; crop it so the parts read bigger on a phone. */
+  .sm-root {
+    overflow: hidden;
+  }
+
+  .sm-svg {
+    width: 116%;
+    margin: 0 -8%;
+    max-width: none;
+  }
+}
