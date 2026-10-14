@@ -8,6 +8,7 @@ export function pct(rate: number): string {
 
 export function wavePlanText(sizes: number[]): string {
   if (sizes.length === 0) return "No readers match this audience.";
+  if (sizes.length === 1 && sizes[0] === 1) return "One wave: 1 reader.";
   if (sizes.length === 1) return `One wave: all ${n(sizes[0])} readers at once.`;
   return `${sizes.length} waves, 10 minutes apart: ${sizes.map(n).join(", ")}. Most engaged readers go first.`;
 }

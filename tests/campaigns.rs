@@ -997,3 +997,18 @@ async fn the_archive_lists_and_shows_sent_issues_only(pool: sqlx::PgPool) {
     .await;
     assert_eq!(s, StatusCode::NOT_FOUND, "web secret required");
 }
+
+#[sqlx::test]
+async fn the_readers_check_says_reader_for_one(pool: sqlx::PgPool) {
+    let t = common::app(pool).await;
+    let (_, c) = api(&t, "POST", "/campaigns", Some(json!({}))).await;
+    contact(&t, "one@example.com", None, &[]).await;
+    let p = preview(&t, c["id"].as_str().unwrap()).await;
+    let check = p["checks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["code"] == "readers")
+        .unwrap();
+    assert_eq!(check["message"], "1 reader");
+}
