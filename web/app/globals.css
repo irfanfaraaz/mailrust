@@ -221,6 +221,17 @@
 .scribble path { fill: none; stroke: var(--scribble, var(--primary)); stroke-width: 3; stroke-linecap: round; }
 .doodle * { fill: none; stroke: var(--foreground); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .doodle .doodle-accent { stroke: var(--primary); }
+.odo { display: inline-flex; align-items: flex-start; height: 1.2em; line-height: 1.2; overflow: hidden; vertical-align: bottom; white-space: pre; }
+.odo-col { display: block; }
+.odo-col::before { content: "0\A 1\A 2\A 3\A 4\A 5\A 6\A 7\A 8\A 9"; white-space: pre; display: block; }
+.toaster [data-sonner-toast].slip-toast[data-styled="true"] { border-width: 2px; border-radius: 4px 14px 6px 12px / 12px 6px 14px 4px; box-shadow: 3px 4px 0 var(--ink-shadow); rotate: -0.6deg; }
+.mail-slot { position: relative; display: grid; height: 4.25rem; width: 8rem; place-items: center; }
+.mail-slot svg { translate: 0 -10px; }
+.mail-slot svg * { fill: var(--paper); stroke: var(--foreground); stroke-width: 2; stroke-linejoin: round; }
+.mail-slot svg path { fill: none; }
+.mail-slot span { position: absolute; bottom: 1rem; height: 4px; width: 7.5rem; border-radius: 4px; background: var(--foreground); }
+.pen-circle path { fill: none; stroke: var(--destructive); stroke-width: 2; stroke-linecap: round; }
+.slash-hint path { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
 
 @media (prefers-reduced-motion: no-preference) {
   .rise { animation: rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) calc(var(--i, 0) * 60ms) both; }
@@ -247,4 +258,17 @@
   @keyframes plane-fly { to { translate: 160px -90px; rotate: -14deg; opacity: 0; } }
   .fade-away { animation: fade-away 0.4s ease-in 1.6s both; }
   @keyframes fade-away { to { opacity: 0; } }
+  .odo-col { transition: translate 0.8s cubic-bezier(0.22, 1, 0.36, 1); }
+  .row-arrive { animation: row-arrive 0.5s cubic-bezier(0.22, 1, 0.36, 1) both, row-wash 1.8s ease-out both; }
+  @keyframes row-arrive { from { opacity: 0; translate: 0 -8px; } }
+  @keyframes row-wash { from { background-color: color-mix(in oklab, var(--primary) 14%, transparent); } }
+  .slip-toast { animation: slip-tilt 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  @keyframes slip-tilt { from { rotate: 2deg; } }
+  .mail-slot svg { animation: slot-drop 0.5s cubic-bezier(0.55, 0, 0.75, 0) 0.15s both; }
+  @keyframes slot-drop { to { translate: 0 34px; clip-path: inset(0 0 100% 0); } }
+  .pen-circle path { stroke-dasharray: 1; animation: draw-1 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.3s both; }
+  @keyframes draw-1 { from { stroke-dashoffset: 1; } }
+  .slash-hint { animation: slash-hint 0.4s ease-out 0.4s both; }
+  .slash-hint path { stroke-dasharray: 1; animation: draw-1 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.6s both; }
+  @keyframes slash-hint { from { opacity: 0; translate: 0 4px; } }
 }

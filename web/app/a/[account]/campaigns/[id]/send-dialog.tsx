@@ -10,6 +10,7 @@ import { when } from "@/lib/format";
 import { namesMissingText, wavePlanText } from "@/lib/report";
 import { changeStatus, previewCampaign, setAudience } from "./actions";
 import { celebrateSend } from "./sent-celebration";
+import { morphFrom, rememberFrom } from "@/lib/morph";
 
 type Props = { account: string; campaign: Schemas["Campaign"]; tags: Schemas["TagView"][]; beforeOpen?: () => Promise<void> };
 
@@ -62,8 +63,9 @@ export function SendDialog({ account, campaign, tags, beforeOpen }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger className={buttonVariants({ size: "lg" }) + " w-full"}>Send…</DialogTrigger>
-      <DialogContent className="sm:max-w-xl">
+      {/* The dialog grows out of the Send button instead of its usual rise-in. */}
+      <DialogTrigger className={buttonVariants({ size: "lg" }) + " w-full"} onClick={(e) => rememberFrom("send", e.currentTarget)}>Send…</DialogTrigger>
+      <DialogContent className="sm:max-w-xl data-open:animate-none" ref={(el) => { if (el) morphFrom("send", el); }}>
         <DialogHeader>
           <DialogTitle>Send this issue</DialogTitle>
           <DialogDescription>Only subscribed readers get it. Unsubscribed, pending and blocked addresses are always left out.</DialogDescription>

@@ -14,6 +14,7 @@ import { SendDialog } from "../send-dialog";
 import { CampaignImage, EmailButton, MergeTag } from "./extensions";
 import { InsertDialogs } from "./insert-dialogs";
 import { PreviewDialog } from "./preview-dialog";
+import { SlashHint } from "./slash-hint";
 import { SlashCommand, type DialogKind } from "./slash-menu";
 import { TestDialog } from "./test-dialog";
 
@@ -114,7 +115,10 @@ export function CampaignEditor({ account, campaign, me, tags }: Props) {
           <Button type="button" variant="outline" size="sm" onClick={() => setDialog("merge")}>Merge tag</Button>
           <Button type="button" variant="outline" size="sm" onClick={() => editor?.chain().focus().setHorizontalRule().run()}>Divider</Button>
         </div>
-        <EditorContent editor={editor} />
+        <div className="relative">
+          <SlashHint empty={editor?.isEmpty ?? false} />
+          <EditorContent editor={editor} />
+        </div>
       </div>
       <aside aria-label="Issue actions" className="flex flex-col gap-5 lg:sticky lg:top-6">
         <Card>

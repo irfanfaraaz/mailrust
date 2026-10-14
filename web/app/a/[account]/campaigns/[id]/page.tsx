@@ -11,6 +11,7 @@ import { CampaignEditor } from "./editor/campaign-editor";
 import { Report } from "./report";
 import { SentCelebration } from "./sent-celebration";
 import { LocalTime } from "@/components/local-time";
+import { MorphTitle } from "@/components/morph";
 
 export const metadata = { title: "Campaign" };
 
@@ -41,7 +42,7 @@ async function Body({ params }: Props) {
   return (
     <>
       <PageHeader
-        title={c.subject || "Untitled draft"}
+        title={<MorphTitle morph={`camp-${c.id}`}>{c.subject || "Untitled draft"}</MorphTitle>}
         actions={
           <>
             <CampaignStatusBadge status={c.status} />

@@ -2,9 +2,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Schemas } from "@/lib/engine";
 import { pct } from "@/lib/report";
-import { AutoRefresh } from "./auto-refresh";
+import { AutoRefresh } from "@/components/auto-refresh";
 import { Controls } from "./controls";
 import { LocalTime } from "@/components/local-time";
+import { Odometer } from "@/components/odometer";
 
 const fmt = (x: number) => x.toLocaleString("en-US");
 
@@ -43,7 +44,7 @@ export function Report({ account, campaign: c, report: r, archiveUrl }: Props) {
           <Card key={label}>
             <CardContent className="flex flex-col gap-1.5">
               <dt className="label-caps text-muted-foreground">{label}</dt>
-              <dd className="tabular-nums text-2xl font-semibold tracking-tight" data-testid={testId}>{value}</dd>
+              <dd className="tabular-nums text-2xl font-semibold tracking-tight" data-testid={testId}><Odometer value={value} /></dd>
             </CardContent>
           </Card>
         ))}
@@ -52,15 +53,23 @@ export function Report({ account, campaign: c, report: r, archiveUrl }: Props) {
       <Card>
         <CardContent className="flex flex-col gap-4">
           <h3 className="text-lg font-semibold">Waves</h3>
+          {/* One bar, one segment per wave (as wide as its share of readers). A segment turns green when its wave is done. */}
           <div
             role="progressbar"
             aria-label="Waves done"
             aria-valuemin={0}
             aria-valuemax={waveReaders}
             aria-valuenow={waveDone}
-            className="h-2 rounded-full bg-foreground/10"
+            className="flex gap-1"
           >
-            <div className="h-full rounded-full bg-primary" style={{ width: `${waveReaders > 0 ? Math.min(waveDone / waveReaders, 1) * 100 : 0}%` }} />
+            {r.waves.map((w) => (
+              <div key={w.wave} className="h-2.5 overflow-hidden rounded-[3px] bg-foreground/10" style={{ flex: Math.max(w.readers, 1) }}>
+                <div
+                  className={`meter-fill h-full transition-[width,background-color] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${w.readers > 0 && w.done >= w.readers ? "bg-good" : "bg-primary"}`}
+                  style={{ width: `${w.readers > 0 ? Math.min(w.done / w.readers, 1) * 100 : 0}%` }}
+                />
+              </div>
+            ))}
           </div>
           <ul className="flex flex-col gap-1 text-sm">
             {r.waves.map((w) => <li key={w.wave} className="tabular-nums">Wave {w.wave}: {fmt(w.done)} of {fmt(w.readers)} done</li>)}

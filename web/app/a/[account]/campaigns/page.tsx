@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MorphLink } from "@/components/morph";
 import { Suspense } from "react";
 import { EmptyState } from "@/components/empty-state";
 import { Loading } from "@/components/loading";
@@ -59,7 +60,7 @@ async function List({ params, searchParams }: Props) {
             {list.data.map((c) => (
               <TableRow key={c.id}>
                 <TableCell className="font-medium">
-                  <Link className="text-primary underline-offset-2 hover:underline" href={`${base}/${c.id}`}>{c.subject || "Untitled draft"}</Link>
+                  <MorphLink morph={`camp-${c.id}`} className="text-primary underline-offset-2 hover:underline" href={`${base}/${c.id}`}>{c.subject || "Untitled draft"}</MorphLink>
                 </TableCell>
                 <TableCell><CampaignStatusBadge status={c.status} /></TableCell>
                 <TableCell className="max-md:hidden text-right tabular-nums">{c.recipients.toLocaleString("en-US")}</TableCell>

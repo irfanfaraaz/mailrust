@@ -9,6 +9,8 @@ import { engine, type Schemas } from "@/lib/engine";
 import { isoDate } from "@/lib/format";
 import { Filters } from "./filters";
 import { LocalTime } from "@/components/local-time";
+import { ArrivingRows } from "@/components/arriving-rows";
+import { AutoRefresh } from "@/components/auto-refresh";
 
 export const metadata = { title: "Emails" };
 
@@ -37,10 +39,14 @@ async function Log({ params, searchParams }: Props) {
   }
   qs.set("limit", "50");
   const list = await engine<Schemas["EmailList"]>(`/emails?${qs}`, { account, nextPath: `/a/${account}/emails` });
+  // The unfiltered first page is the live log: it refreshes itself, and new rows slide in.
+  const live = Object.values(sp).every((v) => !v);
   const older = new URLSearchParams({ ...sp, after: list.next_cursor ?? "" } as Record<string, string>);
   return (
     <>
       <Filters values={sp} />
+      <AutoRefresh active={live} />
+      {live && <ArrivingRows scope={account} ids={list.data.map((e) => e.id).join()} />}
       <Table>
         <TableHeader>
           <TableRow>
@@ -53,7 +59,7 @@ async function Log({ params, searchParams }: Props) {
         </TableHeader>
         <TableBody>
           {list.data.map((e) => (
-            <TableRow key={e.id}>
+            <TableRow key={e.id} data-row={e.id}>
               <TableCell className="max-w-80 truncate">
                 <Link className="font-medium text-primary underline-offset-2 hover:underline" href={`/a/${account}/emails/${e.id}`}>{e.subject}</Link>
               </TableCell>
