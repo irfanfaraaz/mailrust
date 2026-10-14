@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import { Card } from "@/components/ui/card";
 import { getMe } from "@/lib/account";
 
 export default function Home() {
@@ -18,9 +19,11 @@ async function Landing() {
   const target = me.accounts.find((a) => a.id === last) ?? me.accounts[0];
   if (!target) {
     return (
-      <main className="mx-auto max-w-md px-4 py-24">
-        <h1 className="text-2xl font-semibold">No account yet</h1>
-        <p className="mt-2">You are logged in as {me.user.email}, but no account has added you. Ask an owner for an invite.</p>
+      <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-4 py-10">
+        <Card className="gap-3 px-6 py-7">
+          <h1 className="text-2xl font-semibold">No account yet</h1>
+          <p>You are logged in as {me.user.email}, but no account has added you. Ask an owner for an invite.</p>
+        </Card>
       </main>
     );
   }
