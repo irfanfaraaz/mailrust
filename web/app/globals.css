@@ -162,6 +162,10 @@
 .sketch-lg {
   border-radius: 28px 8px 24px 8px / 8px 24px 8px 28px;
 }
+/* A sketch card that needs attention (one-time secrets): amber ink. */
+.sketch-warn {
+  border-color: var(--wait);
+}
 .sketch-btn {
   border-width: 2px;
   border-color: var(--foreground);

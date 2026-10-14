@@ -4,7 +4,9 @@ import { toast } from "sonner";
 import { NativeSelect } from "@/components/native-select";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Stamp } from "@/components/status-badge";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { cancelInvite, invite, leave, removeMember, setRole, type TeamState } from "./actions";
 
@@ -25,19 +27,26 @@ export function InviteForm({ account }: { account: string }) {
   const [state, action, pending] = useActionState(invite.bind(null, account), none);
   useSuccessToast(state, "Invite sent");
   return (
-    <form action={action} className="flex flex-wrap items-end gap-3 text-sm">
-      <label className="flex flex-col gap-1">Email
-        <Input name="email" type="email" required />
-      </label>
-      <label className="flex flex-col gap-1">Invite as
-        <NativeSelect name="role" defaultValue="member">
-          <option value="member">member</option>
-          <option value="owner">owner</option>
-        </NativeSelect>
-      </label>
-      <Button type="submit" disabled={pending}>Send invite</Button>
-      <Alert state={state} />
-    </form>
+    <Card>
+      <CardHeader>
+        <h2 className="text-lg leading-snug font-semibold">Invite someone</h2>
+      </CardHeader>
+      <CardContent>
+        <form action={action} className="flex flex-wrap items-end gap-3 text-sm">
+          <label className="flex flex-col gap-1.5"><span className="label-caps text-muted-foreground">Email</span>
+            <Input name="email" type="email" required />
+          </label>
+          <label className="flex flex-col gap-1.5"><span className="label-caps text-muted-foreground">Invite as</span>
+            <NativeSelect name="role" defaultValue="member">
+              <option value="member">member</option>
+              <option value="owner">owner</option>
+            </NativeSelect>
+          </label>
+          <Button type="submit" disabled={pending}>Send invite</Button>
+          <Alert state={state} />
+        </form>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -83,7 +92,7 @@ export function MemberRow(p: { account: string; userId: string; email: string; r
             </NativeSelect>
             <Button type="submit" size="sm" variant="outline">Save role</Button>
           </form>
-        ) : p.role}
+        ) : <Stamp tone="quiet">{p.role}</Stamp>}
       </TableCell>
       <TableCell className="tabular-nums text-muted-foreground">{p.joined}</TableCell>
       <TableCell>
@@ -106,7 +115,7 @@ export function InviteRow({ account, id, email, role, expires }: { account: stri
   return (
     <TableRow>
       <TableCell className="font-medium">{email}</TableCell>
-      <TableCell>{role}</TableCell>
+      <TableCell><Stamp tone="quiet">{role}</Stamp></TableCell>
       <TableCell className="tabular-nums text-muted-foreground">Pending, expires {expires}</TableCell>
       <TableCell>
         <div className="flex items-center justify-end gap-2">

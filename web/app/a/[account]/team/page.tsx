@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { Loading } from "@/components/loading";
+import { PageHeader } from "@/components/page-header";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { engine, type Schemas } from "@/lib/engine";
 import { currentAccount } from "@/lib/account";
@@ -12,8 +13,8 @@ type Props = { params: Promise<{ account: string }> };
 
 export default function Team(props: Props) {
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Team</h1>
+    <div className="flex flex-col gap-8">
+      <PageHeader title="Team" description="Who can sign in to this account. Owners can invite people and change roles." />
       {/* params and the engine calls are request data: read them inside Suspense (cacheComponents). */}
       <Suspense fallback={<Loading />}>
         <Body {...props} />

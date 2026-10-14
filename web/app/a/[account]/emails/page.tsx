@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import { EmptyState } from "@/components/empty-state";
 import { Loading } from "@/components/loading";
+import { PageHeader } from "@/components/page-header";
 import { EmailStatusBadge, statusLabel } from "@/components/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { engine, type Schemas } from "@/lib/engine";
@@ -15,8 +17,8 @@ type Props = { params: Promise<{ account: string }>; searchParams: Promise<SP> }
 
 export default function Emails(props: Props) {
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Emails</h1>
+    <div className="flex flex-col gap-8">
+      <PageHeader title="Emails" description="Every email your app sent through the API, newest first." />
       {/* params, searchParams and the engine call are request data: read them inside Suspense (cacheComponents). */}
       <Suspense fallback={<Loading rows={6} />}>
         <Log {...props} />
@@ -53,9 +55,9 @@ async function Log({ params, searchParams }: Props) {
           {list.data.map((e) => (
             <TableRow key={e.id}>
               <TableCell className="max-w-80 truncate">
-                <Link className="font-medium underline-offset-2 hover:underline" href={`/a/${account}/emails/${e.id}`}>{e.subject}</Link>
+                <Link className="font-medium text-primary underline-offset-2 hover:underline" href={`/a/${account}/emails/${e.id}`}>{e.subject}</Link>
               </TableCell>
-              <TableCell className="max-w-64 truncate">{e.to.join(", ")}</TableCell>
+              <TableCell className="max-w-64 truncate font-mono text-[0.8125rem]">{e.to.join(", ")}</TableCell>
               <TableCell><EmailStatusBadge status={e.status} /></TableCell>
               <TableCell className="text-muted-foreground">{statusLabel(e.priority)}</TableCell>
               <TableCell className="text-right tabular-nums text-muted-foreground"><LocalTime iso={e.created_at} /></TableCell>
@@ -63,8 +65,8 @@ async function Log({ params, searchParams }: Props) {
           ))}
         </TableBody>
       </Table>
-      {list.data.length === 0 && <p className="text-muted-foreground">No emails match these filters.</p>}
-      {list.next_cursor && <Link className="self-start underline underline-offset-2" href={`?${older}`}>Older emails →</Link>}
+      {list.data.length === 0 && <EmptyState title="No emails match" hint="Change or clear the filters above to see more of the log." />}
+      {list.next_cursor && <Link className="self-start font-medium text-primary underline underline-offset-2" href={`?${older}`}>Older emails →</Link>}
     </>
   );
 }

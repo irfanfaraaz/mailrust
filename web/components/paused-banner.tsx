@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export function PausedBanner({ accountId, reason }: { accountId: string; reason: string }) {
   return (
-    <div role="alert" className="border-b border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive md:px-8">
+    <div role="alert" className="border-b-2 border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive md:px-8">
       <p>
         <strong>Sending is paused for this account.</strong> Reason: {reason}.
       </p>

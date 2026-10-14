@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { EmptyState } from "@/components/empty-state";
 import { Loading } from "@/components/loading";
+import { PageHeader } from "@/components/page-header";
 import { DomainStatusBadge } from "@/components/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { engine, type Schemas } from "@/lib/engine";
@@ -14,8 +15,8 @@ type Props = { params: Promise<{ account: string }> };
 
 export default function Domains(props: Props) {
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Domains</h1>
+    <div className="flex flex-col gap-8">
+      <PageHeader title="Domains" description="Mailrust only sends from domains you have verified." />
       {/* params and the engine call are request data: read them inside Suspense (cacheComponents). */}
       <Suspense fallback={<Loading />}>
         <List {...props} />
@@ -50,7 +51,7 @@ async function List({ params }: Props) {
           <TableBody>
             {domains.data.map((d) => (
               <TableRow key={d.id}>
-                <TableCell><Link className="font-medium underline underline-offset-2" href={`/a/${account}/domains/${d.id}`}>{d.name}</Link></TableCell>
+                <TableCell><Link className="font-mono text-[0.8125rem] font-medium text-primary underline underline-offset-2" href={`/a/${account}/domains/${d.id}`}>{d.name}</Link></TableCell>
                 <TableCell><DomainStatusBadge status={d.status} /></TableCell>
                 <TableCell className="text-muted-foreground">{[d.open_tracking && "opens", d.click_tracking && "clicks"].filter(Boolean).join(", ") || "off"}</TableCell>
                 <TableCell className="text-right tabular-nums text-muted-foreground"><LocalTime iso={d.created_at} /></TableCell>
