@@ -30,6 +30,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - The Desktop preview and the send dialog were squeezed to a narrow width.
 - A new issue's editor showed no "type / for blocks" hint.
 - The issue title stayed "Untitled draft" until a reload.
+- Resume sent the next wave at once and skipped the 10-minute gap. Between waves, the next wave now waits until 10 minutes after the last email went out; a started wave still finishes at once.
 
 ## [0.3.0] - 2026-10-14
 
