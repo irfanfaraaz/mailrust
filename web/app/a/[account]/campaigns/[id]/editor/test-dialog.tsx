@@ -11,7 +11,7 @@ export function TestDialog({ account, id, me, beforeSend }: { account: string; i
   const [state, setState] = useState<{ error?: string; done?: boolean; pending?: boolean }>({});
   return (
     <Dialog onOpenChange={() => setState({})}>
-      <DialogTrigger className={buttonVariants({ variant: "outline", size: "sm" })}>Send test</DialogTrigger>
+      <DialogTrigger className={buttonVariants({ variant: "outline" }) + " w-full"}>Send test</DialogTrigger>
       <DialogContent>
         <DialogHeader><DialogTitle>Send a test</DialogTitle></DialogHeader>
         <form

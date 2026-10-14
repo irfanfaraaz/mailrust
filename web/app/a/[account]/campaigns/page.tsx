@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { EmptyState } from "@/components/empty-state";
 import { Loading } from "@/components/loading";
+import { PageHeader } from "@/components/page-header";
 import { CampaignStatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -15,7 +16,7 @@ type Props = { params: Promise<{ account: string }>; searchParams: Promise<{ aft
 
 export default function Campaigns(props: Props) {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       {/* params, searchParams and the engine call are request data: read them inside Suspense (cacheComponents). */}
       <Suspense fallback={<Loading />}>
         <List {...props} />
@@ -31,12 +32,15 @@ async function List({ params, searchParams }: Props) {
   const list = await engine<Schemas["CampaignList"]>(`/campaigns?limit=50${after ? `&after=${after}` : ""}`, { account, nextPath: base });
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Campaigns</h1>
-        <form action={createCampaign.bind(null, account)}>
-          <Button type="submit">New campaign</Button>
-        </form>
-      </div>
+      <PageHeader
+        title="Campaigns"
+        description="Every issue you have written, sent or scheduled."
+        actions={
+          <form action={createCampaign.bind(null, account)}>
+            <Button type="submit">New campaign</Button>
+          </form>
+        }
+      />
       {list.data.length === 0 && !after ? (
         <EmptyState title="No issues yet" hint="Write an issue in the editor, send yourself a test, then send it to your subscribers in safe waves." />
       ) : (
@@ -55,7 +59,7 @@ async function List({ params, searchParams }: Props) {
             {list.data.map((c) => (
               <TableRow key={c.id}>
                 <TableCell className="font-medium">
-                  <Link className="underline-offset-2 hover:underline" href={`${base}/${c.id}`}>{c.subject || "Untitled draft"}</Link>
+                  <Link className="text-primary underline-offset-2 hover:underline" href={`${base}/${c.id}`}>{c.subject || "Untitled draft"}</Link>
                 </TableCell>
                 <TableCell><CampaignStatusBadge status={c.status} /></TableCell>
                 <TableCell className="text-right tabular-nums">{c.recipients.toLocaleString("en-US")}</TableCell>
@@ -67,7 +71,7 @@ async function List({ params, searchParams }: Props) {
           </TableBody>
         </Table>
       )}
-      {list.next_cursor && <Link className="self-start underline underline-offset-2" href={`?after=${list.next_cursor}`}>Older →</Link>}
+      {list.next_cursor && <Link className="self-start text-primary underline underline-offset-2" href={`?after=${list.next_cursor}`}>Older →</Link>}
     </>
   );
 }

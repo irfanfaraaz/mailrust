@@ -19,7 +19,7 @@ export function Controls({ account, campaign }: { account: string; campaign: Sch
       )}
       {s === "sent" && (
         <ActionForm action={setArchiveHidden.bind(null, account, campaign.id, !campaign.archive_hidden)} done={campaign.archive_hidden ? "Shown in the public archive" : "Hidden from the public archive"}>
-          <button type="submit" className="text-sm underline underline-offset-2">{campaign.archive_hidden ? "Show in the public archive" : "Hide from the public archive"}</button>
+          <button type="submit" className="text-sm text-primary underline underline-offset-2">{campaign.archive_hidden ? "Show in the public archive" : "Hide from the public archive"}</button>
         </ActionForm>
       )}
     </div>
