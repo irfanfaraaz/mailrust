@@ -4839,12 +4839,19 @@
           "complaint_rate",
           "bounce_limit",
           "complaint_limit",
+          "bounce_min_sent",
+          "complaint_min_sent",
           "status"
         ],
         "properties": {
           "bounce_limit": {
             "type": "number",
             "format": "double"
+          },
+          "bounce_min_sent": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Auto-pause judges a rate only once this many emails went out in the window."
           },
           "bounce_rate": {
             "type": "number",
@@ -4854,6 +4861,10 @@
           "complaint_limit": {
             "type": "number",
             "format": "double"
+          },
+          "complaint_min_sent": {
+            "type": "integer",
+            "format": "int64"
           },
           "complaint_rate": {
             "type": "number",
@@ -4975,6 +4986,7 @@
           "open_rate",
           "click_rate",
           "bounce_rate",
+          "complaint_rate",
           "unsubscribe_rate"
         ],
         "properties": {
@@ -4983,6 +4995,10 @@
             "format": "double"
           },
           "click_rate": {
+            "type": "number",
+            "format": "double"
+          },
+          "complaint_rate": {
             "type": "number",
             "format": "double"
           },

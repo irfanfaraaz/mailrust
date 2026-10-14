@@ -13,9 +13,11 @@ export function Report({ account, campaign: c, report: r, archiveUrl }: Props) {
   const t = r.totals;
   const tiles: [string, string, string?][] = [
     ["Sent", fmt(t.sent), "total-sent"],
+    ["Delivered", fmt(t.delivered)],
     ["Opened", `${fmt(t.opened)} · ${pct(r.rates.open_rate)}`],
     ["Clicked", `${fmt(t.clicked)} · ${pct(r.rates.click_rate)}`],
     ["Bounced", `${fmt(t.bounced)} · ${pct(r.rates.bounce_rate)}`],
+    ["Marked as spam", `${fmt(t.complained)} · ${pct(r.rates.complaint_rate)}`],
     ["Unsubscribed", `${fmt(t.unsubscribed)} · ${pct(r.rates.unsubscribe_rate)}`, "total-unsubscribed"],
     ["Skipped", fmt(t.skipped)],
   ];

@@ -28,6 +28,7 @@ pub struct ReportRates {
     pub open_rate: f64,
     pub click_rate: f64,
     pub bounce_rate: f64,
+    pub complaint_rate: f64,
     pub unsubscribe_rate: f64,
 }
 
@@ -165,6 +166,7 @@ pub async fn build(pool: &PgPool, campaign_id: Uuid) -> sqlx::Result<CampaignRep
         open_rate: rate(totals.opened, totals.sent),
         click_rate: rate(totals.clicked, totals.sent),
         bounce_rate: rate(totals.bounced, totals.sent),
+        complaint_rate: rate(totals.complained, totals.sent),
         unsubscribe_rate: rate(totals.unsubscribed, totals.sent),
     };
     Ok(CampaignReport {

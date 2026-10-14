@@ -1110,6 +1110,7 @@ async fn the_report_counts_unique_people_per_link_and_provider(pool: PgPool) {
     assert_eq!(tot["unsubscribed"], 1);
     assert_eq!(r["rates"]["open_rate"], 0.25);
     assert_eq!(r["rates"]["click_rate"], 0.5);
+    assert_eq!(r["rates"]["complaint_rate"], 0.0);
     assert_eq!(
         r["links"],
         json!([

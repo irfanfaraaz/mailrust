@@ -38,5 +38,7 @@ async fn overview_counts_events_in_both_windows(pool: sqlx::PgPool) {
     assert_eq!(b["last_7d"]["bounced"], 1);
     assert!((b["bounce_rate"].as_f64().unwrap() - 1.0 / 3.0).abs() < 1e-9);
     assert_eq!(b["bounce_limit"], 0.02);
+    assert_eq!(b["bounce_min_sent"], 100);
+    assert_eq!(b["complaint_min_sent"], 1250);
     assert_eq!(b["status"], "active");
 }

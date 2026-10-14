@@ -26,6 +26,9 @@ pub struct Overview {
     pub complaint_rate: f64,
     pub bounce_limit: f64,
     pub complaint_limit: f64,
+    /// Auto-pause judges a rate only once this many emails went out in the window.
+    pub bounce_min_sent: i64,
+    pub complaint_min_sent: i64,
     pub status: AccountStatus,
     pub paused_reason: Option<String>,
 }
@@ -81,6 +84,8 @@ pub async fn overview(pool: &PgPool, account_id: Uuid) -> anyhow::Result<Option<
         complaint_rate: rate(r.c7),
         bounce_limit: safety::BOUNCE_LIMIT,
         complaint_limit: safety::COMPLAINT_LIMIT,
+        bounce_min_sent: safety::BOUNCE_MIN_SENT,
+        complaint_min_sent: safety::COMPLAINT_MIN_SENT,
         status: acc.status,
         paused_reason: acc.paused_reason,
     }))
