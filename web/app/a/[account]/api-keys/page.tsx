@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { ActionForm } from "@/components/action-form";
 import { EmptyState } from "@/components/empty-state";
 import { Loading } from "@/components/loading";
+import { PageHeader } from "@/components/page-header";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { buttonVariants } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -16,8 +17,8 @@ type Props = { params: Promise<{ account: string }> };
 
 export default function ApiKeys(props: Props) {
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">API keys</h1>
+    <div className="flex flex-col gap-8">
+      <PageHeader title="API keys" description="Your app sends email by calling the API with one of these keys as a Bearer token." />
       {/* params and the engine call are request data: read them inside Suspense (cacheComponents). */}
       <Suspense fallback={<Loading />}>
         <Keys {...props} />
@@ -56,7 +57,7 @@ async function Keys({ params }: Props) {
               <TableRow key={k.id}>
                 <TableCell className="font-medium">{k.name}</TableCell>
                 <TableCell className="font-mono">{k.prefix}…</TableCell>
-                <TableCell>{k.access}</TableCell>
+                <TableCell className="font-mono text-[0.8125rem]">{k.access}</TableCell>
                 <TableCell className="tabular-nums text-muted-foreground">{k.last_used_at ? <LocalTime iso={k.last_used_at} /> : "never"}</TableCell>
                 <TableCell className="text-right tabular-nums text-muted-foreground"><LocalTime iso={k.created_at} /></TableCell>
                 <TableCell className="text-right">

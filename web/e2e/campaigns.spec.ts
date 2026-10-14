@@ -5,7 +5,7 @@ test("a draft with an image and a merge tag autosaves, previews and goes out as 
   const owner = await freshOwner(page, "editor");
   await openSignupForm(page, `e2e-ed-${Date.now()}`);
   await page.goto(`/a/${SEED.accountId}/campaigns`);
-  await page.getByRole("button", { name: "New campaign" }).click();
+  await page.getByRole("main").getByRole("button", { name: "New issue" }).click();
   await page.waitForURL(/\/campaigns\/[0-9a-f-]{36}$/);
 
   await page.getByLabel("Subject").fill("E2E issue one");
@@ -69,7 +69,7 @@ test("an issue goes to one tag in a wave and the report counts it", async ({ pag
   await expect(page.getByText("Contact saved")).toBeVisible();
 
   await page.goto(`/a/${SEED.accountId}/campaigns`);
-  await page.getByRole("button", { name: "New campaign" }).click();
+  await page.getByRole("main").getByRole("button", { name: "New issue" }).click();
   await page.waitForURL(/\/campaigns\/[0-9a-f-]{36}$/);
   const url = page.url();
   await page.getByLabel("Subject").fill(`E2E send ${Date.now()}`);

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { BackLink } from "@/components/back-link";
 import { Loading } from "@/components/loading";
+import { PageHeader } from "@/components/page-header";
 import { ImportStatusBadge } from "@/components/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { engine, type Schemas } from "@/lib/engine";
@@ -15,12 +16,13 @@ type Props = { params: Promise<{ account: string }>; searchParams: Promise<{ job
 
 export default function Import(props: Props) {
   return (
-    <div className="flex flex-col gap-6">
-      {/* The back link needs the account from params: request data, so it reads inside Suspense too. */}
-      <Suspense fallback={<span className="h-5" />}>
-        <Back params={props.params} />
-      </Suspense>
-      <h1 className="text-2xl font-semibold">Import contacts</h1>
+    <div className="flex flex-col gap-8">
+      <PageHeader title="Import contacts" description="Bring people over from a CSV file.">
+        {/* The back link needs the account from params: request data, so it reads inside Suspense too. */}
+        <Suspense fallback={<span className="h-5" />}>
+          <Back params={props.params} />
+        </Suspense>
+      </PageHeader>
       <Suspense fallback={<Loading />}>
         <Body {...props} />
       </Suspense>
@@ -47,8 +49,8 @@ async function Body({ params, searchParams }: Props) {
       {current && <ImportProgress job={current} />}
       <UploadForm account={account} tags={tags.data} />
       {past.data.length > 0 && (
-        <section className="flex flex-col gap-2">
-          <h2 className="text-lg font-medium">Past imports</h2>
+        <section className="flex flex-col gap-3">
+          <h2 className="text-lg font-semibold">Past imports</h2>
           <Table>
             <TableHeader>
               <TableRow>
@@ -70,7 +72,7 @@ async function Body({ params, searchParams }: Props) {
                   <TableCell className="text-right tabular-nums">{p.added}</TableCell>
                   <TableCell className="text-right tabular-nums">{p.updated}</TableCell>
                   <TableCell className="text-right tabular-nums">{p.skipped}</TableCell>
-                  <TableCell className="text-right"><Link className="underline underline-offset-2" href={`?job=${p.id}`}>Report</Link></TableCell>
+                  <TableCell className="text-right"><Link className="text-primary underline underline-offset-2" href={`?job=${p.id}`}>Report</Link></TableCell>
                 </TableRow>
               ))}
             </TableBody>

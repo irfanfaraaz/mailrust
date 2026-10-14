@@ -9,7 +9,7 @@ export function ConfirmForm({ token, next }: { token: string; next: string }) {
     <form action={action} className="flex flex-col gap-3">
       <input type="hidden" name="token" value={token} />
       <input type="hidden" name="next" value={next} />
-      {state.error && <p role="alert" className="text-sm text-destructive">{state.error} <a className="underline" href="/login">Get a new link</a></p>}
+      {state.error && <p role="alert" className="text-sm text-destructive">{state.error} <a className="text-primary underline underline-offset-2" href="/login">Get a new link</a></p>}
       <Button type="submit" disabled={pending}>Log in</Button>
     </form>
   );

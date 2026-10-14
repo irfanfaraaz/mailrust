@@ -4,7 +4,9 @@ import { EmptyState } from "@/components/empty-state";
 import { Loading } from "@/components/loading";
 import { NativeSelect } from "@/components/native-select";
 import { BlockedBadge, ContactStatusBadge } from "@/components/status-badge";
+import { PageHeader } from "@/components/page-header";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { engine, type Schemas } from "@/lib/engine";
@@ -22,14 +24,17 @@ const STATUS_LABEL: Record<Schemas["ContactStatus"], string> = { subscribed: "Su
 
 export default function Contacts(props: Props) {
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Contacts</h1>
-        {/* params, searchParams and the engine calls are request data: read them inside Suspense (cacheComponents). */}
-        <Suspense fallback={null}>
-          <Actions params={props.params} />
-        </Suspense>
-      </div>
+    <div className="flex flex-col gap-8">
+      {/* params, searchParams and the engine calls are request data: read them inside Suspense (cacheComponents). */}
+      <PageHeader
+        title="Contacts"
+        description="Everyone who can get your email, and where they stand."
+        actions={
+          <Suspense fallback={null}>
+            <Actions params={props.params} />
+          </Suspense>
+        }
+      />
       <Suspense fallback={<Loading />}>
         <List {...props} />
       </Suspense>
@@ -40,11 +45,11 @@ export default function Contacts(props: Props) {
 async function Actions({ params }: Pick<Props, "params">) {
   const { account } = await params;
   return (
-    <div className="flex flex-wrap gap-2">
+    <>
       <Link href={`/a/${account}/contacts/import`} className={buttonVariants({ variant: "outline", size: "sm" })}>Import</Link>
       {/* A file download from a route handler: a plain link, not client navigation. */}
       <a href={`/a/${account}/contacts/export`} download className={buttonVariants({ variant: "outline", size: "sm" })}>Export CSV</a>
-    </div>
+    </>
   );
 }
 
@@ -65,12 +70,16 @@ async function List({ params, searchParams }: Props) {
   const clear = <Link className="underline underline-offset-2" href={base}>Clear filters</Link>;
   return (
     <>
-      <section aria-labelledby="add-contact-title" className="flex flex-col gap-3 rounded-lg bg-muted/40 p-4">
-        <div className="flex flex-col gap-0.5">
-          <h2 id="add-contact-title" className="font-medium">Add a contact</h2>
-          <p className="text-sm text-muted-foreground">Subscribed at once, with no confirm email: only for people who already agreed.</p>
-        </div>
-        <AddContact account={account} />
+      <section aria-labelledby="add-contact-title">
+        <Card>
+          <CardHeader>
+            <h2 id="add-contact-title" className="text-lg leading-snug font-semibold">Add a contact</h2>
+            <p className="text-sm text-muted-foreground">Subscribed at once, with no confirm email: only for people who already agreed.</p>
+          </CardHeader>
+          <CardContent>
+            <AddContact account={account} />
+          </CardContent>
+        </Card>
       </section>
       {n === 0 && !hasFilters && !sp.after ? (
         <EmptyState
@@ -80,19 +89,19 @@ async function List({ params, searchParams }: Props) {
           href={`${base}/import`}
         />
       ) : (
-        <section aria-label="Contact list" className="flex flex-col gap-3">
+        <section aria-label="Contact list" className="flex flex-col gap-4">
           {/* A plain GET form: filters live in the URL and need no JS. */}
           <form method="get" className="flex flex-wrap items-end gap-3 text-sm">
-            <label className="flex flex-col gap-1">Search
+            <label className="flex flex-col gap-1.5"><span className="label-caps text-muted-foreground">Search</span>
               <Input name="q" type="search" placeholder="Email or name" defaultValue={sp.q ?? ""} />
             </label>
-            <label className="flex flex-col gap-1">Status
+            <label className="flex flex-col gap-1.5"><span className="label-caps text-muted-foreground">Status</span>
               <NativeSelect name="status" defaultValue={sp.status ?? ""}>
                 <option value="">Any</option>
                 {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
               </NativeSelect>
             </label>
-            <label className="flex flex-col gap-1">Tag
+            <label className="flex flex-col gap-1.5"><span className="label-caps text-muted-foreground">Tag</span>
               <NativeSelect name="tag" defaultValue={sp.tag ?? ""}>
                 <option value="">Any</option>
                 {tags.data.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -102,7 +111,7 @@ async function List({ params, searchParams }: Props) {
             {hasFilters && <span className="pb-2">{clear}</span>}
           </form>
           {n === 0 ? (
-            <p className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+            <p className="sketch sketch-lg bg-card p-6 text-sm text-muted-foreground">
               No contacts match these filters. {clear}
             </p>
           ) : (
@@ -112,10 +121,10 @@ async function List({ params, searchParams }: Props) {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Email</TableHead>
-                    <TableHead>Name</TableHead>
+                    <TableHead className="max-md:hidden">Name</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Tags</TableHead>
-                    <TableHead className="text-right">Added</TableHead>
+                    <TableHead className="max-md:hidden">Tags</TableHead>
+                    <TableHead className="max-md:hidden text-right">Added</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -124,15 +133,15 @@ async function List({ params, searchParams }: Props) {
                       <TableCell className="font-medium">
                         <Link className="underline-offset-2 hover:underline" href={`${base}/${c.id}`}>{c.email}</Link>
                       </TableCell>
-                      <TableCell>{[c.first_name, c.last_name].filter(Boolean).join(" ")}</TableCell>
+                      <TableCell className="max-md:hidden">{[c.first_name, c.last_name].filter(Boolean).join(" ")}</TableCell>
                       <TableCell>
-                        <span className="flex gap-1">
+                        <span className="flex flex-wrap gap-1.5">
                           <ContactStatusBadge status={c.status} />
                           {c.blocked && <BlockedBadge />}
                         </span>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{c.tags.map((t) => t.name).join(", ")}</TableCell>
-                      <TableCell className="text-right tabular-nums text-muted-foreground"><LocalTime iso={c.created_at} /></TableCell>
+                      <TableCell className="max-md:hidden text-muted-foreground">{c.tags.map((t) => t.name).join(", ")}</TableCell>
+                      <TableCell className="max-md:hidden text-right tabular-nums text-muted-foreground"><LocalTime iso={c.created_at} /></TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

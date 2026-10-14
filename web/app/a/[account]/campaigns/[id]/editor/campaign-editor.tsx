@@ -5,6 +5,7 @@ import StarterKit from "@tiptap/starter-kit";
 import { Placeholder } from "@tiptap/extensions";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import type { Schemas } from "@/lib/engine";
 import { plain } from "@/lib/plain";
@@ -13,11 +14,12 @@ import { SendDialog } from "../send-dialog";
 import { CampaignImage, EmailButton, MergeTag } from "./extensions";
 import { InsertDialogs } from "./insert-dialogs";
 import { PreviewDialog } from "./preview-dialog";
+import { SlashHint } from "./slash-hint";
 import { SlashCommand, type DialogKind } from "./slash-menu";
 import { TestDialog } from "./test-dialog";
 
 type Props = { account: string; campaign: Schemas["Campaign"]; me: string; tags: Schemas["TagView"][] };
-type SaveState = "idle" | "saved" | "saving" | { error: string };
+type SaveState = "idle" | "saved" | "settled" | "saving" | { error: string };
 
 /** A new issue is a doc with no blocks; give it one empty paragraph so the "type /" hint shows. */
 const startDoc = (blocks: unknown): JSONContent => {
@@ -56,7 +58,7 @@ export function CampaignEditor({ account, campaign, me, tags }: Props) {
       SlashCommand.configure({ open: setDialog }),
     ],
     content: doc,
-    editorProps: { attributes: { class: "campaign-editor min-h-80 rounded-md border px-4 py-3 focus:outline-none", "aria-label": "Issue body" } },
+    editorProps: { attributes: { class: "campaign-editor min-h-[28rem] px-1 py-2 text-base focus:outline-none", "aria-label": "Issue body" } },
     onUpdate: ({ editor }) => {
       dirty.current = true;
       setDoc(editor.getJSON());
@@ -83,34 +85,69 @@ export function CampaignEditor({ account, campaign, me, tags }: Props) {
     return () => clearTimeout(t);
   }, [flush]);
 
+  // "Saved" with its tick shows for 2 s, then settles into a quiet line.
+  useEffect(() => {
+    if (save !== "saved") return;
+    const t = setTimeout(() => setSave("settled"), 2000);
+    return () => clearTimeout(t);
+  }, [save]);
+
   const edit = (f: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
     dirty.current = true;
     f(e.target.value);
   };
 
+  const audience = campaign.include_tags.length > 0 ? `Readers tagged ${campaign.include_tags.map((id) => tags.find((t) => t.id === id)?.name ?? id).join(", ")}` : "Everyone subscribed";
+  const skipped = campaign.exclude_tags.map((id) => tags.find((t) => t.id === id)?.name ?? id);
+
   return (
-    <div className="flex flex-col gap-4">
-      <label htmlFor={subjectId} className="flex flex-col gap-1 text-sm">Subject
-        <Input id={subjectId} value={subject} onChange={edit(setSubject)} maxLength={200} className="text-base" />
-      </label>
-      <label htmlFor={previewId} className="flex flex-col gap-1 text-sm">Preview text
-        <Input id={previewId} value={previewText} onChange={edit(setPreviewText)} maxLength={200} placeholder="Shown next to the subject in the inbox" />
-      </label>
-      <div role="toolbar" aria-label="Insert" className="flex flex-wrap gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={() => setDialog("image")}>Image</Button>
-        <Button type="button" variant="outline" size="sm" onClick={() => setDialog("button")}>Button</Button>
-        <Button type="button" variant="outline" size="sm" onClick={() => setDialog("merge")}>Merge tag</Button>
-        <Button type="button" variant="outline" size="sm" onClick={() => editor?.chain().focus().setHorizontalRule().run()}>Divider</Button>
+    <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_19rem]">
+      <div className="sketch sketch-lg flex flex-col gap-5 bg-card p-6 sm:p-8">
+        <label htmlFor={subjectId} className="label-caps flex flex-col gap-1.5 text-muted-foreground">Subject
+          <Input id={subjectId} value={subject} onChange={edit(setSubject)} maxLength={200} className="font-heading text-lg font-semibold normal-case tracking-normal text-foreground" />
+        </label>
+        <label htmlFor={previewId} className="label-caps flex flex-col gap-1.5 text-muted-foreground">Preview text
+          <Input id={previewId} value={previewText} onChange={edit(setPreviewText)} maxLength={200} placeholder="Shown next to the subject in the inbox" className="normal-case tracking-normal text-foreground" />
+        </label>
+        <div role="toolbar" aria-label="Insert" className="flex flex-wrap gap-2 border-t border-dashed border-foreground/30 pt-5">
+          <Button type="button" variant="outline" size="sm" onClick={() => setDialog("image")}>Image</Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => setDialog("button")}>Button</Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => setDialog("merge")}>Merge tag</Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => editor?.chain().focus().setHorizontalRule().run()}>Divider</Button>
+        </div>
+        <div className="relative">
+          <SlashHint empty={editor?.isEmpty ?? false} />
+          <EditorContent editor={editor} />
+        </div>
       </div>
-      <EditorContent editor={editor} />
-      <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={async () => { await flush(); setPreview(await previewCampaign(account, campaign.id)); }}>Preview</Button>
-        <TestDialog account={account} id={campaign.id} me={me} beforeSend={flush} />
-        <SendDialog account={account} campaign={campaign} tags={tags} beforeOpen={flush} />
-        <span role="status" className="ml-auto text-sm text-muted-foreground">
-          {save === "idle" ? "" : save === "saved" ? "Saved" : save === "saving" ? "Saving…" : <span className="text-destructive">Not saved: {save.error}</span>}
-        </span>
-      </div>
+      <aside aria-label="Issue actions" className="flex flex-col gap-5 lg:sticky lg:top-6">
+        <Card>
+          <CardHeader><h2 className="text-lg leading-snug font-semibold">Ready to send?</h2></CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <SendDialog account={account} campaign={campaign} tags={tags} beforeOpen={flush} />
+            <Button type="button" variant="outline" onClick={async () => { await flush(); setPreview(await previewCampaign(account, campaign.id)); }}>Preview</Button>
+            <TestDialog account={account} id={campaign.id} me={me} beforeSend={flush} />
+            <span role="status" className="text-sm text-muted-foreground">
+              {save === "idle" ? "" : save === "saving" ? (
+                <span className="inline-flex items-center gap-2"><span aria-hidden className="save-dot size-1.5 rounded-full bg-wait" />Saving…</span>
+              ) : save === "saved" ? (
+                <span className="inline-flex items-center gap-1.5 text-good">
+                  <svg aria-hidden className="tick-draw size-4" viewBox="0 0 16 16"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  Saved
+                </span>
+              ) : save === "settled" ? "All changes saved" : <span className="text-destructive">Not saved: {save.error}</span>}
+            </span>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><h2 className="text-lg leading-snug font-semibold">Audience</h2></CardHeader>
+          <CardContent className="flex flex-col gap-1.5">
+            <span>{audience}</span>
+            {skipped.length > 0 && <span className="text-muted-foreground">Skipping {skipped.join(", ")}</span>}
+            <span className="text-muted-foreground">Choose the audience and see the checks when you press Send.</span>
+          </CardContent>
+        </Card>
+      </aside>
       <InsertDialogs account={account} editor={editor} kind={dialog} close={() => setDialog(null)} />
       <PreviewDialog preview={preview} close={() => setPreview(null)} />
     </div>

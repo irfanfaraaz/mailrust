@@ -2,13 +2,16 @@ import { Suspense } from "react";
 import { BackLink } from "@/components/back-link";
 import { ConfirmAction } from "@/components/confirm-action";
 import { Loading } from "@/components/loading";
+import { PageHeader } from "@/components/page-header";
 import { CampaignStatusBadge } from "@/components/status-badge";
 import { currentAccount } from "@/lib/account";
 import { engine, type Schemas } from "@/lib/engine";
 import { deleteDraft } from "./actions";
 import { CampaignEditor } from "./editor/campaign-editor";
 import { Report } from "./report";
+import { SentCelebration } from "./sent-celebration";
 import { LocalTime } from "@/components/local-time";
+import { MorphTitle } from "@/components/morph";
 
 export const metadata = { title: "Campaign" };
 
@@ -16,7 +19,7 @@ type Props = { params: Promise<{ account: string; id: string }> };
 
 export default function CampaignPage(props: Props) {
   return (
-    <div className="flex max-w-3xl flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <Suspense fallback={<Loading />}>
         <Body {...props} />
       </Suspense>
@@ -38,13 +41,13 @@ async function Body({ params }: Props) {
   const archiveUrl = c.status === "sent" && !c.archive_hidden && newsletter.public_slug && c.archive_slug ? `/p/${newsletter.public_slug}/${c.archive_slug}` : null;
   return (
     <>
-      <BackLink href={`/a/${account}/campaigns`}>Campaigns</BackLink>
-      <div className="flex items-center gap-3">
-        <h1 className="text-2xl font-semibold">{c.subject || "Untitled draft"}</h1>
-        <CampaignStatusBadge status={c.status} />
-        {c.status === "draft" && (
-          <div className="ml-auto">
-            <ConfirmAction
+      <PageHeader
+        title={<MorphTitle morph={`camp-${c.id}`}>{c.subject || "Untitled draft"}</MorphTitle>}
+        actions={
+          <>
+            <CampaignStatusBadge status={c.status} />
+            {c.status === "draft" && (
+              <ConfirmAction
               trigger="Delete draft"
               title="Delete this draft?"
               description="The draft is erased for good. This cannot be undone."
@@ -52,17 +55,21 @@ async function Body({ params }: Props) {
               dismiss="Keep it"
               done="Draft deleted"
               action={deleteDraft.bind(null, account, c.id)}
-            />
-          </div>
-        )}
-      </div>
-      {c.status === "scheduled" && c.send_at && <p role="status" className="text-sm">Scheduled for <LocalTime iso={c.send_at} />. Editing it puts it back to draft.</p>}
-      {c.status === "draft" && c.paused_reason && <p role="alert" className="text-sm text-destructive">Not sent: {c.paused_reason}</p>}
+              />
+            )}
+          </>
+        }
+      >
+        <BackLink href={`/a/${account}/campaigns`}>Campaigns</BackLink>
+      </PageHeader>
+      {c.status === "scheduled" && c.send_at && <p role="status" className="sketch bg-card px-4 py-3 text-sm">Scheduled for <LocalTime iso={c.send_at} />. Editing it puts it back to draft.</p>}
+      {c.status === "draft" && c.paused_reason && <p role="alert" className="sketch bg-card px-4 py-3 text-sm text-destructive">Not sent: {c.paused_reason}</p>}
       {editable ? (
         <CampaignEditor account={account} campaign={c} me={me.user.email} tags={tags.data} />
       ) : (
         <Report account={account} campaign={c} report={report!} archiveUrl={archiveUrl} />
       )}
+      <SentCelebration campaignId={c.id} />
     </>
   );
 }

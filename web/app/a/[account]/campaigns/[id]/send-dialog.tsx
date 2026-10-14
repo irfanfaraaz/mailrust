@@ -9,6 +9,8 @@ import type { Schemas } from "@/lib/engine";
 import { when } from "@/lib/format";
 import { namesMissingText, wavePlanText } from "@/lib/report";
 import { changeStatus, previewCampaign, setAudience } from "./actions";
+import { celebrateSend } from "./sent-celebration";
+import { morphFrom, rememberFrom } from "@/lib/morph";
 
 type Props = { account: string; campaign: Schemas["Campaign"]; tags: Schemas["TagView"][]; beforeOpen?: () => Promise<void> };
 
@@ -53,6 +55,7 @@ export function SendDialog({ account, campaign, tags, beforeOpen }: Props) {
     setPending(false);
     if (r.error) return setError(r.error);
     toast.success(sendAt ? `Scheduled for ${when(sendAt, Intl.DateTimeFormat().resolvedOptions().timeZone)}` : "Sending started");
+    if (!sendAt) celebrateSend(campaign.id, preview?.readers ?? 0);
     setOpen(false);
     router.refresh();
   };
@@ -60,14 +63,15 @@ export function SendDialog({ account, campaign, tags, beforeOpen }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger className={buttonVariants({ size: "sm" })}>Send…</DialogTrigger>
-      <DialogContent className="sm:max-w-xl">
+      {/* The dialog grows out of the Send button instead of its usual rise-in. */}
+      <DialogTrigger className={buttonVariants({ size: "lg" }) + " w-full"} onClick={(e) => rememberFrom("send", e.currentTarget)}>Send…</DialogTrigger>
+      <DialogContent className="sm:max-w-xl data-open:animate-none" ref={(el) => { if (el) morphFrom("send", el); }}>
         <DialogHeader>
           <DialogTitle>Send this issue</DialogTitle>
           <DialogDescription>Only subscribed readers get it. Unsubscribed, pending and blocked addresses are always left out.</DialogDescription>
         </DialogHeader>
         <fieldset className="flex flex-col gap-2 text-sm">
-          <legend className="mb-1 font-medium">Audience</legend>
+          <legend className="label-caps mb-1 text-muted-foreground">Audience</legend>
           <label className="flex items-center gap-2"><input type="radio" name="audience" checked={!some} onChange={() => setSome(false)} />Everyone subscribed</label>
           <label className="flex items-center gap-2"><input type="radio" name="audience" checked={some} onChange={() => setSome(true)} />Only some tags</label>
           {some && (
@@ -94,16 +98,16 @@ export function SendDialog({ account, campaign, tags, beforeOpen }: Props) {
             {missing && <p className="text-muted-foreground">{missing}</p>}
             <ul className="flex flex-col gap-1" aria-label="Checks">
               {preview.checks.map((c) => (
-                <li key={c.code} className={c.ok ? "text-muted-foreground" : "text-destructive"}>{c.ok ? "✓" : "✗"} {c.message}</li>
+                <li key={c.code} className={c.ok ? "text-good" : "text-destructive"}>{c.ok ? "✓" : "✗"} {c.message}</li>
               ))}
-              {preview.warnings.map((w) => <li key={w} className="text-amber-700 dark:text-amber-300">! {w}</li>)}
+              {preview.warnings.map((w) => <li key={w} className="text-wait">! {w}</li>)}
             </ul>
           </div>
         )}
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         <div className="flex flex-wrap items-end gap-3">
           <Button disabled={!ready || pending} onClick={() => go()}>Send now</Button>
-          <label className="flex flex-col gap-1 text-sm">Send at
+          <label className="label-caps flex flex-col gap-1 text-muted-foreground">Send at
             <Input type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} />
           </label>
           <Button variant="outline" disabled={!ready || pending || !at} onClick={() => go(new Date(at).toISOString())}>Schedule</Button>

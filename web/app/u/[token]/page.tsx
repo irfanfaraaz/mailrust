@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { engine, type Schemas } from "@/lib/engine";
+import { Card } from "@/components/ui/card";
 import { noJsUnsubState } from "@/lib/public-routes";
 import { UnsubscribeForm } from "./unsubscribe-form";
 
@@ -9,11 +10,13 @@ type Props = { params: Promise<{ token: string }>; searchParams: Promise<{ done?
 
 export default function Unsubscribe(props: Props) {
   return (
-    <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-4 px-4">
-      <h1 className="text-2xl font-semibold">Unsubscribe</h1>
-      <Suspense>
-        <Body {...props} />
-      </Suspense>
+    <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center px-4 py-10">
+      <Card className="gap-4 px-6 py-7">
+        <h1 className="text-2xl font-semibold">Unsubscribe</h1>
+        <Suspense>
+          <Body {...props} />
+        </Suspense>
+      </Card>
     </main>
   );
 }

@@ -16,7 +16,7 @@ export function PreviewDialog({ preview, close }: { preview: Schemas["CampaignPr
           <Button variant={width === 375 ? "default" : "outline"} size="sm" onClick={() => setWidth(375)}>Phone</Button>
         </div>
         {/* Never add allow-scripts: same-origin alone only lets the frame load /img images, which a fully opaque frame blocks. */}
-        {preview && <iframe title="Email preview" sandbox="allow-same-origin" srcDoc={preview.html} width={width} height={560} className="max-w-full rounded-md border bg-white" />}
+        {preview && <iframe title="Email preview" sandbox="allow-same-origin" srcDoc={preview.html} width={width} height={560} className="sketch max-w-full bg-white" />}
         <p className="text-sm text-muted-foreground">Merge tags show their fallbacks here; each reader sees their own values.</p>
       </DialogContent>
     </Dialog>

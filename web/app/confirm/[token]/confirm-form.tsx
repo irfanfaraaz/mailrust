@@ -11,7 +11,7 @@ export function ConfirmForm({ token, name, slug }: { token: string; name: string
     return (
       <>
         <h1 className={heading}>Subscription confirmed</h1>
-        <p role="status" className="text-lg">You&apos;re subscribed to {state.name}.</p>
+        <p role="status" className="text-lg text-good">You&apos;re subscribed to {state.name}.</p>
         <p className="text-sm text-muted-foreground">The next issue comes to this inbox. Every issue has an unsubscribe link.</p>
       </>
     );
@@ -25,7 +25,7 @@ export function ConfirmForm({ token, name, slug }: { token: string; name: string
           <p className="text-sm text-muted-foreground">
             If you confirmed before, you are already subscribed. If not, sign up again on the newsletter&apos;s signup form to get a new link.
           </p>
-          {slug && <a className="underline underline-offset-2" href={`/join/${encodeURIComponent(slug)}`}>Sign up again</a>}
+          {slug && <a className="text-primary underline underline-offset-2" href={`/join/${encodeURIComponent(slug)}`}>Sign up again</a>}
         </div>
       </>
     );

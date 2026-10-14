@@ -25,9 +25,9 @@ export function runBlock(editor: Editor, id: BlockId, open: (k: DialogKind) => v
 }
 
 function Menu({ items, index, pick }: { items: BlockItem[]; index: number; pick: (i: BlockItem) => void }) {
-  if (items.length === 0) return <div className="rounded-md border bg-popover px-3 py-2 text-sm text-muted-foreground shadow-md">No blocks match</div>;
+  if (items.length === 0) return <div className="sketch bg-popover px-3 py-2 text-sm text-muted-foreground shadow-md">No blocks match</div>;
   return (
-    <div role="listbox" aria-label="Blocks" className="w-64 rounded-md border bg-popover p-1 text-sm shadow-md">
+    <div role="listbox" aria-label="Blocks" className="sketch w-64 bg-popover p-1 text-sm">
       {items.map((it, i) => (
         <button
           key={it.id}

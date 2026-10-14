@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { HONEYPOT } from "@/lib/embed";
@@ -14,7 +15,7 @@ type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ error?
 
 export default function Join(props: Props) {
   return (
-    <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-6 px-4">
+    <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center px-4 py-10">
       {/* params, searchParams and the engine call are request data: read them inside Suspense (cacheComponents). */}
       <Suspense>
         <JoinForm {...props} />
@@ -35,18 +36,18 @@ async function JoinForm({ params, searchParams }: Props) {
   }
   if (!n.open) {
     return (
-      <>
+      <Card className="gap-4 px-6 py-7">
         <h1 className="text-2xl font-semibold">{n.name}</h1>
         <p>This newsletter is not taking signups right now.</p>
         <p className="text-sm text-muted-foreground">Check back later.</p>
-      </>
+      </Card>
     );
   }
   const bad = error === "email";
   const badName = error === "name";
   const draft = bad || badName ? readDraft((await cookies()).get(DRAFT_COOKIE)?.value) : { email: "", first_name: "" };
   return (
-    <>
+    <Card className="gap-4 px-6 py-7">
       <h1 className="text-2xl font-semibold">Subscribe to {n.name}</h1>
       {/* A plain POST, not a server action: the same route handler takes forms embedded on other sites. */}
       <form method="post" action={`/join/${encodeURIComponent(slug)}`} className="flex flex-col gap-4">
@@ -84,6 +85,6 @@ async function JoinForm({ params, searchParams }: Props) {
         <Button type="submit">Subscribe</Button>
       </form>
       <p className="text-xs text-muted-foreground">You will get an email to confirm. Unsubscribe any time from any issue.</p>
-    </>
+    </Card>
   );
 }

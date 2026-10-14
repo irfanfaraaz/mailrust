@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { ConfirmAction } from "@/components/confirm-action";
+import { EmptyState } from "@/components/empty-state";
 import { Loading } from "@/components/loading";
+import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { engine, type Schemas } from "@/lib/engine";
@@ -17,9 +20,8 @@ type Props = { params: Promise<{ account: string }>; searchParams: Promise<SP> }
 
 export default function Suppressions(props: Props) {
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Suppressions</h1>
-      <p className="text-sm text-muted-foreground">Mailrust never sends to these addresses. Bounces and complaints add them automatically.</p>
+    <div className="flex flex-col gap-8">
+      <PageHeader title="Suppressions" description="Mailrust never sends to these addresses. Bounces and complaints add them automatically." />
       {/* params, searchParams and the engine call are request data: read them inside Suspense (cacheComponents). */}
       <Suspense fallback={<Loading />}>
         <List {...props} />
@@ -40,12 +42,16 @@ async function List({ params, searchParams }: Props) {
     <>
       <AddSuppression account={account} />
       {/* A plain GET form: the search lives in the URL and needs no JS. */}
-      <form method="get" className="flex flex-wrap items-end gap-3 text-sm">
-        <label className="flex flex-col gap-1">Search
-          <Input name="q" type="search" placeholder="Address" defaultValue={sp.q ?? ""} />
-        </label>
-        <Button type="submit" variant="secondary">Search</Button>
-      </form>
+      <Card size="sm">
+        <CardContent>
+          <form method="get" className="flex flex-wrap items-end gap-3 text-sm">
+            <label className="flex flex-col gap-1.5"><span className="label-caps text-muted-foreground">Search</span>
+              <Input name="q" type="search" placeholder="Address" defaultValue={sp.q ?? ""} />
+            </label>
+            <Button type="submit" variant="outline">Search</Button>
+          </form>
+        </CardContent>
+      </Card>
       <Table>
         <TableHeader>
           <TableRow>
@@ -58,7 +64,7 @@ async function List({ params, searchParams }: Props) {
         <TableBody>
           {list.data.map((s) => (
             <TableRow key={s.address}>
-              <TableCell className="font-medium">{s.address}</TableCell>
+              <TableCell className="font-mono text-[0.8125rem]">{s.address}</TableCell>
               <TableCell className="text-muted-foreground">{s.reason}</TableCell>
               <TableCell className="text-right tabular-nums text-muted-foreground"><LocalTime iso={s.created_at} /></TableCell>
               <TableCell className="text-right">
@@ -75,8 +81,8 @@ async function List({ params, searchParams }: Props) {
           ))}
         </TableBody>
       </Table>
-      {list.data.length === 0 && <p className="text-muted-foreground">No suppressed addresses.</p>}
-      {list.next_cursor && <Link className="self-start underline underline-offset-2" href={`?${older}`}>Older →</Link>}
+      {list.data.length === 0 && <EmptyState title="No suppressed addresses" hint="Addresses that bounce or complain are blocked here automatically." />}
+      {list.next_cursor && <Link className="self-start font-medium text-primary underline underline-offset-2" href={`?${older}`}>Older →</Link>}
     </>
   );
 }
