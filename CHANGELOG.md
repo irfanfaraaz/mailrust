@@ -14,12 +14,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Issue report: Delivered and Marked as spam totals, with a complaint rate.
 - Every time in the dashboard and the public archive shows in the viewer's own time zone, labelled (for example 14:03 GMT+5:30).
 - Overview: below the auto-pause minimums (100 emails for bounces, 1,250 for complaints) the bars stay grey and say "Not checked yet". `GET /stats/overview` returns `bounce_min_sent` and `complaint_min_sent`.
+- Toasts after every dashboard action: pause, resume, cancel, send, schedule, test send, delete, unblock, DNS check and tracking. A failed action shows its error as a toast.
+- A sending issue shows when its next wave starts.
+- The email page shows HTML bodies, in a sandboxed frame.
 
 ### Fixed
 
 - Autosave failed with "missing field `attrs`" as soon as an issue had a button, image, heading or merge tag.
 - Images did not show in the issue preview.
 - Overview showed the two rates with different decimals.
+- Tables were cut off on the right on narrow screens; cells now wrap.
+- "1 readers" in the send dialog and its checks.
+- The Resume and Pause confirm buttons were red, like a delete.
+- Form labels on the editor and the contact forms were not linked to their inputs.
+- The Desktop preview and the send dialog were squeezed to a narrow width.
+- A new issue's editor showed no "type / for blocks" hint.
+- The issue title stayed "Untitled draft" until a reload.
 
 ## [0.3.0] - 2026-10-14
 
