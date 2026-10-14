@@ -1,19 +1,29 @@
 "use client";
 import { Menu } from "@base-ui/react/menu";
+import { ChevronsUpDownIcon } from "lucide-react";
 import Link from "next/link";
 import { logout, logoutAll } from "@/app/login/actions";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { Schemas } from "@/lib/engine";
 
 const item = "flex cursor-default items-center rounded-md px-1.5 py-1 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground";
-const trigger = "flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted max-md:min-h-11";
+const trigger = "flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-sidebar-accent max-md:min-h-11";
 
 export function AccountMenu({ me, current }: { me: Schemas["MeResponse"]; current: Schemas["MyAccount"] }) {
   return (
-    <div className="flex flex-col gap-1 border-b p-3 max-md:border-b-0">
+    <div className="flex flex-col gap-0.5 p-3 pb-2">
       <DropdownMenu>
-        <DropdownMenuTrigger aria-label="Switch account" className={`${trigger} font-medium`}>
-          <span className="truncate">{current.name}</span>
+        <DropdownMenuTrigger aria-label="Switch account" className={trigger}>
+          <span className="flex min-w-0 items-center gap-2.5">
+            <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-md bg-primary font-heading text-base font-semibold text-primary-foreground">
+              {current.name.charAt(0).toUpperCase()}
+            </span>
+            <span className="flex min-w-0 flex-col">
+              <span className="truncate font-semibold">{current.name}</span>
+              <span className="truncate text-xs text-muted-foreground capitalize">{current.role}</span>
+            </span>
+          </span>
+          <ChevronsUpDownIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
         </DropdownMenuTrigger>
         <DropdownMenuContent>
           {me.accounts.map((a) => (
@@ -24,7 +34,7 @@ export function AccountMenu({ me, current }: { me: Schemas["MeResponse"]; curren
         </DropdownMenuContent>
       </DropdownMenu>
       <DropdownMenu>
-        <DropdownMenuTrigger aria-label="Account menu" className={`${trigger} text-muted-foreground`}>
+        <DropdownMenuTrigger aria-label="Account menu" className={`${trigger} text-xs text-muted-foreground`}>
           <span className="truncate">{me.user.email}</span>
         </DropdownMenuTrigger>
         <DropdownMenuContent>

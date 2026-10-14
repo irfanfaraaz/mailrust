@@ -9,7 +9,10 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-heading: var(--font-source-serif), ui-serif, Georgia, serif;
+  --color-good: var(--good);
+  --color-wait: var(--wait);
+  --color-paper: var(--paper);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -49,72 +52,88 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* Field notes: parchment ground, paper cards, ink text, one navy ink accent. */
+  --background: #f6f3ea;
+  --foreground: #1a2030;
+  --paper: #fdfbf5;
+  --card: #fdfbf5;
+  --card-foreground: #1a2030;
+  --popover: #fdfbf5;
+  --popover-foreground: #1a2030;
+  --primary: #1f3d7a;
+  --primary-foreground: #ffffff;
+  --secondary: #ebe6d8;
+  --secondary-foreground: #1a2030;
+  --muted: #ece8dc;
+  --muted-foreground: #5b6070;
+  --accent: #ebe6d8;
+  --accent-foreground: #1a2030;
+  --destructive: #c42b1c;
+  --good: #1d7a43;
+  --wait: #a35a0a;
+  --border: #ddd7c7;
+  --input: #c9c2b0;
+  --ring: #1f3d7a;
+  --chart-1: #1f3d7a;
+  --chart-2: #1d7a43;
+  --chart-3: #a35a0a;
+  --chart-4: #6b55b8;
+  --chart-5: #5b6070;
+  --radius: 0.5rem;
+  --sidebar: #f0ece1;
+  --sidebar-foreground: #1a2030;
+  --sidebar-primary: #1f3d7a;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e5e0d1;
+  --sidebar-accent-foreground: #1a2030;
+  --sidebar-border: #ddd7c7;
+  --sidebar-ring: #1f3d7a;
+  /* Sidebar group tabs, kept soft so they never compete with the navy accent. */
+  --tab-newsletter: #c4632f;
+  --tab-api: #1b8079;
+  --tab-settings: #6b55b8;
+  --ink-shadow: color-mix(in oklab, var(--foreground) 16%, transparent);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: #15171c;
+  --foreground: #eeede6;
+  --paper: #1c1f26;
+  --card: #1c1f26;
+  --card-foreground: #eeede6;
+  --popover: #1c1f26;
+  --popover-foreground: #eeede6;
+  --primary: #8aa8e6;
+  --primary-foreground: #0a1530;
+  --secondary: #262a33;
+  --secondary-foreground: #eeede6;
+  --muted: #262a33;
+  --muted-foreground: #a4a8b1;
+  --accent: #262a33;
+  --accent-foreground: #eeede6;
+  --destructive: #f0786b;
+  --good: #5fcf8a;
+  --wait: #f2b54a;
+  --border: #2f343e;
+  --input: #3a404b;
+  --ring: #8aa8e6;
+  --chart-1: #8aa8e6;
+  --chart-2: #5fcf8a;
+  --chart-3: #f2b54a;
+  --chart-4: #a996e8;
+  --chart-5: #a4a8b1;
+  --sidebar: #121419;
+  --sidebar-foreground: #eeede6;
+  --sidebar-primary: #8aa8e6;
+  --sidebar-primary-foreground: #0a1530;
+  --sidebar-accent: #23262e;
+  --sidebar-accent-foreground: #eeede6;
+  --sidebar-border: #2f343e;
+  --sidebar-ring: #8aa8e6;
+  --tab-newsletter: #e08a5c;
+  --tab-api: #4fb5ad;
+  --tab-settings: #a996e8;
+  --ink-shadow: rgb(0 0 0 / 0.45);
 }
 
 @layer base {
@@ -127,8 +146,39 @@
   html {
     @apply font-sans;
   }
+  h1, h2, h3 {
+    font-family: var(--font-heading);
+    letter-spacing: -0.012em;
+  }
 }
-.campaign-editor h1 { font-size: 1.75rem; font-weight: 600; margin: 1rem 0 0.5rem; }
+
+/* Hand-drawn card: ink border with uneven corners and a short offset shadow. */
+.sketch {
+  border: 2px solid var(--foreground);
+  border-radius: 255px 14px 225px 14px / 14px 225px 14px 255px;
+  box-shadow: 3px 4px 0 var(--ink-shadow);
+}
+/* Big panels (tables, the editor) keep the wobble small so the frame never looks bent. */
+.sketch-lg {
+  border-radius: 28px 8px 24px 8px / 8px 24px 8px 28px;
+}
+.sketch-btn {
+  border-width: 2px;
+  border-color: var(--foreground);
+  border-radius: 225px 12px 255px 12px / 12px 255px 12px 225px;
+}
+/* Numbers read as figures: every tabular number is set in the mono face. */
+.tabular-nums {
+  font-family: var(--font-mono);
+}
+/* Small labels: tracked uppercase. */
+.label-caps {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.campaign-editor h1 { font-size: 1.75rem; font-weight: 600; font-family: var(--font-heading); margin: 1rem 0 0.5rem; }
 .campaign-editor h2 { font-size: 1.375rem; font-weight: 600; margin: 1rem 0 0.5rem; }
 .campaign-editor h3 { font-size: 1.125rem; font-weight: 600; margin: 0.75rem 0 0.5rem; }
 .campaign-editor p { margin: 0 0 0.75rem; line-height: 1.6; }
