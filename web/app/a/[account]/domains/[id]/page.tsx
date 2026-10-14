@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { ActionForm } from "@/components/action-form";
 import { ConfirmAction } from "@/components/confirm-action";
 import { Loading } from "@/components/loading";
 import { DomainStatusBadge } from "@/components/status-badge";
@@ -77,20 +78,20 @@ async function Detail({ params }: Props) {
           </TableBody>
         </Table>
         <div className="flex flex-col items-start gap-2">
-          <form action={verifyDomain.bind(null, account, id)}>
+          <ActionForm action={verifyDomain.bind(null, account, id)} done="DNS checked">
             <Button type="submit" variant="secondary">Check now</Button>
-          </form>
+          </ActionForm>
           <p role="status" className={`max-w-prose text-sm ${result.className}`}>{result.text}</p>
         </div>
       </section>
 
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-medium">Tracking</h2>
-        <form action={updateTracking.bind(null, account, id)} className="flex flex-col gap-2 text-sm">
+        <ActionForm action={updateTracking.bind(null, account, id)} done="Tracking saved" className="flex flex-col gap-2 text-sm">
           <label className="flex items-center gap-1.5 max-md:min-h-11"><input type="checkbox" name="open_tracking" defaultChecked={d.open_tracking} />Track opens</label>
           <label className="flex items-center gap-1.5 max-md:min-h-11"><input type="checkbox" name="click_tracking" defaultChecked={d.click_tracking} />Track clicks</label>
           <Button type="submit" className="self-start">Save tracking</Button>
-        </form>
+        </ActionForm>
       </section>
 
       <ConfirmAction
@@ -99,6 +100,7 @@ async function Detail({ params }: Props) {
         title={`Remove ${d.name}?`}
         description="Emails from this domain will be refused."
         confirm="Remove domain"
+        done="Domain removed"
         action={deleteDomain.bind(null, account, id)}
       />
     </div>

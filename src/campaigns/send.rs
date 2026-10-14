@@ -265,7 +265,7 @@ pub async fn pause(state: &AppState, c: &Campaign, reason: &str) -> Result<(), A
     Ok(())
 }
 
-/// Checks again, then `sending` with the next wave due now. An issue that never started gets the full start.
+/// Checks again, then `sending`. The next wave keeps its gap after the last wave. An issue that never started gets the full start.
 pub async fn resume(state: &AppState, c: &Campaign, now: DateTime<Utc>) -> Result<(), ApiError> {
     if c.status != CampaignStatus::Paused {
         return Err(ApiError::Conflict(
@@ -301,10 +301,25 @@ pub async fn resume(state: &AppState, c: &Campaign, now: DateTime<Utc>) -> Resul
             return Err(another());
         }
     } else {
+        // A started wave finishes at once. Between waves the gap still runs from the last email sent,
+        // so a short pause cannot skip it; while emails are in flight the step loop starts the gap.
+        let next = sqlx::query_scalar!(
+            r#"SELECT CASE
+                 WHEN EXISTS (SELECT 1 FROM campaign_recipients WHERE campaign_id = $1 AND wave <= $2 AND email_id IS NULL) THEN $3
+                 WHEN EXISTS (SELECT 1 FROM emails WHERE campaign_id = $1 AND status IN ('queued', 'sending', 'unknown')) THEN NULL
+                 ELSE GREATEST($3, (SELECT max(sent_at) FROM emails WHERE campaign_id = $1) + make_interval(mins => $4))
+               END AS "next: DateTime<Utc>""#,
+            c.id,
+            locked.wave,
+            now,
+            plan::WAVE_GAP_MINUTES as i32
+        )
+        .fetch_one(&mut *tx)
+        .await?;
         let r = sqlx::query!(
             "UPDATE campaigns SET status = 'sending', paused_reason = NULL, next_wave_at = $2, updated_at = now() WHERE id = $1",
             c.id,
-            now
+            next
         )
         .execute(&mut *tx)
         .await;

@@ -258,7 +258,9 @@ pub async fn run(state: &AppState, c: &Campaign) -> anyhow::Result<Report> {
         check(
             "readers",
             audience.readers > 0,
-            if audience.readers > 0 {
+            if audience.readers == 1 {
+                "1 reader".to_string()
+            } else if audience.readers > 0 {
                 format!("{} readers", audience.readers)
             } else {
                 "No subscribed readers match this audience".to_string()

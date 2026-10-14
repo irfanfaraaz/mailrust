@@ -1,6 +1,5 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { engine } from "@/lib/engine";
 
 export async function verifyDomain(account: string, id: string) {
@@ -20,5 +19,5 @@ export async function updateTracking(account: string, id: string, form: FormData
 export async function deleteDomain(account: string, id: string) {
   await engine(`/domains/${id}`, { method: "DELETE", account });
   revalidatePath(`/a/${account}/domains`);
-  redirect(`/a/${account}/domains`);
+  return { goto: `/a/${account}/domains` }; // the client goes there after its toast; a server redirect would drop the toast
 }

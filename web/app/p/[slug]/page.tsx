@@ -2,12 +2,12 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { buttonVariants } from "@/components/ui/button";
 import { engine, EngineError, type Schemas } from "@/lib/engine";
+import { LocalTime } from "@/components/local-time";
 
 export const metadata = { title: "Archive" };
 
 type Props = { params: Promise<{ slug: string }> };
 
-const day = new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", dateStyle: "medium" });
 
 export default function Archive(props: Props) {
   return (
@@ -43,7 +43,7 @@ async function Issues({ params }: Props) {
             <li key={i.slug} className="flex flex-wrap items-baseline justify-between gap-2 py-3">
               {/* A plain link: the issue is a route handler page, not a React page. */}
               <a className="font-medium underline-offset-2 hover:underline" href={`/p/${encodeURIComponent(slug)}/${encodeURIComponent(i.slug)}`}>{i.title}</a>
-              <time className="text-sm text-muted-foreground tabular-nums" dateTime={i.sent_at}>{day.format(new Date(i.sent_at))}</time>
+              <LocalTime iso={i.sent_at} dateOnly className="text-sm text-muted-foreground tabular-nums" />
             </li>
           ))}
         </ul>

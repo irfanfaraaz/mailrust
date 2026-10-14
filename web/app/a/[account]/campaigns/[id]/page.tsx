@@ -1,12 +1,14 @@
 import { Suspense } from "react";
 import { BackLink } from "@/components/back-link";
+import { ConfirmAction } from "@/components/confirm-action";
 import { Loading } from "@/components/loading";
 import { CampaignStatusBadge } from "@/components/status-badge";
 import { currentAccount } from "@/lib/account";
 import { engine, type Schemas } from "@/lib/engine";
-import { utc } from "@/lib/format";
+import { deleteDraft } from "./actions";
 import { CampaignEditor } from "./editor/campaign-editor";
 import { Report } from "./report";
+import { LocalTime } from "@/components/local-time";
 
 export const metadata = { title: "Campaign" };
 
@@ -40,8 +42,21 @@ async function Body({ params }: Props) {
       <div className="flex items-center gap-3">
         <h1 className="text-2xl font-semibold">{c.subject || "Untitled draft"}</h1>
         <CampaignStatusBadge status={c.status} />
+        {c.status === "draft" && (
+          <div className="ml-auto">
+            <ConfirmAction
+              trigger="Delete draft"
+              title="Delete this draft?"
+              description="The draft is erased for good. This cannot be undone."
+              confirm="Delete draft"
+              dismiss="Keep it"
+              done="Draft deleted"
+              action={deleteDraft.bind(null, account, c.id)}
+            />
+          </div>
+        )}
       </div>
-      {c.status === "scheduled" && c.send_at && <p role="status" className="text-sm">Scheduled for {utc(c.send_at)}. Editing it puts it back to draft.</p>}
+      {c.status === "scheduled" && c.send_at && <p role="status" className="text-sm">Scheduled for <LocalTime iso={c.send_at} />. Editing it puts it back to draft.</p>}
       {c.status === "draft" && c.paused_reason && <p role="alert" className="text-sm text-destructive">Not sent: {c.paused_reason}</p>}
       {editable ? (
         <CampaignEditor account={account} campaign={c} me={me.user.email} tags={tags.data} />

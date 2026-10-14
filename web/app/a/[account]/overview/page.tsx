@@ -6,7 +6,7 @@ import { engine, type Schemas } from "@/lib/engine";
 
 export const metadata = { title: "Overview" };
 
-const pct = (n: number, digits = 2) => `${(n * 100).toFixed(digits)}%`;
+const pct = (n: number) => `${(n * 100).toFixed(2)}%`;
 const num = new Intl.NumberFormat("en");
 
 type Props = { params: Promise<{ account: string }> };
@@ -23,27 +23,33 @@ export default function Overview(props: Props) {
   );
 }
 
-/** A rate against the limit that pauses sending: the bar fills toward the limit and turns amber past half, red at it. */
-function Rate({ label, rate, limit, digits }: { label: string; rate: number; limit: number; digits: number }) {
+/**
+ * A rate against the limit that pauses sending: the bar fills toward the limit and turns amber past half, red at it.
+ * Auto-pause ignores the rate until `minSent` emails went out, so before that the bar stays grey.
+ */
+function Rate({ label, rate, limit, sent, minSent }: { label: string; rate: number; limit: number; sent: number; minSent: number }) {
   const share = limit > 0 ? rate / limit : 0;
-  const tone = share >= 1 ? "bg-destructive" : share >= 0.5 ? "bg-amber-500" : "bg-emerald-500";
+  const judged = sent >= minSent;
+  const tone = !judged ? "bg-muted-foreground/40" : share >= 1 ? "bg-destructive" : share >= 0.5 ? "bg-amber-500" : "bg-emerald-500";
   return (
     <div className="flex flex-col gap-2">
       <dt className="text-sm text-muted-foreground">{label}</dt>
       <dd className="flex flex-col gap-2">
-        <span className="text-3xl font-semibold tabular-nums">{pct(rate, digits)}</span>
+        <span className="text-3xl font-semibold tabular-nums">{pct(rate)}</span>
         <div
           role="meter"
           aria-label={`${label} against the pause limit`}
           aria-valuemin={0}
           aria-valuemax={limit}
           aria-valuenow={rate}
-          aria-valuetext={`${pct(rate, digits)} of a ${pct(limit, digits)} limit`}
+          aria-valuetext={`${pct(rate)} of a ${pct(limit)} limit`}
           className="h-1.5 overflow-hidden rounded-full bg-muted"
         >
           <div className={cn("h-full rounded-full", tone)} style={{ width: `${Math.min(share, 1) * 100}%` }} />
         </div>
-        <span className="text-sm text-muted-foreground">Sending pauses above {pct(limit, digits)}</span>
+        <span className="text-sm text-muted-foreground">
+          {judged ? `Sending pauses above ${pct(limit)}` : `Not checked yet: ${num.format(sent)} of ${num.format(minSent)} emails sent. Sending pauses above ${pct(limit)} after that.`}
+        </span>
       </dd>
     </div>
   );
@@ -58,8 +64,8 @@ async function Stats({ params }: Props) {
       <section aria-labelledby="health" className="flex flex-col gap-4">
         <h2 id="health" className="text-lg font-medium">Sending health · last 7 days</h2>
         <dl className="grid max-w-3xl gap-8 sm:grid-cols-2">
-          <Rate label="Bounce rate" rate={o.bounce_rate} limit={o.bounce_limit} digits={2} />
-          <Rate label="Complaint rate" rate={o.complaint_rate} limit={o.complaint_limit} digits={3} />
+          <Rate label="Bounce rate" rate={o.bounce_rate} limit={o.bounce_limit} sent={o.last_7d.sent} minSent={o.bounce_min_sent} />
+          <Rate label="Complaint rate" rate={o.complaint_rate} limit={o.complaint_limit} sent={o.last_7d.sent} minSent={o.complaint_min_sent} />
         </dl>
       </section>
       <section aria-labelledby="events" className="flex flex-col gap-3">

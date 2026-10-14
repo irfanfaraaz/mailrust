@@ -1,13 +1,14 @@
 import { Suspense } from "react";
+import { ActionForm } from "@/components/action-form";
 import { EmptyState } from "@/components/empty-state";
 import { Loading } from "@/components/loading";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { buttonVariants } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { engine, type Schemas } from "@/lib/engine";
-import { utc } from "@/lib/format";
 import { CreateWebhook } from "./create-webhook";
 import { deleteWebhook } from "./actions";
+import { LocalTime } from "@/components/local-time";
 
 export const metadata = { title: "Webhooks" };
 
@@ -55,7 +56,7 @@ async function List({ params }: Props) {
                 <TableCell className="max-w-64 truncate font-medium">{h.url}</TableCell>
                 <TableCell className="min-w-64 whitespace-normal text-muted-foreground">{h.events.join(", ")}</TableCell>
                 <TableCell>{h.enabled ? "yes" : "no"}</TableCell>
-                <TableCell className="text-right tabular-nums text-muted-foreground">{utc(h.created_at)}</TableCell>
+                <TableCell className="text-right tabular-nums text-muted-foreground"><LocalTime iso={h.created_at} /></TableCell>
                 <TableCell className="text-right">
                   <Dialog>
                     <DialogTrigger className={buttonVariants({ variant: "outline", size: "sm" })}>Delete</DialogTrigger>
@@ -66,9 +67,9 @@ async function List({ params }: Props) {
                       </DialogHeader>
                       <DialogFooter>
                         <DialogClose className={buttonVariants({ variant: "outline" })}>Cancel</DialogClose>
-                        <form action={deleteWebhook.bind(null, account, h.id)}>
+                        <ActionForm action={deleteWebhook.bind(null, account, h.id)} done="Webhook deleted">
                           <button type="submit" className={buttonVariants({ variant: "destructive" })}>Delete webhook</button>
-                        </form>
+                        </ActionForm>
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>

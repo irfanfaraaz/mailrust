@@ -1321,12 +1321,19 @@ export interface components {
             /** Format: double */
             bounce_limit: number;
             /**
+             * Format: int64
+             * @description Auto-pause judges a rate only once this many emails went out in the window.
+             */
+            bounce_min_sent: number;
+            /**
              * Format: double
              * @description Over the last 7 days, the same window auto-pause uses.
              */
             bounce_rate: number;
             /** Format: double */
             complaint_limit: number;
+            /** Format: int64 */
+            complaint_min_sent: number;
             /** Format: double */
             complaint_rate: number;
             last_24h: components["schemas"]["Counts"];
@@ -1373,6 +1380,8 @@ export interface components {
             bounce_rate: number;
             /** Format: double */
             click_rate: number;
+            /** Format: double */
+            complaint_rate: number;
             /** Format: double */
             open_rate: number;
             /** Format: double */

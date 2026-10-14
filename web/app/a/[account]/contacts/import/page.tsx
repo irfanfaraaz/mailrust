@@ -5,9 +5,9 @@ import { Loading } from "@/components/loading";
 import { ImportStatusBadge } from "@/components/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { engine, type Schemas } from "@/lib/engine";
-import { utc } from "@/lib/format";
 import { ImportProgress } from "./progress";
 import { UploadForm } from "./upload-form";
+import { LocalTime } from "@/components/local-time";
 
 export const metadata = { title: "Import contacts" };
 
@@ -64,7 +64,7 @@ async function Body({ params, searchParams }: Props) {
             <TableBody>
               {past.data.map((p) => (
                 <TableRow key={p.id}>
-                  <TableCell className="tabular-nums">{utc(p.created_at)}</TableCell>
+                  <TableCell className="tabular-nums"><LocalTime iso={p.created_at} /></TableCell>
                   <TableCell><ImportStatusBadge status={p.status} /></TableCell>
                   <TableCell className="text-right tabular-nums">{p.rows_total}</TableCell>
                   <TableCell className="text-right tabular-nums">{p.added}</TableCell>

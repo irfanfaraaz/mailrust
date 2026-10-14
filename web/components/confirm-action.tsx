@@ -1,3 +1,5 @@
+"use client";
+import { ActionForm } from "@/components/action-form";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { buttonVariants } from "@/components/ui/button";
 
@@ -6,14 +8,18 @@ type Props = {
   title: string;
   description: string;
   confirm: string;
-  action: () => void | Promise<void>;
+  action: () => unknown;
   /** Label for the button that closes the dialog without acting. */
   dismiss?: string;
   triggerClassName?: string;
+  /** Toast shown when the action succeeds; an `{ error }` result is toasted as an error. */
+  done?: string;
+  /** "default" for actions that are safe to undo, like Resume. */
+  variant?: "destructive" | "default";
 };
 
 /** A trigger that opens a confirm dialog; the dialog's form runs the server action. */
-export function ConfirmAction({ trigger, title, description, confirm, action, dismiss = "Cancel", triggerClassName }: Props) {
+export function ConfirmAction({ trigger, title, description, confirm, action, dismiss = "Cancel", triggerClassName, done, variant = "destructive" }: Props) {
   return (
     <Dialog>
       <DialogTrigger className={triggerClassName ?? buttonVariants({ variant: "outline", size: "sm" })}>{trigger}</DialogTrigger>
@@ -24,9 +30,9 @@ export function ConfirmAction({ trigger, title, description, confirm, action, di
         </DialogHeader>
         <DialogFooter>
           <DialogClose className={buttonVariants({ variant: "outline" })}>{dismiss}</DialogClose>
-          <form action={action}>
-            <button type="submit" className={buttonVariants({ variant: "destructive" })}>{confirm}</button>
-          </form>
+          <ActionForm action={action} done={done}>
+            <button type="submit" className={buttonVariants({ variant })}>{confirm}</button>
+          </ActionForm>
         </DialogFooter>
       </DialogContent>
     </Dialog>

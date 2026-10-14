@@ -4,8 +4,8 @@ import { Loading } from "@/components/loading";
 import { EmailStatusBadge, statusLabel } from "@/components/status-badge";
 import { buttonVariants } from "@/components/ui/button";
 import { engine, type Schemas } from "@/lib/engine";
-import { utc } from "@/lib/format";
 import { cancelEmail } from "./actions";
+import { LocalTime } from "@/components/local-time";
 
 export const metadata = { title: "Email" };
 
@@ -41,6 +41,7 @@ async function Detail({ params }: Props) {
           description="It will not be sent. This cannot be undone."
           dismiss="Keep it"
           confirm="Cancel email"
+          done="Email cancelled"
           action={cancelEmail.bind(null, account, id)}
         />
       )}
@@ -50,7 +51,7 @@ async function Detail({ params }: Props) {
         <ol aria-label="Events" className="flex flex-col gap-1 text-sm">
           {e.events.map((ev, i) => (
             <li key={i}>
-              <span className="tabular-nums text-muted-foreground">{utc(ev.created_at)}</span> — {ev.type}
+              <span className="tabular-nums text-muted-foreground"><LocalTime iso={ev.created_at} /></span> — {ev.type}
               {ev.recipient ? ` (${ev.recipient})` : ""}
               {ev.likely_bot ? " · likely a bot" : ""}
             </li>
@@ -60,8 +61,12 @@ async function Detail({ params }: Props) {
       </section>
       <section className="flex flex-col gap-2">
         <h2 className="text-lg font-medium">Body</h2>
-        {/* Customer content: show text only, never render e.html. */}
-        <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border p-3 text-sm">{e.text ?? (e.html ? "(HTML only)" : "(Hidden: login and invite emails hold one-time links.)")}</pre>
+        {e.html ? (
+          // Customer HTML: never add allow-scripts. Tracking is added at send time, so viewing here counts no open.
+          <iframe title="Email body" sandbox="allow-same-origin" srcDoc={e.html} height={560} className="w-full rounded-lg border bg-white" />
+        ) : (
+          <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border p-3 text-sm">{e.text ?? "(Hidden: login and invite emails hold one-time links.)"}</pre>
+        )}
       </section>
     </article>
   );

@@ -11,6 +11,7 @@ describe("report wording", () => {
   it("describes the wave plan", () => {
     expect(wavePlanText([])).toBe("No readers match this audience.");
     expect(wavePlanText([42])).toBe("One wave: all 42 readers at once.");
+    expect(wavePlanText([1])).toBe("One wave: 1 reader.");
     expect(wavePlanText([100, 200, 400, 500])).toBe("4 waves, 10 minutes apart: 100, 200, 400, 500. Most engaged readers go first.");
   });
   it("warns about missing first names only when the issue uses them", () => {

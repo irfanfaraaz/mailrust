@@ -1,10 +1,12 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { Schemas } from "@/lib/engine";
+import { when } from "@/lib/format";
 import { namesMissingText, wavePlanText } from "@/lib/report";
 import { changeStatus, previewCampaign, setAudience } from "./actions";
 
@@ -50,6 +52,7 @@ export function SendDialog({ account, campaign, tags, beforeOpen }: Props) {
     const r = await changeStatus(account, campaign.id, "send", sendAt);
     setPending(false);
     if (r.error) return setError(r.error);
+    toast.success(sendAt ? `Scheduled for ${when(sendAt, Intl.DateTimeFormat().resolvedOptions().timeZone)}` : "Sending started");
     setOpen(false);
     router.refresh();
   };
@@ -58,7 +61,7 @@ export function SendDialog({ account, campaign, tags, beforeOpen }: Props) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger className={buttonVariants({ size: "sm" })}>Send…</DialogTrigger>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Send this issue</DialogTitle>
           <DialogDescription>Only subscribed readers get it. Unsubscribed, pending and blocked addresses are always left out.</DialogDescription>

@@ -18,18 +18,18 @@ export function EditContact({ account, contact }: { account: string; contact: Sc
   return (
     <form action={action} className="flex max-w-xl flex-col gap-3 text-sm">
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="flex flex-col gap-1">First name
-          <Input name="first_name" defaultValue={contact.first_name ?? ""} />
+        <label htmlFor="edit-first" className="flex flex-col gap-1">First name
+          <Input id="edit-first" name="first_name" defaultValue={contact.first_name ?? ""} />
         </label>
-        <label className="flex flex-col gap-1">Last name
-          <Input name="last_name" defaultValue={contact.last_name ?? ""} />
+        <label htmlFor="edit-last" className="flex flex-col gap-1">Last name
+          <Input id="edit-last" name="last_name" defaultValue={contact.last_name ?? ""} />
         </label>
       </div>
-      <label className="flex flex-col gap-1">Tags
-        <Input name="tags" defaultValue={contact.tags.map((t) => t.name).join(", ")} placeholder="vip, news" />
+      <label htmlFor="edit-tags" className="flex flex-col gap-1">Tags
+        <Input id="edit-tags" name="tags" defaultValue={contact.tags.map((t) => t.name).join(", ")} placeholder="vip, news" />
       </label>
-      <label className="flex flex-col gap-1">Fields
-        <Textarea name="fields" rows={5} defaultValue={formatFields(contact.fields)} placeholder={"plan=pro\ncity=Pune"} aria-describedby="fields-hint" className="min-h-24 font-mono" />
+      <label htmlFor="edit-fields" className="flex flex-col gap-1">Fields
+        <Textarea id="edit-fields" name="fields" rows={5} defaultValue={formatFields(contact.fields)} placeholder={"plan=pro\ncity=Pune"} aria-describedby="fields-hint" className="min-h-24 font-mono" />
         <span id="fields-hint" className="text-xs text-muted-foreground">One name=value per line. Names use a-z, 0-9 and _.</span>
       </label>
       {state.error && <p role="alert" className="text-destructive">{state.error}</p>}

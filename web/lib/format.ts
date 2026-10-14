@@ -1,7 +1,10 @@
-const fmt = new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", dateStyle: "medium", timeStyle: "short" });
-
-/** A timestamp in UTC, labelled, so server and viewer agree on what it means. */
-export const utc = (iso: string) => `${fmt.format(new Date(iso))} UTC`;
+/** A timestamp in `timeZone` (the viewer's, from the browser), labelled with the zone so it is never ambiguous. */
+export function when(iso: string, timeZone: string, { dateOnly = false } = {}): string {
+  const opts: Intl.DateTimeFormatOptions = dateOnly
+    ? { timeZone, day: "numeric", month: "short", year: "numeric" }
+    : { timeZone, day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZoneName: "short" };
+  return new Intl.DateTimeFormat("en-GB", opts).format(new Date(iso));
+}
 
 /** A date filter value as ISO, or undefined when it is not a valid date (so a bad URL does not crash the page). */
 export function isoDate(v: string): string | undefined {

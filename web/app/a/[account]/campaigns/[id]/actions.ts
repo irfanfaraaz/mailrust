@@ -60,3 +60,10 @@ export async function setArchiveHidden(account: string, id: string, hidden: bool
   await engine(`/campaigns/${id}`, { method: "PATCH", account, body: { archive_hidden: hidden } });
   revalidatePath(`/a/${account}/campaigns/${id}`);
 }
+
+/** Only a draft can be deleted (the engine says so for any other status). */
+export async function deleteDraft(account: string, id: string) {
+  await engine(`/campaigns/${id}`, { method: "DELETE", account });
+  revalidatePath(`/a/${account}/campaigns`);
+  return { goto: `/a/${account}/campaigns` }; // the client goes there after its toast; a server redirect would drop the toast
+}

@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { engine, type Schemas } from "@/lib/engine";
-import { utc } from "@/lib/format";
 import { AddSuppression } from "./add-suppression";
 import { removeSuppression } from "./actions";
+import { LocalTime } from "@/components/local-time";
 
 export const metadata = { title: "Suppressions" };
 
@@ -60,13 +60,14 @@ async function List({ params, searchParams }: Props) {
             <TableRow key={s.address}>
               <TableCell className="font-medium">{s.address}</TableCell>
               <TableCell className="text-muted-foreground">{s.reason}</TableCell>
-              <TableCell className="text-right tabular-nums text-muted-foreground">{utc(s.created_at)}</TableCell>
+              <TableCell className="text-right tabular-nums text-muted-foreground"><LocalTime iso={s.created_at} /></TableCell>
               <TableCell className="text-right">
                 <ConfirmAction
                   trigger="Unblock"
                   title={`Unblock ${s.address}?`}
                   description="Mailrust will send to this address again. If it bounced or complained before, sending to it can raise your bounce or complaint rate."
                   confirm="Unblock address"
+                  done="Address unblocked"
                   action={removeSuppression.bind(null, account, s.address)}
                 />
               </TableCell>

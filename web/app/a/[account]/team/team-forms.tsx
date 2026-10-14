@@ -1,5 +1,5 @@
 "use client";
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, type ReactNode } from "react";
 import { toast } from "sonner";
 import { NativeSelect } from "@/components/native-select";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -61,7 +61,7 @@ function Confirm({ trigger, title, description, confirm, action }: { trigger: st
   );
 }
 
-export function MemberRow(p: { account: string; userId: string; email: string; role: string; joined: string; isOwner: boolean; isMe: boolean }) {
+export function MemberRow(p: { account: string; userId: string; email: string; role: string; joined: ReactNode; isOwner: boolean; isMe: boolean }) {
   const [roleState, roleAction] = useActionState(setRole.bind(null, p.account, p.userId), none);
   // The row unmounts once the member is gone, so toast from the action itself rather than an effect.
   const [removeState, removeAction] = useActionState(async (prev: TeamState) => {
@@ -101,7 +101,7 @@ export function MemberRow(p: { account: string; userId: string; email: string; r
   );
 }
 
-export function InviteRow({ account, id, email, role, expires }: { account: string; id: string; email: string; role: string; expires: string }) {
+export function InviteRow({ account, id, email, role, expires }: { account: string; id: string; email: string; role: string; expires: ReactNode }) {
   const [state, action] = useActionState(cancelInvite.bind(null, account, id), none);
   return (
     <TableRow>
