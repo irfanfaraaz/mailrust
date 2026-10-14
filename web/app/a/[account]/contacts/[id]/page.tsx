@@ -5,9 +5,9 @@ import { ConfirmAction } from "@/components/confirm-action";
 import { Loading } from "@/components/loading";
 import { BlockedBadge, ContactStatusBadge, PENDING_HINT } from "@/components/status-badge";
 import { engine, type Schemas } from "@/lib/engine";
-import { utc } from "@/lib/format";
 import { deleteContact, unsubscribeContact } from "../actions";
 import { EditContact } from "./edit-contact";
+import { LocalTime } from "@/components/local-time";
 
 export const metadata = { title: "Contact" };
 
@@ -34,9 +34,9 @@ async function Detail({ params }: Props) {
       </div>
       <dl className="grid max-w-xl grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
         <dt className="text-muted-foreground">Source</dt><dd>{c.source}</dd>
-        <dt className="text-muted-foreground">Added</dt><dd>{utc(c.created_at)}</dd>
-        {c.subscribed_at && (<><dt className="text-muted-foreground">Subscribed at</dt><dd>{utc(c.subscribed_at)}</dd></>)}
-        {c.unsubscribed_at && (<><dt className="text-muted-foreground">Unsubscribed at</dt><dd>{utc(c.unsubscribed_at)}</dd></>)}
+        <dt className="text-muted-foreground">Added</dt><dd><LocalTime iso={c.created_at} /></dd>
+        {c.subscribed_at && (<><dt className="text-muted-foreground">Subscribed at</dt><dd><LocalTime iso={c.subscribed_at} /></dd></>)}
+        {c.unsubscribed_at && (<><dt className="text-muted-foreground">Unsubscribed at</dt><dd><LocalTime iso={c.unsubscribed_at} /></dd></>)}
       </dl>
       {c.status === "pending" && <p className="max-w-prose text-sm text-muted-foreground">Pending: {PENDING_HINT.charAt(0).toLowerCase() + PENDING_HINT.slice(1)}</p>}
       {c.blocked && (

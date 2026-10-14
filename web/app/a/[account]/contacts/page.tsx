@@ -8,8 +8,9 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { engine, type Schemas } from "@/lib/engine";
-import { contactCount, utc } from "@/lib/format";
+import { contactCount } from "@/lib/format";
 import { AddContact } from "./add-contact";
+import { LocalTime } from "@/components/local-time";
 
 export const metadata = { title: "Contacts" };
 
@@ -131,7 +132,7 @@ async function List({ params, searchParams }: Props) {
                         </span>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{c.tags.map((t) => t.name).join(", ")}</TableCell>
-                      <TableCell className="text-right tabular-nums text-muted-foreground">{utc(c.created_at)}</TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground"><LocalTime iso={c.created_at} /></TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

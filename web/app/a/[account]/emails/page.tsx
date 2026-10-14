@@ -4,8 +4,9 @@ import { Loading } from "@/components/loading";
 import { EmailStatusBadge, statusLabel } from "@/components/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { engine, type Schemas } from "@/lib/engine";
-import { isoDate, utc } from "@/lib/format";
+import { isoDate } from "@/lib/format";
 import { Filters } from "./filters";
+import { LocalTime } from "@/components/local-time";
 
 export const metadata = { title: "Emails" };
 
@@ -57,7 +58,7 @@ async function Log({ params, searchParams }: Props) {
               <TableCell className="max-w-64 truncate">{e.to.join(", ")}</TableCell>
               <TableCell><EmailStatusBadge status={e.status} /></TableCell>
               <TableCell className="text-muted-foreground">{statusLabel(e.priority)}</TableCell>
-              <TableCell className="text-right tabular-nums text-muted-foreground">{utc(e.created_at)}</TableCell>
+              <TableCell className="text-right tabular-nums text-muted-foreground"><LocalTime iso={e.created_at} /></TableCell>
             </TableRow>
           ))}
         </TableBody>

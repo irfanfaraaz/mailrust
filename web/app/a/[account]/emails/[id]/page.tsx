@@ -4,8 +4,8 @@ import { Loading } from "@/components/loading";
 import { EmailStatusBadge, statusLabel } from "@/components/status-badge";
 import { buttonVariants } from "@/components/ui/button";
 import { engine, type Schemas } from "@/lib/engine";
-import { utc } from "@/lib/format";
 import { cancelEmail } from "./actions";
+import { LocalTime } from "@/components/local-time";
 
 export const metadata = { title: "Email" };
 
@@ -50,7 +50,7 @@ async function Detail({ params }: Props) {
         <ol aria-label="Events" className="flex flex-col gap-1 text-sm">
           {e.events.map((ev, i) => (
             <li key={i}>
-              <span className="tabular-nums text-muted-foreground">{utc(ev.created_at)}</span> — {ev.type}
+              <span className="tabular-nums text-muted-foreground"><LocalTime iso={ev.created_at} /></span> — {ev.type}
               {ev.recipient ? ` (${ev.recipient})` : ""}
               {ev.likely_bot ? " · likely a bot" : ""}
             </li>

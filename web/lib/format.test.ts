@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { closedMessage, contactCount, isoDate } from "./format";
+import { closedMessage, contactCount, isoDate, when } from "./format";
 
 describe("isoDate", () => {
   it("turns a date-time input value into ISO", () => {
@@ -33,5 +33,15 @@ describe("contactCount", () => {
     expect(contactCount(1, 1, false)).toBe("1 contact");
     expect(contactCount(3, 3, false)).toBe("3 contacts");
     expect(contactCount(1234, 50, true)).toBe("Showing 50 of 1,234 contacts");
+  });
+});
+
+describe("when", () => {
+  it("shows a timestamp in the given time zone, labelled with that zone", () => {
+    expect(when("2026-10-14T08:33:00Z", "Asia/Kolkata")).toBe("14 Oct 2026, 14:03 GMT+5:30");
+  });
+
+  it("shows only the date when asked", () => {
+    expect(when("2026-10-14T20:00:00Z", "Asia/Kolkata", { dateOnly: true })).toBe("15 Oct 2026");
   });
 });

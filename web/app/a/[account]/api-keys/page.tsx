@@ -5,9 +5,9 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, Di
 import { buttonVariants } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { engine, type Schemas } from "@/lib/engine";
-import { utc } from "@/lib/format";
 import { CreateKey } from "./create-key";
 import { deleteKey } from "./actions";
+import { LocalTime } from "@/components/local-time";
 
 export const metadata = { title: "API keys" };
 
@@ -56,8 +56,8 @@ async function Keys({ params }: Props) {
                 <TableCell className="font-medium">{k.name}</TableCell>
                 <TableCell className="font-mono">{k.prefix}…</TableCell>
                 <TableCell>{k.access}</TableCell>
-                <TableCell className="tabular-nums text-muted-foreground">{k.last_used_at ? utc(k.last_used_at) : "never"}</TableCell>
-                <TableCell className="text-right tabular-nums text-muted-foreground">{utc(k.created_at)}</TableCell>
+                <TableCell className="tabular-nums text-muted-foreground">{k.last_used_at ? <LocalTime iso={k.last_used_at} /> : "never"}</TableCell>
+                <TableCell className="text-right tabular-nums text-muted-foreground"><LocalTime iso={k.created_at} /></TableCell>
                 <TableCell className="text-right">
                   <Dialog>
                     <DialogTrigger className={buttonVariants({ variant: "outline", size: "sm" })}>Delete</DialogTrigger>

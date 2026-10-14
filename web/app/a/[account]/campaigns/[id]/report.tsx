@@ -1,9 +1,9 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Schemas } from "@/lib/engine";
-import { utc } from "@/lib/format";
 import { pct } from "@/lib/report";
 import { AutoRefresh } from "./auto-refresh";
 import { Controls } from "./controls";
+import { LocalTime } from "@/components/local-time";
 
 const fmt = (x: number) => x.toLocaleString("en-US");
 
@@ -30,8 +30,8 @@ export function Report({ account, campaign: c, report: r, archiveUrl }: Props) {
       </div>
       {c.paused_reason && <p role="status" className="text-sm text-amber-700 dark:text-amber-300">Paused: {c.paused_reason}</p>}
       <p className="text-sm text-muted-foreground">
-        {c.started_at ? `Started ${utc(c.started_at)}` : "Not started"}
-        {c.finished_at ? ` · finished ${utc(c.finished_at)}` : ""}
+        {c.started_at ? <>Started <LocalTime iso={c.started_at} /></> : "Not started"}
+        {c.finished_at && <> · finished <LocalTime iso={c.finished_at} /></>}
         {archiveUrl && <> · <a className="underline underline-offset-2" href={archiveUrl}>Public archive page</a></>}
       </p>
       <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">

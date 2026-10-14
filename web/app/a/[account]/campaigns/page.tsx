@@ -6,8 +6,8 @@ import { CampaignStatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { engine, type Schemas } from "@/lib/engine";
-import { utc } from "@/lib/format";
 import { createCampaign } from "./actions";
+import { LocalTime } from "@/components/local-time";
 
 export const metadata = { title: "Campaigns" };
 
@@ -61,7 +61,7 @@ async function List({ params, searchParams }: Props) {
                 <TableCell className="text-right tabular-nums">{c.recipients.toLocaleString("en-US")}</TableCell>
                 <TableCell className="text-right tabular-nums">{c.opened.toLocaleString("en-US")}</TableCell>
                 <TableCell className="text-right tabular-nums">{c.clicked.toLocaleString("en-US")}</TableCell>
-                <TableCell className="text-right tabular-nums text-muted-foreground">{utc(c.updated_at)}</TableCell>
+                <TableCell className="text-right tabular-nums text-muted-foreground"><LocalTime iso={c.updated_at} /></TableCell>
               </TableRow>
             ))}
           </TableBody>

@@ -5,8 +5,8 @@ import { Loading } from "@/components/loading";
 import { DomainStatusBadge } from "@/components/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { engine, type Schemas } from "@/lib/engine";
-import { utc } from "@/lib/format";
 import { AddDomain } from "./add-domain";
+import { LocalTime } from "@/components/local-time";
 
 export const metadata = { title: "Domains" };
 
@@ -53,7 +53,7 @@ async function List({ params }: Props) {
                 <TableCell><Link className="font-medium underline underline-offset-2" href={`/a/${account}/domains/${d.id}`}>{d.name}</Link></TableCell>
                 <TableCell><DomainStatusBadge status={d.status} /></TableCell>
                 <TableCell className="text-muted-foreground">{[d.open_tracking && "opens", d.click_tracking && "clicks"].filter(Boolean).join(", ") || "off"}</TableCell>
-                <TableCell className="text-right tabular-nums text-muted-foreground">{utc(d.created_at)}</TableCell>
+                <TableCell className="text-right tabular-nums text-muted-foreground"><LocalTime iso={d.created_at} /></TableCell>
               </TableRow>
             ))}
           </TableBody>
