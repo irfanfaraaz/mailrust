@@ -6,6 +6,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-15
+
+### Added
+
+- A new look for the whole dashboard: hand-drawn "field notes" cards, stamps and a parchment palette, on every page from login to the newsletter report.
+- Motion with a purpose in the dashboard: wave progress, rolling numbers, a live email log, a sent stamp, paper-slip toasts and a sliding sidebar marker. All of it stops when the system asks for reduced motion.
+- A public landing page for people who find your server. Set `MAILRUST_LANDING=true` in the `web` environment and signed-out visitors see it at `/` instead of the login page. It has a light and a dark theme, and a live drawing of the engine where you can send an urgent email past the newsletter.
+- `MAILRUST_LANDING=only` for a showcase site with no engine behind it (for example on Vercel): `/` is always the landing page and every other path is a 404.
+
+### Security
+
+- rustls 0.23.46 (RUSTSEC-2026-0346 to 0349).
+
 ## [0.3.1] - 2026-10-14
 
 ### Added
@@ -100,7 +113,8 @@ First release: the sending API and the engine behind it.
 - The database clock stamps `send_at` for send-now emails.
 - No repeat "suppressed" events for the same email.
 
-[Unreleased]: https://github.com/irfanfaraaz/mailrust/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/irfanfaraaz/mailrust/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/irfanfaraaz/mailrust/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/irfanfaraaz/mailrust/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/irfanfaraaz/mailrust/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/irfanfaraaz/mailrust/compare/v0.1.0...v0.2.0

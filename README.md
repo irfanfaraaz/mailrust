@@ -1,13 +1,15 @@
 # Mailrust
 
 [![ci](https://github.com/irfanfaraaz/mailrust/actions/workflows/ci.yml/badge.svg)](https://github.com/irfanfaraaz/mailrust/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/v/release/irfanfaraaz/mailrust)](https://github.com/irfanfaraaz/mailrust/releases)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 
-Self-hosted email platform with two doors: a sending API (like Resend) and a newsletter app (like beehiiv, coming next). One Rust engine sends everything through your own Amazon SES account.
+Self-hosted email platform with two doors: a sending API (like Resend) and a newsletter app (like beehiiv). One Rust engine sends everything through your own Amazon SES account.
 
 - **Sending API** — `POST /emails`, batch, scheduled send, idempotency keys, attachments, webhooks, open/click tracking.
 - **Safe for many accounts** — each account is its own SES tenant with its own block list, and Mailrust pauses an account itself when bounces go over 2% or complaints over 0.08%.
 - **Smart sending** — `"priority": "urgent" | "normal" | "bulk"` puts login codes ahead of newsletters. The send rate follows your SES limits, a hit on the SES daily cap pauses sending instead of failing emails, and the last 10% of the daily quota is kept for urgent mail.
+- **Newsletter** — subscribers with double opt-in, tags, CSV import, a block editor, sending in growing waves, one-click unsubscribe, per-newsletter reports and a public archive.
 - **Dashboard** — magic-link login, teams and invites (owner/member), emails log, API keys, webhooks, domains and suppressions in a Next.js app.
 - **No extra services** — Postgres is the queue (`FOR UPDATE SKIP LOCKED`). No Redis.
 
@@ -61,6 +63,8 @@ One small server runs everything: `deploy/docker-compose.prod.yml` starts Postgr
 cd deploy
 docker compose -f docker-compose.prod.yml --env-file ../.env up -d
 ```
+
+Set `MAILRUST_LANDING=true` for `web` to show a public landing page to signed-out visitors at `/`. `MAILRUST_LANDING=only` is for a showcase site with no engine (for example on Vercel): `/` is the landing page and every other path is a 404.
 
 The reverse proxy in front of `web` must set `X-Forwarded-For` (Caddy does by default). Without it every reader shares one IP, so the signup form's per-IP limit (5 joins an hour) stops all signups. The engine logs a warning once when this happens.
 

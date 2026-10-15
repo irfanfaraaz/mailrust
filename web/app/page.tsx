@@ -1,8 +1,10 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import { Landing as FrontPage } from "@/components/landing/landing";
 import { Card } from "@/components/ui/card";
 import { getMe } from "@/lib/account";
+import { SESSION_COOKIE } from "@/lib/session-cookie";
 
 export default function Home() {
   // Cookies and the engine call are request data: read them inside Suspense (cacheComponents).
@@ -14,8 +16,12 @@ export default function Home() {
 }
 
 async function Landing() {
+  const jar = await cookies();
+  // Only our own public deploy shows the front page; self-hosted copies keep "/" as the way in.
+  const landing = process.env.MAILRUST_LANDING;
+  if (landing === "only" || (landing === "true" && !jar.has(SESSION_COOKIE))) return <FrontPage />;
   const me = await getMe("/");
-  const last = (await cookies()).get("mr_last_account")?.value;
+  const last = jar.get("mr_last_account")?.value;
   const target = me.accounts.find((a) => a.id === last) ?? me.accounts[0];
   if (!target) {
     return (
