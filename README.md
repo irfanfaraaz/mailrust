@@ -64,7 +64,7 @@ cd deploy
 docker compose -f docker-compose.prod.yml --env-file ../.env up -d
 ```
 
-Set `MAILRUST_LANDING=true` for `web` to show a public landing page to signed-out visitors at `/`.
+Set `MAILRUST_LANDING=true` for `web` to show a public landing page to signed-out visitors at `/`. `MAILRUST_LANDING=only` is for a showcase site with no engine (for example on Vercel): `/` is the landing page and every other path is a 404.
 
 The reverse proxy in front of `web` must set `X-Forwarded-For` (Caddy does by default). Without it every reader shares one IP, so the signup form's per-IP limit (5 joins an hour) stops all signups. The engine logs a warning once when this happens.
 

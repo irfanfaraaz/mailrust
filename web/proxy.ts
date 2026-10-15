@@ -3,6 +3,8 @@ import { publicPostTarget } from "@/lib/public-routes";
 import { refreshSessionCookie } from "@/lib/session-cookie";
 
 export function proxy(req: NextRequest) {
+  // Showcase deploy (no engine behind it): only the landing page exists.
+  if (process.env.MAILRUST_LANDING === "only" && req.nextUrl.pathname !== "/") return new NextResponse("Not found", { status: 404 });
   // Server actions carry a Next-Action header and stay on the page.
   const target = publicPostTarget(req.method, req.nextUrl.pathname, req.headers.has("next-action"));
   if (target) return NextResponse.rewrite(new URL(target, req.url));

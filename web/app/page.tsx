@@ -18,7 +18,8 @@ export default function Home() {
 async function Landing() {
   const jar = await cookies();
   // Only our own public deploy shows the front page; self-hosted copies keep "/" as the way in.
-  if (process.env.MAILRUST_LANDING === "true" && !jar.has(SESSION_COOKIE)) return <FrontPage />;
+  const landing = process.env.MAILRUST_LANDING;
+  if (landing === "only" || (landing === "true" && !jar.has(SESSION_COOKIE))) return <FrontPage />;
   const me = await getMe("/");
   const last = jar.get("mr_last_account")?.value;
   const target = me.accounts.find((a) => a.id === last) ?? me.accounts[0];
