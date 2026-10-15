@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <style>
+    .frame { stroke: #1a2030 } .face { fill: #fbfaf5 } .m { fill: #1a2030 } .pen { stroke: #c4632f }
+    @media (prefers-color-scheme: dark) {
+      .frame { stroke: #eeede6 } .face { fill: #1c1f26 } .m { fill: #eeede6 } .pen { stroke: #e08a5c }
+    }
+  </style>
+  <rect class="face frame" x="2.25" y="2.25" width="59.5" height="59.5" rx="7" stroke-width="4.5"/>
+  <path class="m" transform="translate(32 30.5) scale(1.19) translate(-32 -32)" d="M17 42H25V40.6L22.6 40V26.5L31 42H33L41.4 26.5V40L39 40.6V42H47V40.6L45.2 40V24L47 23.4V22H40.2L32.6 36.5L25.2 22H17V23.4L18.8 24V40L17 40.6Z"/>
+  <path class="pen" d="M14 51C24 47 36 54 50 48" fill="none" stroke-width="6" stroke-linecap="round"/>
+</svg>
