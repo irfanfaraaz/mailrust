@@ -20,6 +20,7 @@ export function HeroScene() {
   const rWave = useRef<HTMLElement>(null);
   const rSize = useRef<HTMLElement>(null);
   const rBounce = useRef<HTMLElement>(null);
+  const fire = useRef<() => void>(undefined);
 
   useEffect(() => {
     const canvas = cv.current;
@@ -156,6 +157,12 @@ export function HeroScene() {
       if (!wave.length && waveTimer > 0) text(`NEXT WAVE IN ${Math.ceil(waveTimer / 7)} MIN`, X0, LANE_N + 2);
     };
 
+    // a visitor can drop an urgent email into its lane: it passes the newsletter
+    fire.current = () => {
+      urgent.push({ x: X0 - 6 });
+      if (still) for (let i = 0; i < 80; i++) frame();
+    };
+
     let raf = 0;
     let visible = true;
     let io: IntersectionObserver | undefined;
@@ -192,6 +199,7 @@ export function HeroScene() {
       cancelAnimationFrame(raf);
       io?.disconnect();
       themed.disconnect();
+      fire.current = undefined;
     };
   }, [still]);
 
@@ -207,7 +215,14 @@ export function HeroScene() {
         height={H}
         role="img"
         aria-label="Animation: urgent emails pass the newsletter queue in their own lane, while the newsletter goes out in growing waves."
+        onClick={() => fire.current?.()}
       />
+      <div className="hint">
+        <span>Try it: click the drawing</span>
+        <button type="button" onClick={() => fire.current?.()}>
+          Send an urgent email
+        </button>
+      </div>
       <dl className="readout">
         <div>
           <dt>Urgent lane</dt>

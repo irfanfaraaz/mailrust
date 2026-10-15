@@ -18,6 +18,14 @@ export function useStill() {
   );
 }
 
+/** Restarts a one-shot CSS animation class on an element. */
+export function replay(el: Element | null | undefined, cls: string) {
+  if (!el) return;
+  el.classList.remove(cls);
+  void (el as HTMLElement).offsetWidth;
+  el.classList.add(cls);
+}
+
 export function CopyButton({ text, className, children = "Copy" }: { text: string; className: string; children?: string }) {
   const [label, setLabel] = useState(children);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -26,10 +34,13 @@ export function CopyButton({ text, className, children = "Copy" }: { text: strin
     <button
       type="button"
       className={className}
-      onClick={async () => {
+      onClick={async (e) => {
+        const btn = e.currentTarget;
         try {
           await navigator.clipboard.writeText(text);
           setLabel("Copied");
+          replay(btn, "popped");
+          replay(btn.closest(".clone")?.querySelector("span") ?? btn.closest(".win")?.querySelector("pre"), "flash");
         } catch {
           setLabel("Copy failed");
         }
@@ -56,6 +67,21 @@ export function Tabs({
 }) {
   const [active, setActive] = useState(tabs[0].id);
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
+  const list = useRef<HTMLDivElement>(null);
+  const ink = useRef<HTMLSpanElement>(null);
+  const at = tabs.findIndex((t) => t.id === active);
+  // The orange marker slides under the active tab. A ResizeObserver also catches a tab list that starts hidden.
+  useEffect(() => {
+    const place = () => {
+      const b = refs.current[at];
+      if (!b || !ink.current || !b.offsetWidth) return;
+      ink.current.style.transform = `translate(${b.offsetLeft}px, ${b.offsetTop + b.offsetHeight - 3}px) scaleX(${b.offsetWidth})`;
+    };
+    place();
+    const ro = new ResizeObserver(place);
+    if (list.current) ro.observe(list.current);
+    return () => ro.disconnect();
+  }, [at]);
   const onKey = (e: KeyboardEvent, i: number) => {
     const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
     if (!d) return;
@@ -66,7 +92,7 @@ export function Tabs({
   return (
     <>
       {before}
-      <div className={className} role="tablist" aria-label={label}>
+      <div ref={list} className={className} role="tablist" aria-label={label}>
         {tabs.map((t, i) => (
           <button
             key={t.id}
@@ -85,6 +111,7 @@ export function Tabs({
             {t.title}
           </button>
         ))}
+        <span ref={ink} className="ink" aria-hidden="true" />
       </div>
       {tabs.map((t) => (
         <div key={t.id} id={`panel-${t.id}`} role="tabpanel" aria-labelledby={`tab-${t.id}`} hidden={t.id !== active}>
@@ -203,6 +230,7 @@ export function WavePlan() {
       </div>
       <div className="sendrow">
         <span className="status" aria-live="polite">{status}</span>
+        {ran && !running ? <span className="stamp landed">Sent</span> : null}
         <button className="btn pri" type="button" disabled={running} onClick={run}>
           {ran ? "Run it again" : "Run a send"}
         </button>
@@ -250,7 +278,7 @@ export function BounceDemo() {
         <span id="b-state" aria-live="polite">
           {over ? `Bounces hit ${v.toFixed(1)}%. Mailrust paused the account. The rest of your list is safe.` : "Sending normally. Wave 3 goes out at 14:20."}
         </span>
-        <span className={over ? "stamp paused" : "stamp"}>{over ? "Auto-paused" : "Sending"}</span>
+        <span key={over ? "paused" : "sending"} className={over ? "stamp paused landed" : "stamp"}>{over ? "Auto-paused" : "Sending"}</span>
       </div>
     </div>
   );
@@ -266,7 +294,26 @@ const CHECKS = [
 ];
 
 /** No. 04: the Send button stays locked until every check passes. */
+/** A small envelope (the logo) flies up and away from the Send button. */
+function flyEnvelope(from: HTMLElement) {
+  const page = from.closest(".mr-landing");
+  const logo = page?.querySelector(".logo svg");
+  if (!page || !logo) return;
+  const r = from.getBoundingClientRect();
+  const env = logo.cloneNode(true) as SVGElement;
+  Object.assign(env.style, { position: "fixed", left: `${r.left + r.width / 2 - 12}px`, top: `${r.top - 6}px`, width: "24px", height: "18px", color: "var(--hot)", zIndex: "50", pointerEvents: "none" });
+  page.append(env);
+  env.animate(
+    [
+      { transform: "translate(0, 0) rotate(0)", opacity: 1 },
+      { transform: "translate(140px, -160px) rotate(-14deg)", opacity: 0 },
+    ],
+    { duration: 750, easing: "cubic-bezier(.16,1,.3,1)" },
+  ).onfinish = () => env.remove();
+}
+
 export function SendChecks() {
+  const still = useStill();
   const [ok, setOk] = useState(CHECKS.map(() => true));
   const [sent, setSent] = useState(false);
   const bad = CHECKS.find((_, i) => !ok[i]);
@@ -294,7 +341,15 @@ export function SendChecks() {
         <span className="status" aria-live="polite">
           {bad ? bad.why : sent ? "In the real app, wave 1 would start now." : "All checks pass."}
         </span>
-        <button className="btn pri" type="button" disabled={!!bad} onClick={() => setSent(true)}>
+        <button
+          className="btn pri"
+          type="button"
+          disabled={!!bad}
+          onClick={(e) => {
+            setSent(true);
+            if (!still) flyEnvelope(e.currentTarget);
+          }}
+        >
           Send newsletter
         </button>
       </div>

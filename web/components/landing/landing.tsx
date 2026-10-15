@@ -1,12 +1,16 @@
 import type { ReactNode } from "react";
-import { Silkscreen } from "next/font/google";
+import { Martian_Mono, Schibsted_Grotesk, Silkscreen } from "next/font/google";
 import { BounceDemo, CopyButton, SendChecks, SlashMenu, Tabs, Tagline, WavePlan } from "./demos";
 import { HeroScene } from "./hero-scene";
+import { LandingMotion } from "./motion";
 import { ThemeToggle, themeScript } from "./theme-toggle";
 import "./landing.css";
 
 // Only the hero's pixel drawing uses it.
 const silkscreen = Silkscreen({ weight: "400", subsets: ["latin"], variable: "--font-silkscreen" });
+// The landing's own faces; the dashboard keeps Geist.
+const schibsted = Schibsted_Grotesk({ subsets: ["latin"], variable: "--font-schibsted" });
+const martian = Martian_Mono({ subsets: ["latin"], axes: ["wdth"], variable: "--font-martian" });
 
 const REPO = "https://github.com/irfanfaraaz/mailrust";
 const DOCS = `${REPO}#readme`;
@@ -362,8 +366,9 @@ const apiDoor = (
 export function Landing() {
   return (
     // The inline script may set data-theme before React hydrates.
-    <div className={`mr-landing ${silkscreen.variable}`} suppressHydrationWarning>
+    <div className={`mr-landing ${silkscreen.variable} ${schibsted.variable} ${martian.variable}`} suppressHydrationWarning>
       <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      <LandingMotion />
       <header className="nav">
         <div className="wrap">
           <a className="logo" href="#top" aria-label="Mailrust home">

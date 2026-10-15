@@ -12,16 +12,27 @@ export function ThemeToggle() {
       type="button"
       className="theme"
       onClick={(e) => {
-        const el = e.currentTarget.closest<HTMLElement>(".mr-landing");
+        const btn = e.currentTarget;
+        const el = btn.closest<HTMLElement>(".mr-landing");
         if (!el) return;
         const next = el.dataset.theme === "dark" ? "light" : "dark";
-        if (next === "dark") el.dataset.theme = "dark";
-        else delete el.dataset.theme;
+        const flip = () => {
+          if (next === "dark") el.dataset.theme = "dark";
+          else delete el.dataset.theme;
+        };
         try {
           localStorage.setItem(KEY, next);
         } catch {
           // private mode: the choice just isn't remembered
         }
+        // The new theme grows out of the button as a circle. Without View Transitions or with reduced motion it just switches.
+        if (!document.startViewTransition || matchMedia("(prefers-reduced-motion: reduce)").matches) return flip();
+        const r = btn.getBoundingClientRect();
+        const root = document.documentElement;
+        root.style.setProperty("--mr-x", `${r.left + r.width / 2}px`);
+        root.style.setProperty("--mr-y", `${r.top + r.height / 2}px`);
+        root.classList.add("mr-wipe");
+        document.startViewTransition(flip).finished.finally(() => root.classList.remove("mr-wipe"));
       }}
     >
       <span className="moon">
