@@ -13,6 +13,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - A new look for the whole dashboard: hand-drawn "field notes" cards, stamps and a parchment palette, on every page from login to the newsletter report.
 - Motion with a purpose in the dashboard: wave progress, rolling numbers, a live email log, a sent stamp, paper-slip toasts and a sliding sidebar marker. All of it stops when the system asks for reduced motion.
 - A public landing page for people who find your server. Set `MAILRUST_LANDING=true` in the `web` environment and signed-out visitors see it at `/` instead of the login page. It has a light and a dark theme, and a live drawing of the engine where you can send an urgent email past the newsletter.
+- `MAILRUST_LANDING=only` for a showcase site with no engine behind it (for example on Vercel): `/` is always the landing page and every other path is a 404.
 
 ### Security
 
