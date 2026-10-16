@@ -402,16 +402,18 @@ const aiDoor = (
 
 `}
         <span className="c">ai   ›</span>
-        {" import_contacts      "}
-        <span className="k">1,204 added</span>
+        {` create_tag           spring
+       import_contacts      queued
+       get_import           `}
+        <span className="k">done · 1,204 added</span>
         {`
-       create_tag           spring
        create_campaign      "Spring at the shop"
        send_test_campaign   you@shop.com
        send_campaign        `}
-        <span className="k">Preview only. Nothing changed yet.</span>
+        <span className="k">Preview only</span>
         {`
-                            1,204 readers · Monday 09:00
+                            Nothing changed yet.
+                            1,204 readers · Mon 09:00
        Send it?
 
 `}
