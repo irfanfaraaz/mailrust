@@ -18,6 +18,7 @@ pub mod images;
 pub mod imports;
 pub mod keys;
 pub mod limiter;
+pub mod mcp;
 pub mod newsletter;
 pub mod openapi;
 pub mod queue;
