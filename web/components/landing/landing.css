@@ -100,8 +100,9 @@ html:has(.mr-landing){scroll-behavior:smooth;scroll-padding-top:72px}
 .mr-landing .door .copytext{display:grid;gap:18px}
 .mr-landing .door .copytext h3{font-size:1.45rem}
 .mr-landing .ticks{list-style:none;padding:0;margin:0;display:grid;gap:10px}
-.mr-landing .ticks li{display:grid;grid-template-columns:16px 1fr;gap:12px;align-items:baseline}
-.mr-landing .ticks li::before{content:"";width:10px;height:10px;border:var(--bw) solid var(--line);background:var(--ink);transform:translateY(1px)}
+/* block, not grid: inline <code> must stay in the text flow */
+.mr-landing .ticks li{position:relative;padding-left:28px}
+.mr-landing .ticks li::before{content:"";position:absolute;left:0;top:.45em;width:10px;height:10px;border:var(--bw) solid var(--line);background:var(--ink)}
 .mr-landing .editor .doc{display:grid;gap:12px}
 .mr-landing .editor .ttl{font:600 1.4rem/1.2 var(--body)}
 .mr-landing .editor .meta{font:500 .75rem/1 var(--mono);color:var(--muted)}
@@ -143,8 +144,8 @@ html:has(.mr-landing){scroll-behavior:smooth;scroll-padding-top:72px}
 .mr-landing .count b{font:var(--dw) clamp(3rem,9vw,6rem)/.9 var(--display);letter-spacing:var(--dls)}
 .mr-landing .catalog{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,330px),1fr));gap:28px}
 .mr-landing .catalog .win ul{list-style:none;margin:0;padding:6px 0}
-.mr-landing .catalog li{display:grid;grid-template-columns:14px 1fr;gap:10px;padding:8px 18px;font-size:.94rem;line-height:1.45}
-.mr-landing .catalog li::before{content:"";width:6px;height:6px;background:var(--ink);margin-top:.55em}
+.mr-landing .catalog li{position:relative;padding:8px 18px 8px 42px;font-size:.94rem;line-height:1.45}
+.mr-landing .catalog li::before{content:"";position:absolute;left:18px;top:calc(8px + .55em);width:6px;height:6px;background:var(--ink)}
 .mr-landing .catalog li code{font-size:.84em;border:1px solid var(--line);padding:0 4px}
 .mr-landing .catalog .lead{padding:14px 18px;border-bottom:1px solid var(--line);font-size:.88rem;color:var(--ink-2)}
 .mr-landing .note{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:48px;align-items:center;padding-block:56px;border-top:1px dashed var(--line)}
