@@ -76,7 +76,7 @@ impl AppState {
 }
 
 pub fn router(state: AppState) -> Router {
-    Router::new()
+    let api = Router::new()
         .merge(health::routes())
         .merge(campaigns::routes())
         .merge(contacts::routes())
@@ -99,7 +99,8 @@ pub fn router(state: AppState) -> Router {
         .merge(crate::openapi::routes())
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
         .layer(TraceLayer::new_for_http().make_span_with(request_span))
-        .with_state(state)
+        .with_state(state.clone());
+    crate::mcp::mount(api, state)
 }
 
 /// The request span. /public/* paths carry unsubscribe tokens, so those log the route, not the URI.

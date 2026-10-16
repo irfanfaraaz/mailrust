@@ -55,6 +55,10 @@ API reference: `GET /openapi.json`.
 7. Pricing: new SES accounts start on the Essentials plan ($0.16 / 1,000). À la carte is $0.10 / 1,000 plus $0.005 / tenant / month and $0.005 / 1,000 emails for tenants. Pick the plan in the SES console.
 8. Ask AWS for production access before sending to real people.
 
+## Use it from your AI
+
+Your engine has an MCP endpoint at `/mcp`. Claude Code, Codex and Cursor can use it to run everything the dashboard does, with one of your API keys. Setup: [docs/mcp.md](docs/mcp.md).
+
 ## Deploy
 
 One small server runs everything: `deploy/docker-compose.prod.yml` starts Postgres, Mailrust, the `web` dashboard (served at `app.<domain>`, set `MAILRUST_DOMAIN`, `WEB_URL` and `WEB_SECRET` in `.env`), Caddy (automatic HTTPS, including customers' tracking subdomains) and a nightly `pg_dump` backup.

@@ -14,8 +14,10 @@ const martian = Martian_Mono({ subsets: ["latin"], axes: ["wdth"], variable: "--
 
 const REPO = "https://github.com/irfanfaraaz/mailrust";
 const DOCS = `${REPO}#readme`;
-const VERSION = "0.3.1";
+const VERSION = "0.5.0";
 const CLONE = `git clone ${REPO}`;
+
+const MCP_ADD = `claude mcp add --transport http mailrust https://mail.example.com/mcp --header "Authorization: Bearer mr_live_…"`;
 
 const LOCAL = ["git clone https://github.com/irfanfaraaz/mailrust", "cd mailrust && cp .env.example .env", "docker compose up -d postgres", "cargo run -- migrate", "cargo run -- serve"];
 const PROD = ["cd deploy", "docker compose -f docker-compose.prod.yml \\\n    --env-file ../.env up -d"];
@@ -143,6 +145,17 @@ const features: { group: string; lead: string; items: ReactNode[] }[] = [
       "AGPL-3.0 licence",
     ],
   },
+  {
+    group: "From your AI",
+    lead: "Your newsletter, run from a chat.",
+    items: [
+      <>An MCP endpoint at <code>/mcp</code>, built into the engine</>,
+      "45 tools, one for each thing the dashboard does",
+      "Works with Claude Code, Codex and Cursor",
+      "Logs in with your API keys; a sending key only sees the email tools",
+      "A preview before anything that cannot be undone, such as a send or a delete",
+    ],
+  },
 ];
 const featureCount = features.reduce((n, f) => n + f.items.length, 0);
 
@@ -154,9 +167,12 @@ const rust: { k: string; v: ReactNode; proof: string }[] = [
   { k: "Modern TLS", v: <>Connections use rustls, a TLS library written in Rust. <b>There is no OpenSSL</b> in the engine to patch.</>, proof: "rustls" },
   { k: "Strict CI", v: <>Every change passes Clippy with warnings treated as errors, and cargo-deny checks each dependency against the <b>RustSec advisory list</b>.</>, proof: "clippy -D warnings · cargo-deny" },
   { k: "Typed API docs", v: <>The OpenAPI reference is generated from the same Rust types the API uses, so <b>the docs match the code</b>.</>, proof: "GET /openapi.json" },
+  { k: "AI tools from the types", v: <>The 45 MCP tools take their inputs from that same OpenAPI document. <b>A route with no tool fails the build</b>, so your AI never falls behind the API.</>, proof: "utoipa → MCP schemas" },
 ];
 
 const releases = [
+  { v: "0.5.0", date: "Oct 16, 2026", text: "Run Mailrust from your AI: an MCP endpoint with 45 tools for Claude Code, Codex and Cursor, with a preview before anything that cannot be undone." },
+  { v: "0.4.0", date: "Oct 15, 2026", text: "A new look for the whole dashboard, motion with a purpose, and this landing page." },
   { v: "0.3.1", date: "Oct 14, 2026", text: "Newsletter reports with spam complaints, local time zones everywhere, toasts for every action, and a round of fixes." },
   { v: "0.3.0", date: "Oct 14, 2026", text: "Newsletters: the block editor, waves, checks before send, reports, the public archive and image uploads." },
   { v: "0.2.0", date: "Oct 13, 2026", text: "The dashboard and your audience: contacts, tags, signup form, CSV import and export, unsubscribe." },
@@ -168,6 +184,7 @@ const faq = [
   { q: "Do I need my own Amazon SES account?", a: "Yes. Mailrust sends through your SES account, so the sending reputation, the limits and the bill are yours. To try it locally you don't need AWS at all, because the fake sender writes each email to a file." },
   { q: "Can I use only the API, or only the newsletter?", a: "Yes. Each door works on its own. If you use both, they share one block list and one queue, and urgent API mail always goes ahead of a newsletter." },
   { q: "How is this different from Resend or beehiiv?", a: "Resend is a sending API and beehiiv is a newsletter platform, and both run on their own servers. Mailrust does both jobs in one engine that runs on yours, with your SES account and your database." },
+  { q: "Can my AI run it?", a: "Yes. Your server has an MCP endpoint, so Claude Code, Codex and Cursor can import contacts, write and schedule a newsletter, and read the report. Sends and deletes need your yes: the AI gets a preview first, such as how many readers a send will reach." },
   { q: "What happens if a send goes badly?", a: "The first wave is small and goes to your most engaged readers. If bounces pass 2% or complaints pass 0.08%, Mailrust pauses the account and the newsletter stops. When you resume, nobody who already got it gets it again." },
   { q: "Can I bring my subscribers with me?", a: "Yes. Import a CSV of up to 100,000 rows. The import runs in the background and picks up where it stopped if the server restarts. You can export your contacts as CSV at any time." },
   { q: "What does the AGPL licence mean for me?", a: "You can run, change and use Mailrust for free, for any purpose. If you change the code and offer it to other people as a network service, you have to share your changes under the same licence." },
@@ -362,6 +379,58 @@ const apiDoor = (
   </div>
 );
 
+const aiDoor = (
+  <div className="door">
+    <div className="copytext">
+      <h3>Ask your AI to run the newsletter</h3>
+      <p className="lede">
+        Your server has an MCP endpoint at <code>/mcp</code>. MCP is the standard way for AI apps to use an app&apos;s actions. Add it to Claude Code, Codex or Cursor with one of your API keys, and your AI can do everything the dashboard does.
+      </p>
+      <ul className="ticks">
+        <li>45 tools: email, contacts, imports, tags, campaigns, reports, domains and webhooks</li>
+        <li>Anything that cannot be undone shows a preview first, and runs only when you say yes</li>
+        <li>It logs in with your API key. A sending key only gets the email tools</li>
+        <li>Built into the engine. Nothing extra to install on your server</li>
+      </ul>
+    </div>
+    <Win title="claude · mailrust">
+      <pre className="code">
+        <span className="c">you  ›</span>
+        {` Import subscribers.csv, tag them "spring",
+       write the spring issue, send me a test,
+       then schedule it for Monday 9:00.
+
+`}
+        <span className="c">ai   ›</span>
+        {" import_contacts      "}
+        <span className="k">1,204 added</span>
+        {`
+       create_tag           spring
+       create_campaign      "Spring at the shop"
+       send_test_campaign   you@shop.com
+       send_campaign        `}
+        <span className="k">Preview only. Nothing changed yet.</span>
+        {`
+                            1,204 readers · Monday 09:00
+       Send it?
+
+`}
+        <span className="c">you  ›</span>
+        {` Yes.
+
+`}
+        <span className="c">ai   ›</span>
+        {" send_campaign        confirm: true · scheduled"}
+      </pre>
+      <div className="resp">
+        <span className="ok">setup</span>
+        <code>{MCP_ADD}</code>
+        <CopyButton className="copy" text={MCP_ADD} />
+      </div>
+    </Win>
+  </div>
+);
+
 /** The public front page. Only shown on our own deploy (MAILRUST_LANDING=true) to visitors who are not logged in. */
 export function Landing() {
   return (
@@ -395,7 +464,7 @@ export function Landing() {
             <span className="pill"><b>v{VERSION}</b> Self-hosted · Open source · Written in Rust · AGPL-3.0</span>
             <h1><span className="hl">One server</span> for every email you send.</h1>
             <p className="lede">
-              Mailrust is an open-source email platform you run on your own server. Write newsletters for your contacts in a dashboard, and send transactional emails from your app with an API. Every email goes out through your own Amazon SES account.
+              Mailrust is an open-source email platform you run on your own server. Write newsletters for your contacts in a dashboard, and send transactional emails from your app with an API. Every email goes out through your own Amazon SES account. Or let your AI run it: Claude Code, Codex and Cursor can do everything the dashboard does.
             </p>
             <div className="ctas">
               <a className="btn pri" href={REPO}>Self-host Mailrust <Arr /></a>
@@ -410,6 +479,7 @@ export function Landing() {
               <li>Written in Rust</li>
               <li>One other service to run: Postgres</li>
               <li>AGPL-3.0, every line public</li>
+              <li>Runs from your AI over MCP</li>
             </ul>
           </div>
         </section>
@@ -421,7 +491,7 @@ export function Landing() {
               className="tabs"
               before={
                 <div className="head">
-                  <span className="eyebrow">One server, two jobs</span>
+                  <span className="eyebrow">One server, two jobs, run by you or your AI</span>
                   <h2>Newsletters and transactional emails, from one place</h2>
                   <p className="lede">
                     Newsletters go out in bulk to a contact list. Transactional emails are personal and triggered by your app: login codes, receipts, alerts. Mailrust sends both from one queue and one block list, so a big newsletter never holds up a login code.
@@ -431,6 +501,7 @@ export function Landing() {
               tabs={[
                 { id: "news", title: "Newsletters", panel: newsletterDoor },
                 { id: "api", title: "Transactional email", panel: apiDoor },
+                { id: "ai", title: "From your AI", panel: aiDoor },
               ]}
             />
           </div>
