@@ -159,6 +159,16 @@ const features: { group: string; lead: string; items: ReactNode[] }[] = [
 ];
 const featureCount = features.reduce((n, f) => n + f.items.length, 0);
 
+const ses: { k: string; v: ReactNode; proof: string }[] = [
+  { k: "Bounces", v: <>SES puts an account under review at 5% bounces. Mailrust <b>pauses the account at 2%</b>, once 100 emails have gone out.</>, proof: "SES 5% · Mailrust 2%" },
+  { k: "Spam complaints", v: <>SES puts an account under review at 0.1% complaints. Mailrust <b>pauses at 0.08%</b> over the last 7 days.</>, proof: "SES 0.1% · Mailrust 0.08%" },
+  { k: "Bad addresses", v: <>An address that hard-bounces or reports you as spam goes on the account&apos;s block list. <b>Mailrust never emails it again.</b></>, proof: "suppression list" },
+  { k: "One bad sender", v: <>Each account on your server is its own SES tenant. If one goes bad, <b>SES pauses that tenant, not your whole server</b>.</>, proof: "SES tenants" },
+  { k: "Sending speed", v: <>The send rate follows the limits SES gives you, read every 5 minutes. Hitting the daily cap <b>pauses sending instead of failing emails</b>.</>, proof: "max_send_rate" },
+  { k: "Cold lists", v: <>A newsletter goes to the 100 most engaged readers first, then doubles every 10 minutes. <b>A bad list shows up in the first wave</b>, not the whole send.</>, proof: "100 → 10,000" },
+  { k: "Consent", v: <>New subscribers confirm by email first. Every newsletter has a <b>one-click unsubscribe</b> that Gmail and Yahoo show as a button.</>, proof: "double opt-in · RFC 8058" },
+];
+
 const rust: { k: string; v: ReactNode; proof: string }[] = [
   { k: "Checked SQL", v: <>Every database query is checked against the real schema when the code compiles. <b>A typo in a column name fails the build</b> before it can fail a send.</>, proof: "sqlx query! macros" },
   { k: "Memory safety", v: <>The engine has <b>zero <code>unsafe</code> blocks</b>. There is no garbage collector, so a large send has no pauses in the middle.</>, proof: "unsafe: 0" },
@@ -402,16 +412,18 @@ const aiDoor = (
 
 `}
         <span className="c">ai   ›</span>
-        {" import_contacts      "}
-        <span className="k">1,204 added</span>
+        {` create_tag           spring
+       import_contacts      queued
+       get_import           `}
+        <span className="k">done · 1,204 added</span>
         {`
-       create_tag           spring
        create_campaign      "Spring at the shop"
        send_test_campaign   you@shop.com
        send_campaign        `}
-        <span className="k">Preview only. Nothing changed yet.</span>
+        <span className="k">Preview only</span>
         {`
-                            1,204 readers · Monday 09:00
+                            Nothing changed yet.
+                            1,204 readers · Mon 09:00
        Send it?
 
 `}
@@ -449,6 +461,7 @@ export function Landing() {
           <ul>
             <li><a href="#doors">Product</a></li>
             <li><a href="#features">Features</a></li>
+            <li><a href="#ses">Deliverability</a></li>
             <li><a href="#how">How it works</a></li>
             <li><a href="#faq">FAQ</a></li>
             <li><a href={REPO}>GitHub</a></li>
@@ -606,6 +619,26 @@ export function Landing() {
               </div>
               <Win title="Ready to send?"><SendChecks /></Win>
             </article>
+          </div>
+        </section>
+
+        <section id="ses">
+          <div className="wrap">
+            <div className="head">
+              <span className="eyebrow">Deliverability on SES</span>
+              <h2>SES grades every sender. Mailrust stops before the grade drops.</h2>
+              <p className="lede">Amazon SES watches your bounces and complaints, and pauses accounts that cross its lines. Mailrust watches the same numbers on your server and acts first.</p>
+            </div>
+            <div className="plate">
+              <div className="top"><span>What SES watches</span><span>What Mailrust does</span></div>
+              {ses.map((r) => (
+                <div key={r.k} className="row">
+                  <span className="k">{r.k}</span>
+                  <p className="v">{r.v}</p>
+                  <span className="proof">{r.proof}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
