@@ -57,7 +57,7 @@ API reference: `GET /openapi.json`.
 
 ## Use it from your AI
 
-Your engine has an MCP endpoint at `/mcp`. Claude Code, Claude Desktop and Cursor can use it to run everything the dashboard does, with one of your API keys. Setup: [docs/mcp.md](docs/mcp.md).
+Your engine has an MCP endpoint at `/mcp`. Claude Code, Codex and Cursor can use it to run everything the dashboard does, with one of your API keys. Setup: [docs/mcp.md](docs/mcp.md).
 
 ## Deploy
 

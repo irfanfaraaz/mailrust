@@ -8,7 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
-- An MCP endpoint at `POST /mcp`, so AI apps (Claude Code, Claude Desktop, Cursor) can do everything the dashboard does with an API key: 45 tools for email, contacts, tags, campaigns, newsletter settings, domains, webhooks, suppressions and stats. Actions that cannot be undone return a preview until the call says `confirm: true`. Setup in `docs/mcp.md`.
+- An MCP endpoint at `POST /mcp`, so AI apps (Claude Code, Codex, Cursor) can do everything the dashboard does with an API key: 45 tools for email, contacts, tags, campaigns, newsletter settings, domains, webhooks, suppressions and stats. Actions that cannot be undone return a preview until the call says `confirm: true`. Setup in `docs/mcp.md`.
 
 ## [0.4.0] - 2026-10-15
 

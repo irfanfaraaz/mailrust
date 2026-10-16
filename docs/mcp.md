@@ -1,6 +1,6 @@
 # Use Mailrust from your AI
 
-Mailrust has an MCP endpoint. MCP (Model Context Protocol) is the standard way for AI apps to find and use an app's actions. With it, an AI app can do everything the dashboard can: send email, manage contacts and tags, write and send campaigns, and read reports.
+Mailrust has an MCP endpoint. MCP (Model Context Protocol) is the standard way for AI apps to find and use an app's actions. With it, an AI app such as Claude Code, Codex or Cursor can do everything the dashboard can: send email, manage contacts and tags, write and send campaigns, and read reports.
 
 ## What you need
 
@@ -13,20 +13,13 @@ Mailrust has an MCP endpoint. MCP (Model Context Protocol) is the standard way f
 claude mcp add --transport http mailrust https://mail.example.com/mcp --header "Authorization: Bearer mr_live_..."
 ```
 
-## Claude Desktop
+## Codex
 
-Settings → Developer → Edit Config, then add:
+Put the key in an environment variable, then add the server:
 
-```json
-{
-  "mcpServers": {
-    "mailrust": {
-      "type": "http",
-      "url": "https://mail.example.com/mcp",
-      "headers": { "Authorization": "Bearer mr_live_..." }
-    }
-  }
-}
+```bash
+export MAILRUST_KEY=mr_live_...
+codex mcp add mailrust --url https://mail.example.com/mcp --bearer-token-env-var MAILRUST_KEY
 ```
 
 ## Cursor
