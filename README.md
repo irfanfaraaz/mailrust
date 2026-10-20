@@ -4,6 +4,8 @@
 [![release](https://img.shields.io/github/v/release/irfanfaraaz/mailrust)](https://github.com/irfanfaraaz/mailrust/releases)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 
+https://github.com/user-attachments/assets/602079c3-4b50-4d81-bd8f-903796d3266d
+
 Self-hosted email platform with two doors: a sending API (like Resend) and a newsletter app (like beehiiv). One Rust engine sends everything through your own Amazon SES account.
 
 - **Sending API** — `POST /emails`, batch, scheduled send, idempotency keys, attachments, webhooks, open/click tracking.
